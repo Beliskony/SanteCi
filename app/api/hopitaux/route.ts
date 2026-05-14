@@ -25,9 +25,11 @@ export async function GET(req: NextRequest) {
     };
 
     const result = await hospitalClinicService.search(filters);
+    console.log("🔍 result:", JSON.stringify(result, null, 2));
     return NextResponse.json({ success: true, ...result });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
+     console.error("❌ GET /api/hopitaux error:", error);
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }

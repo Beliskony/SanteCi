@@ -9,20 +9,20 @@ import { Types } from "mongoose";
 type AccountStatus = "active" | "suspended" | "blocked";
 type Subscription = "free" | "premium";
 
-interface BaseProfile {
+export interface BaseProfile {
   firstName: string;
   lastName: string;
   photo?: string;
 }
 
-interface BaseContact {
+export interface BaseContact {
   phone: string;
   phoneVerified: boolean;
   email?: string;
   emailVerified: boolean;
 }
 
-interface BaseLocation {
+export interface BaseLocation {
   city: string;
   district?: string;
   address?: string;
@@ -32,7 +32,7 @@ interface BaseLocation {
   };
 }
 
-interface BaseStatus {
+export interface BaseStatus {
   isVerified: boolean;
   accountStatus: AccountStatus;
   subscription: Subscription | "elite" | "vip";
@@ -43,13 +43,13 @@ interface BaseStatus {
 // Patient-specific types
 // ─────────────────────────────────────────────
 
-interface PatientProfile extends BaseProfile {
+export interface PatientProfile extends BaseProfile {
   dateOfBirth: Date;
   gender: "male" | "female" | "other";
   bloodGroup?: "A+" | "A-" | "B+" | "B-" | "AB+" | "AB-" | "O+" | "O-";
 }
 
-interface PatientContact extends BaseContact {
+export interface PatientContact extends BaseContact {
   emergencyContacts: Array<{
     name: string;
     phone: string;
@@ -57,7 +57,7 @@ interface PatientContact extends BaseContact {
   }>;
 }
 
-interface PatientHealth {
+export interface PatientHealth {
   allergies: string[];
   chronicDiseases: string[];
   currentMedications: string[];
@@ -67,7 +67,7 @@ interface PatientHealth {
   bmi?: number;
 }
 
-interface PatientSecurity {
+export interface PatientSecurity {
   isPatient: true;
   isActive: boolean;
   lastLogin?: Date;
@@ -76,7 +76,7 @@ interface PatientSecurity {
   pinCode?: string;
 }
 
-interface PatientPreferences {
+export interface PatientPreferences {
   language: "fr" | "en";
   notifications: {
     sms: boolean;
@@ -90,7 +90,7 @@ interface PatientPreferences {
   };
 }
 
-interface PatientMetadata {
+export interface PatientMetadata {
   createdAt: Date;
   updatedAt: Date;
   lastMedicalUpdate: Date;
@@ -115,7 +115,7 @@ export interface PatientUser {
 // Doctor-specific types
 // ─────────────────────────────────────────────
 
-interface DoctorProfile extends BaseProfile {
+export interface DoctorProfile extends BaseProfile {
   title: "Dr" | "Pr" | "Médecin" | "Spécialiste";
   specialty: string;
   bio: string;
@@ -123,11 +123,11 @@ interface DoctorProfile extends BaseProfile {
   yearsOfExperience: number;
 }
 
-interface DoctorContact extends BaseContact {
+export interface DoctorContact extends BaseContact {
   emergencyContact?: string;
 }
 
-interface DoctorProfessional {
+export interface DoctorProfessional {
   licenseNumber: string;
   licenseExpiry: Date;
   university: string;
@@ -139,7 +139,7 @@ interface DoctorProfessional {
   }>;
 }
 
-interface DoctorTelemedicine {
+export interface DoctorTelemedicine {
   isAvailable: boolean;
   consultationTypes: Array<"video" | "audio" | "chat">;
   consultationFees: {
@@ -160,13 +160,13 @@ interface DoctorTelemedicine {
   totalConsultations: number;
 }
 
-interface DoctorAffiliations {
+export interface DoctorAffiliations {
   hospitals: Types.ObjectId[];
   clinics: Types.ObjectId[];
   insuranceCompanies: string[];
 }
 
-interface DoctorAnalytics {
+export interface DoctorAnalytics {
   totalPatients: number;
   totalConsultations: number;
   monthlyEarnings: number;
@@ -174,7 +174,7 @@ interface DoctorAnalytics {
   cancellationRate: number;
 }
 
-interface DoctorSecurity {
+export interface DoctorSecurity {
   isMedcin: true;
   username?: string;
   twoFactorEnabled: boolean;
@@ -185,7 +185,7 @@ interface DoctorSecurity {
   }>;
 }
 
-interface DoctorMetadata {
+export interface DoctorMetadata {
   createdAt: Date;
   updatedAt: Date;
 }

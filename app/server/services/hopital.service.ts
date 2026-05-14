@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { Types, QueryFilter } from 'mongoose';
-import { HospitalClinic } from '../models/hopitalClinic.model';
+import HospitalClinic from '../models/hopitalClinic.model';
 import { IHospitalClinic } from '../interfaces/hopitalClinic.interface';
 import {
   TCreateHospitalClinic,

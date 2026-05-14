@@ -71,4 +71,8 @@ const HospitalClinicSchema: Schema = new Schema({
   }
 });
 
-export const HospitalClinic = mongoose.model<IHospitalClinic>('HospitalClinic', HospitalClinicSchema);
+const HospitalClinic =
+  (mongoose.models.HospitalClinic as mongoose.Model<IHospitalClinic>) ||
+  mongoose.model<IHospitalClinic>("HospitalClinic", HospitalClinicSchema);
+
+export default HospitalClinic;
