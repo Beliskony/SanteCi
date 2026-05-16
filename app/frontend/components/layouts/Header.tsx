@@ -9,9 +9,9 @@ import { authService } from "@/app/frontend/services/authService";
 
 const NavItems: { name: string; href: string }[] = [
   { name: "Accueil", href: "/" },
-  { name: "Médecins", href: "/doctors" },
+  { name: "Médecins", href: "/medecins" },
   { name: "Hôpitaux", href: "/hospitals" },
-  { name: "Teleconsultation", href: "/appointments" },
+  { name: "Teleconsultation", href: "/teleconsultation" },
   { name: "Comment ça marche", href: "/how-it-works" },
   { name: "FAQ", href: "/FAQ" },
 ];
@@ -42,6 +42,10 @@ const Header = () => {
   }, []);
 
   const isAuthenticated = hydrated && !!user && !!user?.profile;
+  // Dans Header, testez différentes manières d'accéder à la photo
+console.log('Manière 1:', user?.profile?.photo);
+console.log('Manière 2:', user?.profile?.photo ?? 'Pas de photo');
+console.log('Manière 3:', (user as any)?.profile?.photo);
 
   const roleLabel = !isAuthenticated
     ? ""
@@ -49,8 +53,8 @@ const Header = () => {
     ? `${user!.profile?.title ?? ""} · ${user!.profile?.specialty ?? ""}`.trim().replace(/^·\s*/, "")
     : "Patient";
 
-  const dashboardHref = !user ? "/" : isDoctor(user) ? "/dashboard/doctor" : "/dashboard/patient";
-  const settingsHref  = !user ? "/" : isDoctor(user) ? "/dashboard/doctor/settings" : "/dashboard/patient/settings";
+  const dashboardHref = !user ? "/" : isDoctor(user) ? "/doctor" : "/patient";
+  const settingsHref  = !user ? "/" : isDoctor(user) ? "/doctor/settings" : "/patient/settings";
 
   const handleLogout = () => {
     authService.logout();

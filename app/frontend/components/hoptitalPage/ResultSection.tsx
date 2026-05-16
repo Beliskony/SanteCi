@@ -10,38 +10,53 @@ interface ResultGridProps {
 }
 
 const TYPE_FILTERS = [
-  { label: "Clinique privée", value: "clinic" },
-  { label: "Hôpital public", value: "hospital" },
-  { label: "Centre de santé", value: "community" },
-  { label: "Laboratoire", value: "laboratory" },
+  { label: "Clinique privée", value: "clinic" as const },
+  { label: "Hôpital public", value: "hospital" as const },
+  { label: "Centre de santé", value: "community" as const },
+  { label: "Laboratoire", value: "laboratory" as const },
 ];
 
-const ResultGrid = ({ city = "Abidjan" }: ResultGridProps) => {
-  const { facilities, pagination, isLoading, error, search } = useHospitalStore();
-  const [selectedTypes, setSelectedTypes] = useState<string[]>(["clinic", "hospital"]);
+type FacilityType = 'clinic' | 'hospital' | 'laboratory' | 'pharmacy' | 'imaging_center';
 
-  const toggleType = (value: string) =>
-    setSelectedTypes((prev) =>
-      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
-    );
+const ResultSection = ({ city = "Abidjan" }: ResultGridProps) => {
+  const { facilities, pagination, isLoading, search } = useHospitalStore();
+  const [selectedTypes, setSelectedTypes] = useState<FacilityType[]>(["clinic", "hospital"]);
+  const [activeType, setActiveType] = useState<FacilityType>("hospital");
 
-  useEffect(() => {
-    const filters: any = { city, limit: 12 };
-    if (selectedTypes.length > 0) filters.type = selectedTypes;
-    search(filters);
-  }, [city, selectedTypes]);
+  const toggleType = (value: FacilityType) => {
+    let newTypes: FacilityType[];
+    if (selectedTypes.includes(value)) {
+      newTypes = selectedTypes.filter((v) => v !== value);
+    } else {
+      newTypes = [...selectedTypes, value];
+    }
+    setSelectedTypes(newTypes);
+    
+    // Choisir le premier type sélectionné pour l'API
+    const typeToSend = newTypes.length > 0 ? newTypes[0] : "hospital";
+    setActiveType(typeToSend);
+    
+    // Rechercher avec le type unique
+    search({
+      city,
+      type: typeToSend, // Maintenant c'est du type FacilityType
+      limit: 12,
+      page: 1,
+    });
+  };
 
   const loadMore = () => {
     if (pagination.page < pagination.pages) {
-      const filters: any = {
+      search({
         city,
-        type: selectedTypes,
+        type: activeType, // Maintenant c'est du type FacilityType
         page: pagination.page + 1,
         limit: 12,
-      };
-      search(filters);
+      });
     }
   };
+
+  // Ne pas faire de recherche automatique ici
 
   if (isLoading && facilities.length === 0) {
     return (
@@ -56,7 +71,6 @@ const ResultGrid = ({ city = "Abidjan" }: ResultGridProps) => {
   return (
     <section className="bg-[#f4f6fb] w-full px-6 md:px-12 lg:px-20 py-10">
       <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-6">
-        {/* Filtres */}
         <aside className="w-full lg:w-64 shrink-0">
           <div className="bg-white rounded-xl p-4">
             <h3 className="text-sm font-bold text-gray-900 mb-3">Type d'établissement</h3>
@@ -65,18 +79,20 @@ const ResultGrid = ({ city = "Abidjan" }: ResultGridProps) => {
                 <label key={f.value} className="flex items-center gap-2.5 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={selectedTypes.includes(f.value)}
-                    onChange={() => toggleType(f.value)}
+                    checked={selectedTypes.includes(f.value as FacilityType)}
+                    onChange={() => toggleType(f.value as FacilityType)}
                     className="w-4 h-4 accent-[#1e3a8a] rounded"
                   />
                   <span className="text-sm text-gray-600">{f.label}</span>
                 </label>
               ))}
             </div>
+            <p className="text-xs text-gray-400 mt-3">
+              Note: La recherche utilise le premier type sélectionné
+            </p>
           </div>
         </aside>
 
-        {/* Grille résultats */}
         <div className="flex-1">
           <h2 className="text-lg font-bold text-gray-900 mb-4">
             {pagination.total > 0
@@ -117,4 +133,4 @@ const ResultGrid = ({ city = "Abidjan" }: ResultGridProps) => {
   );
 };
 
-export default ResultGrid;
+export default ResultSection;

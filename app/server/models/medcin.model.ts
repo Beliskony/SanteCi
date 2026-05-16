@@ -9,6 +9,7 @@ const DoctorSchema: Schema = new Schema({
     lastName: { type: String, required: true },
     title: { type: String, enum: ['Dr', 'Pr', 'Médecin', 'Spécialiste'], required: true },
     specialty: { type: String, enum: ['Cardiologie', 'Pédiatrie', 'Généraliste', 'Dermatologie', 'Psychiatrie', 'Gynécologie', 'autres...'], required: true },
+    photo:     { type: String, default: null },
   },
   professional: {
     licenseNumber: { type: String, required: true },

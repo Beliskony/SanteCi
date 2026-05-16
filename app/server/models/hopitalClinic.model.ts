@@ -6,6 +6,13 @@ const HospitalClinicSchema: Schema = new Schema({
   name: { type: String, required: true },
   type: { type: String, required: true },
   category: { type: String, required: true },
+
+  // Image de couverture (gérée via Cloudinary)
+  imageCover: {
+    url:      { type: String },
+    publicId: { type: String },
+  },
+  
   location: {
     address: { type: String, required: true },
     city: { type: String, required: true },

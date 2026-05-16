@@ -6,6 +6,7 @@ import {
   TCreateHospitalClinic,
   TUpdateHospitalClinic,
 } from '../schemas/HospitalClinic.schema';
+import { cloudinaryService } from './cloudinary.service';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,7 +29,10 @@ class HospitalClinicService {
 
   // ── Create ─────────────────────────────────────────────────────────────────
 
-  async create(dto: Omit<TCreateHospitalClinic, 'facilityId'>): Promise<IHospitalClinic> {
+  async create(
+    dto: Omit<TCreateHospitalClinic, 'facilityId'>,
+    imageBuffer?: Buffer
+  ): Promise<IHospitalClinic> {
     const existing = await HospitalClinic.findOne({
       'certification.licenseNumber': dto.certification.licenseNumber,
     });
@@ -36,9 +40,15 @@ class HospitalClinicService {
 
     const facilityId = `FAC-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 
+    let imageCover: { url: string; publicId: string } | undefined;
+    if (imageBuffer) {
+      imageCover = await cloudinaryService.uploadHospitalCover(imageBuffer, `cover_${facilityId}`);
+    }
+
     const facility = await HospitalClinic.create({
       ...dto,
       facilityId,
+      imageCover,
       metadata: {
         createdAt:    new Date(),
         updatedAt:    new Date(),
@@ -96,7 +106,6 @@ class HospitalClinicService {
     if (homeVisits !== undefined)          query['partnerships.homeVisits']          = homeVisits;
     if (emergency24h !== undefined)        query['hours.emergency24h']               = emergency24h;
 
-    // Filtrer par spécialité dans les services
     if (specialty) {
       query['services'] = {
         $elemMatch: {
@@ -121,20 +130,23 @@ class HospitalClinicService {
 
   // ── Update ─────────────────────────────────────────────────────────────────
 
-  async update(id: string, dto: TUpdateHospitalClinic): Promise<IHospitalClinic> {
+  async update(
+    id: string,
+    dto: TUpdateHospitalClinic,
+    imageBuffer?: Buffer
+  ): Promise<IHospitalClinic> {
     const updateFields: Record<string, unknown> = {};
 
-    // Mise à jour dot-notation pour éviter d'écraser les sous-documents entiers
     if (dto.name)     updateFields['name']     = dto.name;
     if (dto.type)     updateFields['type']     = dto.type;
     if (dto.category) updateFields['category'] = dto.category;
 
     if (dto.location) {
-      if (dto.location.address)     updateFields['location.address']               = dto.location.address;
-      if (dto.location.city)        updateFields['location.city']                  = dto.location.city;
-      if (dto.location.district)    updateFields['location.district']              = dto.location.district;
-      if (dto.location.commune)     updateFields['location.commune']               = dto.location.commune;
-      if (dto.location.coordinates) updateFields['location.coordinates']           = dto.location.coordinates;
+      if (dto.location.address)     updateFields['location.address']     = dto.location.address;
+      if (dto.location.city)        updateFields['location.city']        = dto.location.city;
+      if (dto.location.district)    updateFields['location.district']    = dto.location.district;
+      if (dto.location.commune)     updateFields['location.commune']     = dto.location.commune;
+      if (dto.location.coordinates) updateFields['location.coordinates'] = dto.location.coordinates;
     }
 
     if (dto.contact) {
@@ -144,8 +156,15 @@ class HospitalClinicService {
       if (dto.contact.emergencyNumber) updateFields['contact.emergencyNumber'] = dto.contact.emergencyNumber;
     }
 
-    if (dto.services)   updateFields['services']   = dto.services;
-    if (dto.facilities) updateFields['facilities'] = dto.facilities;
+    if (dto.services   !== undefined) updateFields['services']   = dto.services;
+    if (dto.facilities !== undefined) updateFields['facilities'] = dto.facilities;
+
+    // ── Staff ────────────────────────────────────────────────
+    if (dto.staff) {
+      if (dto.staff.doctors        !== undefined) updateFields['staff.doctors']        = dto.staff.doctors;
+      if (dto.staff.nurses         !== undefined) updateFields['staff.nurses']         = dto.staff.nurses;
+      if (dto.staff.administrators !== undefined) updateFields['staff.administrators'] = dto.staff.administrators;
+    }
 
     if (dto.partnerships) {
       if (dto.partnerships.insuranceCompanies  !== undefined) updateFields['partnerships.insuranceCompanies']  = dto.partnerships.insuranceCompanies;
@@ -161,6 +180,28 @@ class HospitalClinicService {
       if (dto.certification.expiryDate)    updateFields['certification.expiryDate']    = dto.certification.expiryDate;
     }
 
+    // ── imageCover passée directement dans le dto (sans upload) ──
+    if (dto.imageCover) {
+      updateFields['imageCover.url']      = dto.imageCover.url;
+      updateFields['imageCover.publicId'] = dto.imageCover.publicId;
+    }
+
+    // ── imageCover via upload buffer (remplace Cloudinary) ────────
+    if (imageBuffer) {
+      const current = await HospitalClinic.findById(id).select('imageCover facilityId');
+      if (!current) throw new Error('Établissement introuvable.');
+
+      const imageCover = await cloudinaryService.replaceImage(
+        current.imageCover?.publicId,
+        imageBuffer,
+        'hospitalCover',
+        `cover_${current.facilityId}`
+      );
+
+      updateFields['imageCover.url']      = imageCover.url;
+      updateFields['imageCover.publicId'] = imageCover.publicId;
+    }
+
     updateFields['metadata.updatedAt'] = new Date();
 
     const updated = await HospitalClinic.findByIdAndUpdate(
@@ -171,6 +212,50 @@ class HospitalClinicService {
 
     if (!updated) throw new Error('Établissement introuvable.');
     return updated;
+  }
+
+  // ── Upload / Replace image de couverture ───────────────────────────────────
+
+  async updateCoverImage(
+    id: string,
+    imageBuffer: Buffer
+  ): Promise<IHospitalClinic> {
+    const facility = await HospitalClinic.findById(id).select('imageCover facilityId');
+    if (!facility) throw new Error('Établissement introuvable.');
+
+    const imageCover = await cloudinaryService.replaceImage(
+      facility.imageCover?.publicId,
+      imageBuffer,
+      'hospitalCover',
+      `cover_${facility.facilityId}`
+    );
+
+    const updated = await HospitalClinic.findByIdAndUpdate(
+      id,
+      { $set: { imageCover, 'metadata.updatedAt': new Date() } },
+      { new: true }
+    ).populate('staff.doctors', 'profile.firstName profile.lastName profile.specialty');
+
+    if (!updated) throw new Error('Établissement introuvable.');
+    return updated;
+  }
+
+  // ── Supprimer l'image de couverture ───────────────────────────────────────
+
+  async deleteCoverImage(id: string): Promise<{ message: string }> {
+    const facility = await HospitalClinic.findById(id).select('imageCover');
+    if (!facility) throw new Error('Établissement introuvable.');
+
+    if (facility.imageCover?.publicId) {
+      await cloudinaryService.deleteImage(facility.imageCover.publicId);
+    }
+
+    await HospitalClinic.findByIdAndUpdate(id, {
+      $unset: { imageCover: '' },
+      $set:   { 'metadata.updatedAt': new Date() },
+    });
+
+    return { message: 'Image de couverture supprimée.' };
   }
 
   // ── Add doctor to staff ────────────────────────────────────────────────────
@@ -237,8 +322,14 @@ class HospitalClinicService {
   // ── Delete ─────────────────────────────────────────────────────────────────
 
   async delete(id: string): Promise<{ message: string }> {
-    const facility = await HospitalClinic.findByIdAndDelete(id);
+    const facility = await HospitalClinic.findById(id).select('imageCover');
     if (!facility) throw new Error('Établissement introuvable.');
+
+    if (facility.imageCover?.publicId) {
+      await cloudinaryService.deleteImage(facility.imageCover.publicId);
+    }
+
+    await HospitalClinic.findByIdAndDelete(id);
     return { message: 'Établissement supprimé avec succès.' };
   }
 }

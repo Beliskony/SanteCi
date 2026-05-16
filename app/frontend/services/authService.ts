@@ -12,6 +12,14 @@ interface BackendUser {
   role: "doctor" | "patient";
   isVerified: boolean;
   accountStatus?: string;
+  photo?: string;        // ← Ajouté
+  title?: string;        // ← Ajouté pour doctor
+  specialty?: string;    // ← Ajouté pour doctor
+  profile?: {            // ← Au cas où le backend retourne aussi profile
+    photo?: string;
+    title?: string;
+    specialty?: string;
+}
 }
 
 interface BackendAuthResponse {
@@ -49,6 +57,9 @@ export interface RegisterPayload {
 // ── Adaptateur backend → store ────────────────────────────────
 // Le backend retourne un objet plat, le store attend PatientUser | DoctorUser
 function mapToAuthUser(backendUser: BackendUser): AuthUser {
+
+  const photoUrl = backendUser.photo || backendUser.profile?.photo;
+
   if (backendUser.role === "doctor") {
     return {
       _id: backendUser.id as any,
@@ -62,6 +73,7 @@ function mapToAuthUser(backendUser: BackendUser): AuthUser {
         bio: "",
         languages: "fr",
         yearsOfExperience: 0,
+        photo: photoUrl,
       },
       contact: {
         phone: "",
@@ -114,6 +126,7 @@ function mapToAuthUser(backendUser: BackendUser): AuthUser {
       lastName: backendUser.lastName,
       dateOfBirth: new Date(),
       gender: "other",
+      photo: photoUrl,
     },
     contact: {
       phone: "",

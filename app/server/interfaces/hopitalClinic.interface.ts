@@ -9,6 +9,12 @@ export interface IHospitalClinic extends Document {
   type: 'hospital' | 'clinic' | 'pharmacy' | 'laboratory' | 'imaging_center';
   category: 'public' | 'private' | 'community';
   
+
+   imageCover?: {
+    url: string;
+    publicId: string;
+  };
+  
   // Localisation
   location: {
     address: string;

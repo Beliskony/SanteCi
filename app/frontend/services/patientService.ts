@@ -1,7 +1,5 @@
-// ============================================================
 // services/patientService.ts — Patient connecté
 // Endpoints: /api/patients/*
-// ============================================================
 
 import * as api from "@/app/frontend/lib/apiClient";
 import { useAuthStore } from "../store/useAuthStore";
@@ -31,7 +29,7 @@ export const patientService = {
    */
   async updateProfile(data: Partial<PatientProfile>): Promise<PatientUser> {
     const res = await api.patch<ApiResponse<PatientUser>>(
-      "/api/patients/me/profile",
+      "/patients/me/profile",
       data
     );
     useAuthStore.getState().updatePatientProfile(data);
@@ -43,7 +41,7 @@ export const patientService = {
    */
   async updateHealth(data: Partial<PatientHealth>): Promise<PatientUser> {
     const res = await api.patch<ApiResponse<PatientUser>>(
-      "/api/patients/me/health",
+      "/patients/me/health",
       data
     );
     useAuthStore.getState().updateHealth(data);
@@ -57,7 +55,7 @@ export const patientService = {
     data: Partial<PatientPreferences>
   ): Promise<PatientUser> {
     const res = await api.patch<ApiResponse<PatientUser>>(
-      "/api/patients/me/preferences",
+      "/patients/me/preferences",
       data
     );
     useAuthStore.getState().updatePreferences(data);
@@ -76,15 +74,15 @@ export const patientService = {
    * Upload photo de profil
    */
   async uploadPhoto(file: File): Promise<{ photoUrl: string }> {
-    const formData = new FormData();
-    formData.append("photo", file);
-    const res = await api.uploadFile<ApiResponse<{ photoUrl: string }>>(
-      "/api/patients/me/photo",
-      formData
-    );
-    useAuthStore.getState().updatePatientProfile({ photo: res.data.photoUrl });
-    return res.data;
-  },
+  const formData = new FormData();
+  formData.append("photo", file);
+  const res = await api.uploadFile<ApiResponse<{ photoUrl: string }>>(
+    "/patients/uniquement/photo",  // ← corriger l'URL selon ta structure
+    formData
+  );
+  useAuthStore.getState().updatePatientProfile({ photo: res.data.photoUrl });
+  return res.data;
+},
 
   /**
    * Changer le mot de passe
@@ -94,7 +92,7 @@ export const patientService = {
     newPassword: string
   ): Promise<{ message: string }> {
     const res = await api.patch<ApiResponse<{ message: string }>>(
-      "/api/patients/me/password",
+      "/patients/me/password",
       { currentPassword, newPassword }
     );
     return res.data;
@@ -112,7 +110,7 @@ export const patientService = {
     if (params?.limit) qs.append("limit", String(params.limit));
     const query = qs.toString();
     return api.get<PaginatedResponse<Prescription>>(
-      `/api/patients/me/prescriptions${query ? `?${query}` : ""}`
+      `/patients/me/prescriptions${query ? `?${query}` : ""}`
     );
   },
 

@@ -4,46 +4,50 @@
 
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
-import { chatService } from "@/app/frontend/services/chatService";
-import type { IChatMessage, SendMessagePayload, ConversationSummary } from "@/app/frontend/types/Chat";
+import {
+  chatService,
+  type ConversationSummary,
+  type Interlocutor,
+  type SendTextPayload,
+  type SendMediaPayload,
+  type SendAudioPayload,
+} from "@/app/frontend/services/chatService";
+import type { IChatMessage } from "@/app/server/interfaces/chatMessage.interface";
 
-// ─── Type "plain object" du message ──────────────────────────
-// IChatMessage étend Document (Mongoose) qui contient des méthodes
-// internes ($save, $clone...) incompatibles avec un store Zustand.
-// On extrait uniquement les données sérialisables.
+// ─── Plain object sérialisable ────────────────────────────────
+
 export type ChatMessageData = {
-  _id: string;
-  senderId: string;
-  receiverId: string;
+  _id:            string;
+  senderId:       string;
+  receiverId:     string;
   appointmentId?: string;
-  chatRoomId: string;
-  messageType: IChatMessage["messageType"];
-  content: string;
-  file?: IChatMessage["file"];
+  chatRoomId:     string;
+  messageType:    IChatMessage["messageType"];
+  content:        string;
+  file?:          IChatMessage["file"];
   status: {
-    delivered: boolean;
+    delivered:    boolean;
     deliveredAt?: Date;
-    read: boolean;
-    readAt?: Date;
+    read:         boolean;
+    readAt?:      Date;
   };
   metadata: {
-    createdAt: Date;
-    updatedAt: Date;
+    createdAt:   Date;
+    updatedAt:   Date;
     deletedFor?: string[];
   };
 };
 
-// Conversion IChatMessage (Mongoose Document) → ChatMessageData (plain object)
 function toPlain(msg: IChatMessage): ChatMessageData {
   return {
-    _id:           String(msg._id),
-    senderId:      String(msg.senderId),
-    receiverId:    String(msg.receiverId),
-    appointmentId: msg.appointmentId ? String(msg.appointmentId) : undefined,
-    chatRoomId:    msg.chatRoomId,
-    messageType:   msg.messageType,
-    content:       msg.content,
-    file:          msg.file,
+    _id:            String(msg._id),
+    senderId:       String(msg.senderId),
+    receiverId:     String(msg.receiverId),
+    appointmentId:  msg.appointmentId ? String(msg.appointmentId) : undefined,
+    chatRoomId:     msg.chatRoomId,
+    messageType:    msg.messageType,
+    content:        msg.content,
+    file:           msg.file,
     status: {
       delivered:   msg.status.delivered,
       deliveredAt: msg.status.deliveredAt,
@@ -58,35 +62,56 @@ function toPlain(msg: IChatMessage): ChatMessageData {
   };
 }
 
-// ConversationSummary avec lastMessage en plain object
-type PlainConversationSummary = Omit<ConversationSummary, "lastMessage"> & {
-  lastMessage: ChatMessageData | null;
+// ConversationSummary avec lastMessage sérialisé + interlocuteur enrichi
+export type PlainConversationSummary = {
+  chatRoomId:   string;
+  unreadCount:  number;
+  lastMessage:  ChatMessageData | null;
+  interlocutor: Interlocutor;
 };
 
 // ─── State ────────────────────────────────────────────────────
 
 interface ChatState {
-  conversations: PlainConversationSummary[];
-  messages: ChatMessageData[];
+  conversations:    PlainConversationSummary[];
+  messages:         ChatMessageData[];
   activeChatRoomId: string | null;
-  hasMore: boolean;
-  totalUnread: number;
-  isLoading: boolean;
-  isSending: boolean;
-  error: string | null;
+  activeInterlocutor: Interlocutor | null;
+  sharedFiles:      ChatMessageData[];
+  searchResults:    ChatMessageData[];
+  hasMore:          boolean;
+  totalUnread:      number;
+  isLoading:        boolean;
+  isSending:        boolean;
+  error:            string | null;
 
+  // ── Conversations ──────────────────────────────────────────
   fetchConversations: () => Promise<void>;
-  openRoom: (chatRoomId: string) => Promise<void>;
+
+  // ── Room ──────────────────────────────────────────────────
+  openRoom:         (roomId: string) => Promise<void>;
   loadMoreMessages: () => Promise<void>;
-  sendMessage: (payload: SendMessagePayload) => Promise<void>;
-  sendFile: (file: File, meta: Omit<SendMessagePayload, "content" | "file">) => Promise<void>;
-  markRoomAsRead: (chatRoomId: string, receiverId: string) => Promise<void>;
-  deleteForMe: (messageId: string, userId: string) => Promise<void>;
-  deleteForEveryone: (messageId: string, senderId: string) => Promise<void>;
-  searchMessages: (keyword: string) => Promise<ChatMessageData[]>;
-  getSharedFiles: (chatRoomId: string) => Promise<ChatMessageData[]>;
-  receiveMessage: (message: IChatMessage) => void;
-  clearRoom: () => void;
+  markRoomAsRead:   (roomId: string) => Promise<void>;
+  closeRoom:        () => void;
+
+  // ── Envoi ─────────────────────────────────────────────────
+  sendText:  (roomId: string, payload: SendTextPayload)  => Promise<void>;
+  sendMedia: (roomId: string, payload: SendMediaPayload) => Promise<void>;
+  sendAudio: (roomId: string, payload: SendAudioPayload) => Promise<void>;
+
+  // ── Suppression ───────────────────────────────────────────
+  deleteMessage: (roomId: string, messageId: string, scope?: "me" | "everyone") => Promise<void>;
+
+  // ── Fichiers & recherche ──────────────────────────────────
+  fetchSharedFiles:   (roomId: string) => Promise<void>;
+  searchMessages:     (roomId: string, keyword: string) => Promise<void>;
+  clearSearchResults: () => void;
+
+  // ── WebSocket ─────────────────────────────────────────────
+  receiveMessage:       (message: IChatMessage) => void;
+  setInterlocutorOnline:(interlocutorId: string, isOnline: boolean) => void;
+
+  // ── Utilitaires ───────────────────────────────────────────
   clearError: () => void;
 }
 
@@ -95,24 +120,28 @@ interface ChatState {
 export const useChatStore = create<ChatState>()(
   devtools(
     (set, get) => ({
-      conversations: [],
-      messages: [],
-      activeChatRoomId: null,
-      hasMore: true,
-      totalUnread: 0,
-      isLoading: false,
-      isSending: false,
-      error: null,
+      conversations:      [],
+      messages:           [],
+      activeChatRoomId:   null,
+      activeInterlocutor: null,
+      sharedFiles:        [],
+      searchResults:      [],
+      hasMore:            true,
+      totalUnread:        0,
+      isLoading:          false,
+      isSending:          false,
+      error:              null,
 
-      // ── Conversations ──────────────────────────────────────
+      // ── fetchConversations ─────────────────────────────────
       fetchConversations: async () => {
         set({ isLoading: true, error: null });
         try {
           const raw = await chatService.getConversations();
           const conversations: PlainConversationSummary[] = raw.map((c) => ({
-            chatRoomId:  c.chatRoomId,
-            unreadCount: c.unreadCount,
-            lastMessage: c.lastMessage ? toPlain(c.lastMessage) : null,
+            chatRoomId:   c.chatRoomId,
+            unreadCount:  c.unreadCount,
+            lastMessage:  c.lastMessage ? toPlain(c.lastMessage) : null,
+            interlocutor: c.interlocutor,
           }));
           const totalUnread = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
           set({ conversations, totalUnread, isLoading: false });
@@ -121,22 +150,27 @@ export const useChatStore = create<ChatState>()(
         }
       },
 
-      // ── Ouvrir une room ────────────────────────────────────
-      openRoom: async (chatRoomId) => {
-        set({ isLoading: true, error: null, activeChatRoomId: chatRoomId, messages: [], hasMore: true });
+      // ── openRoom ──────────────────────────────────────────
+      openRoom: async (roomId) => {
+        set({ isLoading: true, error: null, activeChatRoomId: roomId, messages: [], hasMore: true });
         try {
-          const raw = await chatService.getMessages({ chatRoomId, limit: 30 });
+          // Récupérer l'interlocuteur depuis la conversation déjà chargée
+          const conv = get().conversations.find((c) => c.chatRoomId === roomId);
+          const activeInterlocutor = conv?.interlocutor ?? null;
+
+          const raw = await chatService.getMessages({ roomId, limit: 30 });
           set({
-            messages: raw.map(toPlain),
-            hasMore: raw.length === 30,
-            isLoading: false,
+            messages:           raw.map(toPlain),
+            activeInterlocutor,
+            hasMore:            raw.length === 30,
+            isLoading:          false,
           });
         } catch (err) {
           set({ error: err instanceof Error ? err.message : "Erreur de chargement", isLoading: false });
         }
       },
 
-      // ── Infinite scroll ────────────────────────────────────
+      // ── loadMoreMessages ───────────────────────────────────
       loadMoreMessages: async () => {
         const { activeChatRoomId, messages, hasMore, isLoading } = get();
         if (!activeChatRoomId || !hasMore || isLoading) return;
@@ -148,10 +182,10 @@ export const useChatStore = create<ChatState>()(
             ? new Date(oldest.metadata.createdAt).toISOString()
             : undefined;
 
-          const raw = await chatService.getMessages({ chatRoomId: activeChatRoomId, before, limit: 30 });
+          const raw = await chatService.getMessages({ roomId: activeChatRoomId, before, limit: 30 });
           set((state) => ({
-            messages: [...state.messages, ...raw.map(toPlain)],
-            hasMore: raw.length === 30,
+            messages:  [...state.messages, ...raw.map(toPlain)],
+            hasMore:   raw.length === 30,
             isLoading: false,
           }));
         } catch (err) {
@@ -159,11 +193,45 @@ export const useChatStore = create<ChatState>()(
         }
       },
 
-      // ── Envoyer texte ──────────────────────────────────────
-      sendMessage: async (payload) => {
+      // ── markRoomAsRead ─────────────────────────────────────
+      markRoomAsRead: async (roomId) => {
+        try {
+          await chatService.markAllRead(roomId);
+          set((state) => ({
+            messages: state.messages.map((m) =>
+              m.chatRoomId === roomId
+                ? { ...m, status: { ...m.status, read: true } }
+                : m
+            ),
+            conversations: state.conversations.map((c) =>
+              c.chatRoomId === roomId ? { ...c, unreadCount: 0 } : c
+            ),
+            totalUnread: Math.max(
+              0,
+              state.totalUnread -
+                (state.conversations.find((c) => c.chatRoomId === roomId)?.unreadCount ?? 0)
+            ),
+          }));
+        } catch {
+          // silencieux — non bloquant
+        }
+      },
+
+      // ── closeRoom ─────────────────────────────────────────
+      closeRoom: () => set({
+        messages:           [],
+        activeChatRoomId:   null,
+        activeInterlocutor: null,
+        hasMore:            true,
+        sharedFiles:        [],
+        searchResults:      [],
+      }),
+
+      // ── sendText ──────────────────────────────────────────
+      sendText: async (roomId, payload) => {
         set({ isSending: true, error: null });
         try {
-          const msg = await chatService.send(payload);
+          const msg = await chatService.sendText(roomId, payload);
           set((state) => ({ messages: [toPlain(msg), ...state.messages], isSending: false }));
           get().fetchConversations();
         } catch (err) {
@@ -172,11 +240,11 @@ export const useChatStore = create<ChatState>()(
         }
       },
 
-      // ── Envoyer fichier ────────────────────────────────────
-      sendFile: async (file, meta) => {
+      // ── sendMedia ─────────────────────────────────────────
+      sendMedia: async (roomId, payload) => {
         set({ isSending: true, error: null });
         try {
-          const msg = await chatService.sendFile(file, meta);
+          const msg = await chatService.sendMedia(roomId, payload);
           set((state) => ({ messages: [toPlain(msg), ...state.messages], isSending: false }));
           get().fetchConversations();
         } catch (err) {
@@ -185,35 +253,23 @@ export const useChatStore = create<ChatState>()(
         }
       },
 
-      // ── Marquer room comme lue ─────────────────────────────
-      markRoomAsRead: async (chatRoomId, receiverId) => {
+      // ── sendAudio ─────────────────────────────────────────
+      sendAudio: async (roomId, payload) => {
+        set({ isSending: true, error: null });
         try {
-          await chatService.markAllRead(chatRoomId, receiverId);
-          set((state) => ({
-            // String(m.receiverId) car les IDs sont déjà des strings dans ChatMessageData
-            messages: state.messages.map((m) =>
-              m.receiverId === receiverId
-                ? { ...m, status: { ...m.status, read: true } }
-                : m
-            ),
-            conversations: state.conversations.map((c) =>
-              c.chatRoomId === chatRoomId ? { ...c, unreadCount: 0 } : c
-            ),
-            totalUnread: Math.max(
-              0,
-              state.totalUnread -
-                (state.conversations.find((c) => c.chatRoomId === chatRoomId)?.unreadCount ?? 0)
-            ),
-          }));
-        } catch {
-          // silencieux — non bloquant
+          const msg = await chatService.sendAudio(roomId, payload);
+          set((state) => ({ messages: [toPlain(msg), ...state.messages], isSending: false }));
+          get().fetchConversations();
+        } catch (err) {
+          set({ error: err instanceof Error ? err.message : "Erreur d'envoi audio", isSending: false });
+          throw err;
         }
       },
 
-      // ── Supprimer pour moi ─────────────────────────────────
-      deleteForMe: async (messageId, userId) => {
+      // ── deleteMessage ─────────────────────────────────────
+      deleteMessage: async (roomId, messageId, scope = "me") => {
         try {
-          await chatService.deleteForMe(messageId, userId);
+          await chatService.deleteMessage(roomId, messageId, scope);
           set((state) => ({
             messages: state.messages.filter((m) => m._id !== messageId),
           }));
@@ -223,35 +279,32 @@ export const useChatStore = create<ChatState>()(
         }
       },
 
-      // ── Supprimer pour tout le monde ───────────────────────
-      deleteForEveryone: async (messageId, senderId) => {
+      // ── fetchSharedFiles ──────────────────────────────────
+      fetchSharedFiles: async (roomId) => {
+        set({ isLoading: true });
         try {
-          await chatService.deleteForEveryone(messageId, senderId);
-          set((state) => ({
-            messages: state.messages.filter((m) => m._id !== messageId),
-          }));
+          const raw = await chatService.getSharedFiles(roomId);
+          set({ sharedFiles: raw.map(toPlain), isLoading: false });
         } catch (err) {
-          set({ error: err instanceof Error ? err.message : "Erreur de suppression" });
-          throw err;
+          set({ error: err instanceof Error ? err.message : "Erreur de chargement", isLoading: false });
         }
       },
 
-      // ── Recherche ──────────────────────────────────────────
-      searchMessages: async (keyword) => {
-        const { activeChatRoomId } = get();
-        if (!activeChatRoomId) return [];
-        const raw = await chatService.searchInRoom(activeChatRoomId, keyword);
-        return raw.map(toPlain);
+      // ── searchMessages ────────────────────────────────────
+      searchMessages: async (roomId, keyword) => {
+        set({ isLoading: true });
+        try {
+          const raw = await chatService.searchMessages(roomId, keyword);
+          set({ searchResults: raw.map(toPlain), isLoading: false });
+        } catch (err) {
+          set({ error: err instanceof Error ? err.message : "Erreur de recherche", isLoading: false });
+        }
       },
 
-      // ── Fichiers partagés ──────────────────────────────────
-      getSharedFiles: async (chatRoomId) => {
-        const raw = await chatService.getSharedFiles(chatRoomId);
-        return raw.map(toPlain);
-      },
+      clearSearchResults: () => set({ searchResults: [] }),
 
-      // ── WebSocket — réception temps réel ───────────────────
-      // socket.on("new_message", (msg) => useChatStore.getState().receiveMessage(msg))
+      // ── receiveMessage (WebSocket) ────────────────────────
+      // Appel : socket.on("new_message", (msg) => useChatStore.getState().receiveMessage(msg))
       receiveMessage: (message) => {
         const plain = toPlain(message);
         const { activeChatRoomId } = get();
@@ -276,14 +329,29 @@ export const useChatStore = create<ChatState>()(
           );
 
           return {
-            messages: updatedMessages,
+            messages:      updatedMessages,
             conversations: updatedConversations,
-            totalUnread: updatedConversations.reduce((sum, c) => sum + c.unreadCount, 0),
+            totalUnread:   updatedConversations.reduce((sum, c) => sum + c.unreadCount, 0),
           };
         });
       },
 
-      clearRoom: () => set({ messages: [], activeChatRoomId: null, hasMore: true }),
+      // ── setInterlocutorOnline (WebSocket presence) ────────
+      // Appel : socket.on("user_online", ({ userId, isOnline }) => store.setInterlocutorOnline(userId, isOnline))
+      setInterlocutorOnline: (interlocutorId, isOnline) => {
+        set((state) => ({
+          conversations: state.conversations.map((c) =>
+            c.interlocutor._id === interlocutorId
+              ? { ...c, interlocutor: { ...c.interlocutor, isOnline } }
+              : c
+          ),
+          activeInterlocutor:
+            state.activeInterlocutor?._id === interlocutorId
+              ? { ...state.activeInterlocutor, isOnline }
+              : state.activeInterlocutor,
+        }));
+      },
+
       clearError: () => set({ error: null }),
     }),
     { name: "ChatStore" }

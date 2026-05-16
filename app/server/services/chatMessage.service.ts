@@ -1,22 +1,23 @@
 import { Types, QueryFilter } from 'mongoose';
 import { ChatMessage } from '../models/chatMessage.model';
 import { Appointment } from '../models/appointement.model';
+import { Doctor } from '../models/medcin.model';
+import { Patient } from '../models/patient.model';
 import { IChatMessage } from '../interfaces/chatMessage.interface';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type MessageType = 'text' | 'image' | 'file' | 'audio' | 'video' | 'prescription';
-type SenderRole = 'patient' | 'doctor';
 
 interface SendMessageDTO {
-  senderId: string;
-  receiverId: string;
-  chatRoomId: string;
-  messageType: MessageType;
-  content: string;
+  senderId:      string;
+  receiverId:    string;
+  chatRoomId:    string;
+  messageType:   MessageType;
+  content:       string;
   appointmentId?: string;
   file?: {
-    url: string;
+    url:  string;
     name: string;
     size: number;
     type: string;
@@ -25,8 +26,26 @@ interface SendMessageDTO {
 
 interface MessageFilters {
   chatRoomId: string;
-  before?: Date;
-  limit?: number;
+  before?:    Date;
+  limit?:     number;
+}
+
+// ─── Type enrichi pour la liste des conversations ─────────────────────────────
+
+export interface Interlocutor {
+  _id:        string;
+  name:       string;
+  avatar?:    string;
+  role:       'doctor' | 'patient';
+  isOnline:   boolean;
+  specialty?: string; // doctor uniquement
+}
+
+export interface ConversationSummaryEnriched {
+  chatRoomId:    string;
+  lastMessage:   IChatMessage | null;
+  unreadCount:   number;
+  interlocutor:  Interlocutor;
 }
 
 // ─── ChatMessage Service ──────────────────────────────────────────────────────
@@ -36,9 +55,9 @@ class ChatMessageService {
   // ── Send message ───────────────────────────────────────────────────────────
 
   async send(dto: SendMessageDTO): Promise<IChatMessage> {
-    // Si appointmentId fourni, vérifier que la room correspond bien
     if (dto.appointmentId) {
-      const appointment = await Appointment.findById(dto.appointmentId).select('communication.chatRoomId status.current');
+      const appointment = await Appointment.findById(dto.appointmentId)
+        .select('communication.chatRoomId status.current');
       if (!appointment) throw new Error('Rendez-vous introuvable.');
 
       if (appointment.communication.chatRoomId !== dto.chatRoomId) {
@@ -51,26 +70,25 @@ class ChatMessageService {
       }
     }
 
-    // Validation : fichier requis si type non-text
     if (['image', 'file', 'audio', 'video'].includes(dto.messageType) && !dto.file) {
       throw new Error(`Un fichier est requis pour le type de message "${dto.messageType}".`);
     }
 
     const message = await ChatMessage.create({
-      senderId: new Types.ObjectId(dto.senderId),
-      receiverId: new Types.ObjectId(dto.receiverId),
+      senderId:      new Types.ObjectId(dto.senderId),
+      receiverId:    new Types.ObjectId(dto.receiverId),
       appointmentId: dto.appointmentId ? new Types.ObjectId(dto.appointmentId) : undefined,
-      chatRoomId: dto.chatRoomId,
-      messageType: dto.messageType,
-      content: dto.content,
-      file: dto.file,
+      chatRoomId:    dto.chatRoomId,
+      messageType:   dto.messageType,
+      content:       dto.content,
+      file:          dto.file,
       status: {
         delivered: false,
-        read: false,
+        read:      false,
       },
       metadata: {
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt:  new Date(),
+        updatedAt:  new Date(),
         deletedFor: [],
       },
     });
@@ -78,14 +96,13 @@ class ChatMessageService {
     return message;
   }
 
-  // ── Get messages for a room (pagination curseur) ───────────────────────────
+  // ── Get messages for a room ────────────────────────────────────────────────
 
   async getMessages(filters: MessageFilters): Promise<IChatMessage[]> {
     const { chatRoomId, before, limit = 30 } = filters;
 
     const query: QueryFilter<IChatMessage> = { chatRoomId };
 
-    // Pagination par curseur : messages avant une date donnée (infinite scroll)
     if (before) {
       query['metadata.createdAt'] = { $lt: before };
     }
@@ -103,7 +120,7 @@ class ChatMessageService {
       messageId,
       {
         $set: {
-          'status.delivered': true,
+          'status.delivered':   true,
           'status.deliveredAt': new Date(),
           'metadata.updatedAt': new Date(),
         },
@@ -122,11 +139,11 @@ class ChatMessageService {
     if (!message) throw new Error('Message introuvable.');
 
     if (String(message.receiverId) !== receiverId) {
-      throw new Error('Action non autorisée : vous n\'êtes pas le destinataire.');
+      throw new Error("Action non autorisée : vous n'êtes pas le destinataire.");
     }
 
-    message.status.read = true;
-    message.status.readAt = new Date();
+    message.status.read      = true;
+    message.status.readAt    = new Date();
     message.metadata.updatedAt = new Date();
     await message.save();
 
@@ -139,14 +156,14 @@ class ChatMessageService {
     const result = await ChatMessage.updateMany(
       {
         chatRoomId,
-        receiverId: new Types.ObjectId(receiverId),
+        receiverId:    new Types.ObjectId(receiverId),
         'status.read': false,
       },
       {
         $set: {
-          'status.read': true,
-          'status.readAt': new Date(),
-          'status.delivered': true,
+          'status.read':        true,
+          'status.readAt':      new Date(),
+          'status.delivered':   true,
           'status.deliveredAt': new Date(),
           'metadata.updatedAt': new Date(),
         },
@@ -169,24 +186,24 @@ class ChatMessageService {
 
     await ChatMessage.findByIdAndUpdate(messageId, {
       $push: { 'metadata.deletedFor': new Types.ObjectId(userId) },
-      $set: { 'metadata.updatedAt': new Date() },
+      $set:  { 'metadata.updatedAt': new Date() },
     });
 
     return { message: 'Message supprimé pour vous.' };
   }
 
-  // ── Delete for everyone (expéditeur seulement, dans les 5 min) ────────────
+  // ── Delete for everyone ────────────────────────────────────────────────────
 
   async deleteForEveryone(messageId: string, senderId: string): Promise<{ message: string }> {
     const msg = await ChatMessage.findById(messageId);
     if (!msg) throw new Error('Message introuvable.');
 
     if (String(msg.senderId) !== senderId) {
-      throw new Error('Seul l\'expéditeur peut supprimer un message pour tout le monde.');
+      throw new Error("Seul l'expéditeur peut supprimer un message pour tout le monde.");
     }
 
     const fiveMinutes = 5 * 60 * 1000;
-    const elapsed = Date.now() - msg.metadata.createdAt.getTime();
+    const elapsed     = Date.now() - msg.metadata.createdAt.getTime();
     if (elapsed > fiveMinutes) {
       throw new Error('Vous ne pouvez plus supprimer ce message (délai de 5 minutes dépassé).');
     }
@@ -195,17 +212,17 @@ class ChatMessageService {
     return { message: 'Message supprimé pour tout le monde.' };
   }
 
-  // ── Get unread count for a user in a room ─────────────────────────────────
+  // ── Get unread count ───────────────────────────────────────────────────────
 
   async getUnreadCount(chatRoomId: string, receiverId: string): Promise<number> {
     return ChatMessage.countDocuments({
       chatRoomId,
-      receiverId: new Types.ObjectId(receiverId),
+      receiverId:    new Types.ObjectId(receiverId),
       'status.read': false,
     });
   }
 
-  // ── Get last message of a room (pour liste de conversations) ──────────────
+  // ── Get last message ───────────────────────────────────────────────────────
 
   async getLastMessage(chatRoomId: string): Promise<IChatMessage | null> {
     return ChatMessage.findOne({ chatRoomId })
@@ -213,17 +230,62 @@ class ChatMessageService {
       .lean();
   }
 
-  // ── Get conversation summary for all rooms of a user ──────────────────────
+  // ── Helper : résoudre l'interlocuteur ─────────────────────────────────────
 
-  async getConversationSummaries(userId: string): Promise<Array<{
-    chatRoomId: string;
-    lastMessage: IChatMessage | null;
-    unreadCount: number;
-  }>> {
-    // Récupérer toutes les rooms où l'utilisateur est impliqué
+  private async resolveInterlocutor(
+    interlocutorId: string,
+    senderRole: 'doctor' | 'patient'
+  ): Promise<Interlocutor> {
+    // L'interlocuteur a le rôle opposé à l'expéditeur
+    const interlocutorRole = senderRole === 'doctor' ? 'patient' : 'doctor';
+
+    if (interlocutorRole === 'doctor') {
+      const doctor = await Doctor.findById(interlocutorId)
+        .select('profile.firstName profile.lastName profile.title profile.specialty profile.photo status.isOnline')
+        .lean();
+
+      if (!doctor) {
+        return { _id: interlocutorId, name: 'Médecin inconnu', role: 'doctor', isOnline: false };
+      }
+
+      return {
+        _id:       String(doctor._id),
+        name:      `${doctor.profile.title} ${doctor.profile.firstName} ${doctor.profile.lastName}`,
+        avatar:    doctor.profile.photo,
+        role:      'doctor',
+        isOnline:  doctor.status.isOnline ?? false,
+        specialty: doctor.profile.specialty,
+      };
+    }
+
+    // Interlocuteur = patient
+    const patient = await Patient.findById(interlocutorId)
+      .select('profile.firstName profile.lastName profile.photo')
+      .lean();
+
+    if (!patient) {
+      return { _id: interlocutorId, name: 'Patient inconnu', role: 'patient', isOnline: false };
+    }
+
+    return {
+      _id:      String(patient._id),
+      name:     `${patient.profile.firstName} ${patient.profile.lastName}`,
+      avatar:   patient.profile.photo,
+      role:     'patient',
+      isOnline: false, // géré côté WebSocket
+    };
+  }
+
+  // ── Get conversation summaries enrichies ──────────────────────────────────
+
+  async getConversationSummaries(
+    userId: string,
+    userRole: 'doctor' | 'patient'
+  ): Promise<ConversationSummaryEnriched[]> {
+    // Toutes les rooms où l'utilisateur est impliqué
     const rooms = await ChatMessage.distinct('chatRoomId', {
       $or: [
-        { senderId: new Types.ObjectId(userId) },
+        { senderId:   new Types.ObjectId(userId) },
         { receiverId: new Types.ObjectId(userId) },
       ],
     });
@@ -234,7 +296,20 @@ class ChatMessageService {
           this.getLastMessage(chatRoomId),
           this.getUnreadCount(chatRoomId, userId),
         ]);
-        return { chatRoomId, lastMessage, unreadCount };
+
+        // Déduire l'interlocuteur depuis le lastMessage
+        let interlocutorId: string | null = null;
+        if (lastMessage) {
+          const senderId   = String(lastMessage.senderId);
+          const receiverId = String(lastMessage.receiverId);
+          interlocutorId   = senderId === userId ? receiverId : senderId;
+        }
+
+        const interlocutor: Interlocutor = interlocutorId
+          ? await this.resolveInterlocutor(interlocutorId, userRole)
+          : { _id: '', name: 'Inconnu', role: userRole === 'doctor' ? 'patient' : 'doctor', isOnline: false };
+
+        return { chatRoomId, lastMessage, unreadCount, interlocutor };
       })
     );
 
@@ -252,7 +327,7 @@ class ChatMessageService {
     return ChatMessage.find({
       chatRoomId,
       messageType: 'text',
-      content: { $regex: keyword, $options: 'i' },
+      content:     { $regex: keyword, $options: 'i' },
     })
       .sort({ 'metadata.createdAt': -1 })
       .limit(20)
@@ -270,7 +345,7 @@ class ChatMessageService {
       .lean();
   }
 
-  // ── Count total messages in a room ─────────────────────────────────────────
+  // ── Count total messages ───────────────────────────────────────────────────
 
   async countMessages(chatRoomId: string): Promise<number> {
     return ChatMessage.countDocuments({ chatRoomId });

@@ -34,40 +34,43 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/hospitals — créer un établissement (médecin authentifié)
+// POST — remplacer req.json() par formData
 export async function POST(req: NextRequest) {
   try {
     await connectDB();
+    await getAuthDoctor(req);
 
-    await getAuthDoctor(req); // seul un médecin peut créer un établissement
+    const formData = await req.formData();
+    const raw = JSON.parse(formData.get('data') as string);
+    const imageFile = formData.get('image') as File | null;
 
-    const body = await req.json();
-
-    // Validation Zod
-    const parsed = CreateHospitalClinicSchema.omit({ facilityId: true}).safeParse({
-      ...body,
+    const parsed = CreateHospitalClinicSchema.omit({ facilityId: true }).safeParse({
+      ...raw,
       certification: {
-        ...body.certification,
-        expiryDate: body.certification?.expiryDate
-          ? new Date(body.certification.expiryDate)
+        ...raw.certification,
+        expiryDate: raw.certification?.expiryDate
+          ? new Date(raw.certification.expiryDate)
           : undefined,
       },
     });
 
     if (!parsed.success) {
       return NextResponse.json(
-        { success: false, message: 'Données invalides.', errors: parsed.error.flatten().fieldErrors },
+        { success: false, errors: parsed.error.flatten().fieldErrors },
         { status: 400 }
       );
     }
 
-    const facility = await hospitalClinicService.create(parsed.data);
+    const imageBuffer = imageFile
+      ? Buffer.from(await imageFile.arrayBuffer())
+      : undefined;
+
+    const facility = await hospitalClinicService.create(parsed.data, imageBuffer);
     return NextResponse.json({ success: true, data: facility }, { status: 201 });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
-    const status = message === 'Unauthorized' || message === 'Accès réservé aux médecins.' ? 401
-      : message.includes('existe déjà') ? 409
-      : 500;
+    const status = message === 'Unauthorized' ? 401
+      : message.includes('existe déjà') ? 409 : 500;
     return NextResponse.json({ success: false, message }, { status });
   }
 }

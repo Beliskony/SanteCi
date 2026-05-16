@@ -13,7 +13,6 @@ import type {
 } from "@/app/frontend/types/Etablisement";
 import type { ApiResponse } from "@/app/frontend/types";
 
-
 interface RawSearchResponse {
   success: boolean;
   facilities: IHospitalClinic[];
@@ -22,6 +21,36 @@ interface RawSearchResponse {
   pages: number;
 }
 
+// ── Helper interne : fetch multipart avec méthode configurable ──
+async function uploadWithMethod<T>(
+  endpoint: string,
+  method: "PUT" | "PATCH",
+  formData: FormData
+): Promise<T> {
+  const token = typeof window !== "undefined"
+    ? (() => {
+        try {
+          const raw = localStorage.getItem("auth-storage");
+          return raw ? JSON.parse(raw)?.state?.token ?? null : null;
+        } catch { return null; }
+      })()
+    : null;
+
+  const headers: HeadersInit = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL ?? ""}${endpoint}`,
+    { method, headers, body: formData }
+  );
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message ?? `Erreur ${res.status}`);
+  }
+
+  return res.json() as Promise<T>;
+}
 
 export const hospitalService = {
 
@@ -29,31 +58,32 @@ export const hospitalService = {
 
   /**
    * Recherche avec filtres
-   * → search() du backend
+   * → GET /hopitaux
    */
   async search(filters?: HospitalFilters): Promise<HospitalSearchResponse> {
     const qs = new URLSearchParams();
 
-    if (filters?.city)                    qs.append("city",                 filters.city);
-    if (filters?.district)                qs.append("district",             filters.district);
-    if (filters?.type)                    qs.append("type",                 filters.type);
-    if (filters?.category)                qs.append("category",             filters.category);
-    if (filters?.specialty)               qs.append("specialty",            filters.specialty);
+    if (filters?.city)                     qs.append("city",                 filters.city);
+    if (filters?.district)                 qs.append("district",             filters.district);
+    if (filters?.type)                     qs.append("type",                 filters.type);
+    if (filters?.category)                 qs.append("category",             filters.category);
+    if (filters?.specialty)                qs.append("specialty",            filters.specialty);
     if (filters?.telemedicineEnabled !== undefined)
       qs.append("telemedicineEnabled", String(filters.telemedicineEnabled));
     if (filters?.homeVisits !== undefined)
       qs.append("homeVisits",          String(filters.homeVisits));
     if (filters?.emergency24h !== undefined)
       qs.append("emergency24h",        String(filters.emergency24h));
-    if (filters?.page)                    qs.append("page",                 String(filters.page));
-    if (filters?.limit)                   qs.append("limit",                String(filters.limit));
+    if (filters?.page)                     qs.append("page",                 String(filters.page));
+    if (filters?.limit)                    qs.append("limit",                String(filters.limit));
 
     const query = qs.toString();
     const res = await api.get<RawSearchResponse>(
       `/hopitaux${query ? `?${query}` : ""}`,
-      false // accessible sans auth
+      false
     );
-   return {
+
+    return {
       facilities: res.facilities ?? [],
       total:      res.total      ?? 0,
       page:       res.page       ?? 1,
@@ -63,7 +93,7 @@ export const hospitalService = {
 
   /**
    * Détail par _id MongoDB
-   * → getById() du backend
+   * → GET /hopitaux/[id]
    */
   async getById(id: string): Promise<IHospitalClinic> {
     const res = await api.get<ApiResponse<IHospitalClinic>>(
@@ -73,50 +103,75 @@ export const hospitalService = {
     return res.data;
   },
 
-  /**
-   * Détail par facilityId (ex: "FAC-A3F2B1C4")
-   * → getByFacilityId() du backend
-   */
-  async getByFacilityId(facilityId: string): Promise<IHospitalClinic> {
-    const res = await api.get<ApiResponse<IHospitalClinic>>(
-      `/hopitaux/facility/${facilityId}`,
-      false
-    );
-    return res.data;
-  },
-
   // ── Admin ──────────────────────────────────────────────────
 
   /**
-   * Créer un établissement (admin)
-   * → create() du backend
+   * Créer un établissement — FormData pour supporter l'image optionnelle
+   * → POST /hopitaux  (via uploadFile qui gère le multipart)
    */
-  async create(payload: CreateHospitalPayload): Promise<IHospitalClinic> {
-    const res = await api.post<ApiResponse<IHospitalClinic>>(
+  async create(payload: CreateHospitalPayload, image?: File): Promise<IHospitalClinic> {
+    const formData = new FormData();
+    formData.append("data", JSON.stringify(payload));
+    if (image) formData.append("image", image);
+
+    const res = await api.uploadFile<ApiResponse<IHospitalClinic>>(
       "/hopitaux",
-      payload
+      formData
     );
     return res.data;
   },
 
   /**
-   * Mettre à jour un établissement (admin)
-   * → update() du backend — dot-notation côté serveur
+   * Mettre à jour un établissement — FormData pour supporter l'image optionnelle
+   * → PUT /hopitaux/[id]
    */
   async update(
     id: string,
-    payload: UpdateHospitalPayload
+    payload: UpdateHospitalPayload,
+    image?: File
   ): Promise<IHospitalClinic> {
-    const res = await api.put<ApiResponse<IHospitalClinic>>(
+    const formData = new FormData();
+    formData.append("data", JSON.stringify(payload));
+    if (image) formData.append("image", image);
+
+    const res = await uploadWithMethod<ApiResponse<IHospitalClinic>>(
       `/hopitaux/${id}`,
-      payload
+      "PUT",
+      formData
+    );
+    return res.data;
+  },
+
+  /**
+   * Mettre à jour uniquement l'image de couverture
+   * → PATCH /hopitaux/[id]/cover
+   */
+  async updateCoverImage(id: string, image: File): Promise<IHospitalClinic> {
+    const formData = new FormData();
+    formData.append("image", image);
+
+    const res = await uploadWithMethod<ApiResponse<IHospitalClinic>>(
+      `/hopitaux/${id}/cover`,
+      "PATCH",
+      formData
+    );
+    return res.data;
+  },
+
+  /**
+   * Supprimer l'image de couverture
+   * → DELETE /hopitaux/[id]/cover
+   */
+  async deleteCoverImage(id: string): Promise<{ message: string }> {
+    const res = await api.del<ApiResponse<{ message: string }>>(
+      `/hopitaux/${id}/cover`
     );
     return res.data;
   },
 
   /**
    * Ajouter un médecin au staff
-   * → addDoctor() du backend
+   * → POST /hopitaux/[id]/doctors
    */
   async addDoctor(
     facilityId: string,
@@ -131,21 +186,37 @@ export const hospitalService = {
 
   /**
    * Retirer un médecin du staff
-   * → removeDoctor() du backend
+   * → DELETE /hopitaux/[id]/doctors?doctorId=xxx
+   * api.del n'accepte pas de body → doctorId en query param
    */
   async removeDoctor(
     facilityId: string,
     doctorId: string
   ): Promise<{ message: string }> {
     const res = await api.del<ApiResponse<{ message: string }>>(
-      `/hopitaux/${facilityId}/doctors/${doctorId}`
+      `/hopitaux/${facilityId}/doctors?doctorId=${doctorId}`
+    );
+    return res.data;
+  },
+
+  /**
+   * Soumettre une note
+   * → POST /hopitaux/[id]/rating
+   */
+  async submitReview(
+    id: string,
+    data: { rating: number; comment?: string }
+  ): Promise<{ message: string }> {
+    const res = await api.post<ApiResponse<{ message: string }>>(
+      `/hopitaux/${id}/rating`,
+      data
     );
     return res.data;
   },
 
   /**
    * Vérifier un établissement (admin)
-   * → verify() du backend
+   * → PATCH /hopitaux/[id]/verify
    */
   async verify(id: string): Promise<{ message: string }> {
     const res = await api.patch<ApiResponse<{ message: string }>>(
@@ -157,26 +228,11 @@ export const hospitalService = {
 
   /**
    * Supprimer un établissement (admin)
-   * → delete() du backend
+   * → DELETE /hopitaux/[id]
    */
   async delete(id: string): Promise<{ message: string }> {
     const res = await api.del<ApiResponse<{ message: string }>>(
       `/hopitaux/${id}`
-    );
-    return res.data;
-  },
-
-  /**
-   * Soumettre un avis + note (patient)
-   * → updateRating() du backend (déclenché côté serveur après review)
-   */
-  async submitReview(
-    id: string,
-    data: { rating: number; comment?: string }
-  ): Promise<{ message: string }> {
-    const res = await api.post<ApiResponse<{ message: string }>>(
-      `/hopitaux/${id}/reviews`,
-      data
     );
     return res.data;
   },

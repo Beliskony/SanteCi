@@ -1,6 +1,7 @@
 import { Doctor } from '../models/medcin.model';
 import { QueryFilter, Types } from 'mongoose';
 import { IDoctor } from '../interfaces/medecin.interface';
+import { cloudinaryService } from './cloudinary.service';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -58,11 +59,11 @@ class DoctorService {
     return doctor;
   }
 
-  // ── Get doctor by doctorId (public) ───────────────────────────────────────
+  // ── Get doctor by _id (public) ───────────────────────────────────────
 
-  async getDoctorPublicProfile(doctorId: string): Promise<Partial<IDoctor>> {
-    const doctor = await Doctor.findOne({ doctorId })
-      .select('profile professional.certifications contact.phone contact.email telemedicine location status.isVerified status.isOnline analytics.patientSatisfaction analytics.totalConsultations')
+  async getDoctorPublicProfile(id: string): Promise<Partial<IDoctor>> {
+    const doctor = await Doctor.findById(id)
+      .select('doctorId profile professional.certifications contact.phone contact.email telemedicine location status.isVerified status.isOnline analytics.patientSatisfaction analytics.totalConsultations')
       .lean();
 
     if (!doctor) throw new Error('Médecin introuvable.');
@@ -98,12 +99,29 @@ class DoctorService {
     return updated;
   }
 
-  // ── Update photo ───────────────────────────────────────────────────────────
-
-  async updatePhoto(doctorId: string, photoUrl: string): Promise<{ message: string }> {
-    await Doctor.findByIdAndUpdate(doctorId, { 'profile.photo': photoUrl });
-    return { message: 'Photo de profil mise à jour.' };
-  }
+ // ── Update photo ───────────────────────────────────────────────────────────
+async updatePhoto(doctorId: string, buffer: Buffer): Promise<{ photoUrl: string }> {
+  const doctor = await Doctor.findById(doctorId);
+  if (!doctor) throw new Error('Médecin introuvable.');
+  
+  const { url } = await cloudinaryService.uploadProfilePhoto(buffer, doctorId, 'doctor');
+  
+  // Mise à jour
+  await Doctor.updateOne(
+    { _id: doctorId },
+    { $set: { 'profile.photo': url } }
+  );
+  
+  // Vérification en forçant la sélection du champ
+  const updatedDoctor = await Doctor.findById(doctorId).select('+profile.photo');
+  console.log('Photo en DB après update:', updatedDoctor?.profile?.photo);
+  
+  // Si toujours undefined, essayez ceci :
+  const rawDoc = await Doctor.findById(doctorId).lean();
+  console.log('Document brut:', rawDoc?.profile);
+  
+  return { photoUrl: url };
+}
 
   // ── Update telemedicine settings ───────────────────────────────────────────
 
@@ -180,7 +198,7 @@ class DoctorService {
     const total = await Doctor.countDocuments(query);
 
     const doctors = await Doctor.find(query)
-      .select('profile telemedicine location status.isOnline status.isVerified analytics.patientSatisfaction analytics.totalConsultations')
+      .select('doctorId profile telemedicine location status.isOnline status.isVerified analytics.patientSatisfaction analytics.totalConsultations')
       .sort({ 'telemedicine.rating': -1 })
       .skip(skip)
       .limit(limit)

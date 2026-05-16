@@ -3,20 +3,21 @@ import { doctorService } from '@/app/server/services/doctor.service';
 import { getAuthDoctor } from '@/app/server/middleware/auth.middleware';
 import connectDB from '@/app/server/config/databaseConnect';
 
-// GET /api/doctors/[id]/telemedicine
+// GET /api/doctor/[id]/telemedicine     api/doctor/(auth)/telemedicine
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
+    const { id } = await params;
 
     const authDoctor = await getAuthDoctor(req);
-    if (String(authDoctor._id) !== params.id) {
+    if (String(authDoctor._id) !== id) {
       return NextResponse.json({ success: false, message: 'Accès non autorisé.' }, { status: 403 });
     }
 
-    const doctor = await doctorService.getAvailability(params.id);
+    const doctor = await doctorService.getAvailability(id);
     return NextResponse.json({ success: true, data: doctor });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
@@ -25,21 +26,21 @@ export async function GET(
   }
 }
 
-// PUT /api/doctors/[id]/telemedicine
+// PUT /api/doctor/[id]/telemedicine
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
-
+    const { id } = await params;
     const authDoctor = await getAuthDoctor(req);
-    if (String(authDoctor._id) !== params.id) {
+    if (String(authDoctor._id) !== id) {
       return NextResponse.json({ success: false, message: 'Accès non autorisé.' }, { status: 403 });
     }
 
     const body = await req.json();
-    const updated = await doctorService.updateTelemedicine(params.id, body);
+    const updated = await doctorService.updateTelemedicine(id, body);
 
     return NextResponse.json({ success: true, data: updated });
   } catch (error: unknown) {

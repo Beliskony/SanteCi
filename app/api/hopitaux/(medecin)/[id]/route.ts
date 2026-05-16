@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { hospitalClinicService } from '@/app/server/services/hopital.service';
 import { getAuthDoctor } from '@/app/server/middleware/auth.middleware';
-import { UpdateHospitalClinicSchema} from '@/app/server/schemas/HospitalClinic.schema';
+import { UpdateHospitalClinicSchema } from '@/app/server/schemas/HospitalClinic.schema';
 import connectDB from '@/app/server/config/databaseConnect';
 
-// GET /api/hospitals/[id] — détail complet d'un établissement (public)
+// GET /api/hopitaux/[id] — détail complet d'un établissement (public)
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
+    const { id } = await params;
 
-    const facility = await hospitalClinicService.getById(params.id);
+    const facility = await hospitalClinicService.getById(id);
     return NextResponse.json({ success: true, data: facility });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
@@ -21,19 +22,19 @@ export async function GET(
   }
 }
 
-// PUT /api/hospitals/[id] — mise à jour (médecin authentifié)
+// PUT /api/hopitaux/[id] — mise à jour (médecin authentifié)
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
+    const { id } = await params;
 
     await getAuthDoctor(req);
 
     const body = await req.json();
 
-    // Conversion de date si présente
     if (body.certification?.expiryDate) {
       body.certification.expiryDate = new Date(body.certification.expiryDate);
     }
@@ -46,7 +47,7 @@ export async function PUT(
       );
     }
 
-    const updated = await hospitalClinicService.update(params.id, parsed.data);
+    const updated = await hospitalClinicService.update(id, parsed.data);
     return NextResponse.json({ success: true, data: updated });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
@@ -57,17 +58,18 @@ export async function PUT(
   }
 }
 
-// DELETE /api/hospitals/[id] — suppression (médecin authentifié)
+// DELETE /api/hopitaux/[id] — suppression (médecin authentifié)
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
+    const { id } = await params;
 
     await getAuthDoctor(req);
 
-    const result = await hospitalClinicService.delete(params.id);
+    const result = await hospitalClinicService.delete(id);
     return NextResponse.json({ success: true, ...result });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';

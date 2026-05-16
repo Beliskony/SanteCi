@@ -1,14 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Search, MapPin } from "lucide-react";
 import { useHospitalStore } from "@/app/frontend/store/hopitalStore";
 
 const HeroHopiSection = () => {
-  const { search, isLoading } = useHospitalStore();
-
+  const { search, isLoading, facilities } = useHospitalStore();
   const [name, setName] = useState("");
-  const [city, setCity] = useState("");
+  const [city, setCity] = useState("Abidjan");
+  const hasSearched = useRef(false); // Pour éviter les doubles appels
+
+  // Recherche initiale au chargement de la page (une seule fois)
+  useEffect(() => {
+    if (!hasSearched.current) {
+      hasSearched.current = true;
+      search({
+        city: "Abidjan",
+        limit: 12,
+      });
+    }
+  }, [search]);
 
   const handleSearch = () => {
     search({
@@ -23,26 +34,22 @@ const HeroHopiSection = () => {
 
   return (
     <section className="w-full bg-[#1e3a8a] min-h-110 flex flex-col items-center justify-center px-6 py-16 gap-5 text-white text-center">
-
-      {/* Titre */}
       <h1 className="text-4xl font-bold leading-tight">
         Trouvez un hôpital ou une clinique
       </h1>
 
-      {/* Sous-titre */}
       <p className="text-sm text-white/80 max-w-xl leading-relaxed">
         Découvrez nos établissements partenaires, consultez leurs spécialités
         et prenez rendez-vous avec leurs médecins.
       </p>
 
-      {/* Barre de recherche */}
       <div className="flex items-center bg-white rounded-xl shadow-lg w-full max-w-2xl mt-2 overflow-hidden">
-
-        {/* Champ nom / spécialité */}
         <div className="flex items-center gap-2.5 flex-1 px-4 py-3.5">
           <Search size={18} className="text-gray-400 shrink-0" />
           <input
             type="text"
+            name="specialty" // Ajouté pour l'accessibilité
+            id="specialty"   // Ajouté pour l'accessibilité
             placeholder="Nom de l'établissement, spécialité..."
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -51,14 +58,14 @@ const HeroHopiSection = () => {
           />
         </div>
 
-        {/* Séparateur vertical */}
         <div className="w-px h-6 bg-gray-200 shrink-0" />
 
-        {/* Champ ville */}
         <div className="flex items-center gap-2.5 flex-1 px-4 py-3.5">
           <MapPin size={18} className="text-gray-400 shrink-0" />
           <input
             type="text"
+            name="city"      // Ajouté pour l'accessibilité
+            id="city"        // Ajouté pour l'accessibilité
             placeholder="Ville, commune..."
             value={city}
             onChange={(e) => setCity(e.target.value)}
@@ -67,7 +74,6 @@ const HeroHopiSection = () => {
           />
         </div>
 
-        {/* Bouton */}
         <button
           onClick={handleSearch}
           disabled={isLoading}
@@ -76,7 +82,6 @@ const HeroHopiSection = () => {
           {isLoading ? "Recherche..." : "Rechercher"}
         </button>
       </div>
-
     </section>
   );
 };

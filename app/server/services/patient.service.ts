@@ -1,6 +1,7 @@
 import { Patient } from '../models/patient.model';
 import { QueryFilter, Types } from 'mongoose';
 import { IPatient } from '../interfaces/patient.interface';
+import { cloudinaryService } from './cloudinary.service';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -107,10 +108,11 @@ class PatientService {
 
   // ── Update photo ───────────────────────────────────────────────────────────
 
-  async updatePhoto(patientId: string, photoUrl: string): Promise<{ message: string }> {
-    await Patient.findByIdAndUpdate(patientId, { 'profile.photo': photoUrl });
-    return { message: 'Photo de profil mise à jour.' };
-  }
+  async updatePhoto(patientId: string, buffer: Buffer): Promise<{ message: string }> {
+  const { url } = await cloudinaryService.uploadProfilePhoto(buffer, patientId, 'patient');
+  await Patient.findByIdAndUpdate(patientId, { 'profile.photo': url });
+  return { message: 'Photo de profil mise à jour.' };
+}
 
   // ── Update health info ─────────────────────────────────────────────────────
 

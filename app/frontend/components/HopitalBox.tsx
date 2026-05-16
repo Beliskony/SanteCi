@@ -4,7 +4,7 @@ import { IHospitalClinic } from "@/app/server/interfaces/hopitalClinic.interface
 
 interface HopitalBoxProps {
   hospital: Pick<IHospitalClinic, "_id" | "name" | "type" | "location" | "staff"> & {
-    imageCover?: string;
+    imageCover?: { url: string; publicId: string };
   };
 }
 
@@ -22,12 +22,12 @@ const HopitalBox = ({ hospital }: HopitalBoxProps) => {
   return (
     <Link
       href={`/hospitals/${_id}`}
-      className="flex flex-col w-72 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow bg-white overflow-hidden"
+      className="flex flex-col w-96 my-1.5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow bg-white overflow-hidden"
     >
       {/* Image */}
       <div className="relative h-40 w-full overflow-hidden bg-gray-100">
         <img
-          src={imageCover || "/hospitals/default.jpg"}
+          src={imageCover?.url || "/hospitals/default.jpg"}
           alt={name}
           className="w-full h-full object-cover"
         />

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect } from "react";
 import { MapPin, Building2, Video, MessageSquare, Star, ChevronDown } from "lucide-react";
 import { useDoctorStore } from "@/app/frontend/store/otherStore";
@@ -68,13 +69,14 @@ const RenderResultSection = () => {
           </div>
         )}
 
-        {/* Liste des médecins */}
+        {/* Liste vide */}
         {!isLoading && doctors.length === 0 && (
           <div className="bg-white rounded-2xl px-6 py-12 text-center text-gray-400 text-sm">
             Aucun médecin trouvé pour ces critères.
           </div>
         )}
 
+        {/* Liste des médecins */}
         {!isLoading && doctors.map((doctor) => (
           <DoctorCard key={String(doctor._id)} doctor={doctor} />
         ))}
@@ -101,8 +103,10 @@ const DoctorCard = ({ doctor }: { doctor: Partial<DoctorUser> }) => {
   const types = doctor.telemedicine?.consultationTypes ?? [];
 
   return (
-    <div className="bg-white rounded-2xl p-5 flex flex-col gap-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-
+    <Link
+      href={`/medecins/${doctor._id}`}
+      className=" bg-white rounded-2xl p-5 flex flex-col gap-4 shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-100 transition-all duration-150 cursor-pointer"
+    >
       {/* ── Ligne principale ── */}
       <div className="flex gap-4">
 
@@ -133,7 +137,7 @@ const DoctorCard = ({ doctor }: { doctor: Partial<DoctorUser> }) => {
               </p>
             </div>
             {/* Note */}
-            {(doctor.telemedicine?.rating ?? 0) && (
+            {(doctor.telemedicine?.rating ?? 0) > 0 && (
               <div className="flex items-center gap-1 shrink-0">
                 <Star size={14} className="text-yellow-400 fill-yellow-400" />
                 <span className="text-sm font-semibold text-gray-800">
@@ -192,24 +196,23 @@ const DoctorCard = ({ doctor }: { doctor: Partial<DoctorUser> }) => {
         <p className="text-xs text-gray-500 font-medium">Prochaines disponibilités</p>
         <div className="flex items-center gap-2 flex-wrap">
           {MOCK_SLOTS.slice(0, 5).map((slot, i) => (
-            <button
+            <span
               key={slot}
-              className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
+              className={`text-xs font-semibold px-3 py-1.5 rounded-lg ${
                 i === 0
                   ? "bg-[#1e3a8a] text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-blue-50 hover:text-[#1e3a8a]"
+                  : "bg-gray-100 text-gray-700"
               }`}
             >
               {slot}
-            </button>
+            </span>
           ))}
-          <button className="text-xs text-[#1e3a8a] font-medium hover:underline">
-            Plus d'horaires
-          </button>
+          <span className="text-xs text-[#1e3a8a] font-medium">
+            Plus d&apos;horaires
+          </span>
         </div>
       </div>
-
-    </div>
+    </Link>
   );
 };
 

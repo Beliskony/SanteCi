@@ -19,10 +19,10 @@ import { useAuthStore } from "@/app/frontend/store/useAuthStore";
 import { authService } from "@/app/frontend/services/authService";
 
 const NAV_ITEMS = [
-  { label: "Tableau de bord",    href: "/dashboard/patient",          icon: LayoutDashboard },
-  { label: "Trouver un médecin", href: "/dashboard/patient/medecins", icon: Search },
+  { label: "Tableau de bord",    href: "/patient",          icon: LayoutDashboard },
+  { label: "Trouver un médecin", href: "/patient/medecins", icon: Search },
   { label: "Mes rendez-vous",    href: "/dashboard/patient/rdv",      icon: CalendarDays },
-  { label: "Messagerie",         href: "/dashboard/patient/messages", icon: MessageSquare },
+  { label: "Messagerie",         href: "/patient/messages", icon: MessageSquare },
   { label: "Dossier médical",    href: "/dashboard/patient/dossier",  icon: FolderHeart },
 ];
 
@@ -41,23 +41,26 @@ const SidebarContent = ({ onClose }: { onClose?: () => void }) => {
     <div className="flex flex-col h-full px-4 py-6">
 
       {/* Logo + badge + bouton fermer mobile */}
-      <div className="flex items-center gap-3 px-2 mb-8">
-        <div className="w-9 h-9 rounded-xl bg-[#1e3a8a] flex items-center justify-center shrink-0">
-          <Heart size={18} stroke="white" fill="white" />
-        </div>
-        <span className="text-base font-bold text-gray-900">SanteCi</span>
-        <span className="text-[10px] font-bold text-[#1e3a8a] bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full tracking-wide">
-          PATIENT
-        </span>
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="ml-auto p-1 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-          >
-            <X size={18} />
-          </button>
-        )}
-      </div>
+      {/* Logo + badge + bouton fermer mobile */}
+<div className="flex items-center gap-3 px-2 mb-8">
+  <Link href="/" onClick={() => onClose?.()} className="flex items-center gap-3 shrink-0">
+    <div className="w-9 h-9 rounded-xl bg-[#1e3a8a] flex items-center justify-center">
+      <Heart size={18} stroke="white" fill="white" />
+    </div>
+    <span className="text-base font-bold text-gray-900">SanteCi</span>
+  </Link>
+  <span className="text-[10px] font-bold text-[#1e3a8a] bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full tracking-wide">
+    PATIENT
+  </span>
+  {onClose && (
+    <button
+      onClick={onClose}
+      className="ml-auto p-1 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+    >
+      <X size={18} />
+    </button>
+  )}
+</div>
 
       {/* Navigation */}
       <nav className="flex flex-col gap-1 flex-1">

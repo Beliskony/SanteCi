@@ -8,26 +8,25 @@ import {
   Pill,
   Video,
   Search,
-  Bell,
-  ChevronRight,
   CalendarDays,
+  ChevronRight,
   Loader2,
 } from "lucide-react";
 import { useAuthStore, isPatient } from "@/app/frontend/store/useAuthStore";
 import { useConsultationStore } from "@/app/frontend/store/consultationStore";
 import { useDoctorStore } from "@/app/frontend/store/otherStore";
-
+import PatHeader from "@/app/frontend/components/dashboard/patient/PatHeader";
 
 // ─── Composant DoctorInfo ─────────────────────────────────────
-// Charge le profil du médecin à partir de son ID (string)
+
 const DoctorInfo = ({ doctorId }: { doctorId: string }) => {
   const { currentDoctor, fetchById } = useDoctorStore();
 
   useEffect(() => {
     fetchById(doctorId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doctorId]);
 
-  // currentDoctor est Partial<DoctorUser> — profile peut être undefined
   const firstName = currentDoctor?.profile?.firstName;
   const lastName  = currentDoctor?.profile?.lastName;
   const title     = currentDoctor?.profile?.title;
@@ -46,30 +45,29 @@ const DoctorInfo = ({ doctorId }: { doctorId: string }) => {
               ? `${title ?? ""} ${firstName} ${lastName ?? ""}`.trim()
               : "Chargement..."}
           </p>
-          {specialty && (
-            <p className="text-xs text-white/60">{specialty}</p>
-          )}
+          {specialty && <p className="text-xs text-white/60">{specialty}</p>}
         </div>
       </div>
     </div>
   );
 };
 
+// ─── PatDash ──────────────────────────────────────────────────
+
 const PatDash = () => {
-  const router = useRouter();
+  const router  = useRouter();
   const { user } = useAuthStore();
   const { consultations, isLoading, fetchMine, getByStatus, joinRoom } =
     useConsultationStore();
 
-  // ── Charger les consultations au montage ──────────────────
   useEffect(() => {
     fetchMine({ status: "confirmed", limit: 5 });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Données utilisateur ───────────────────────────────────
   const profile   = user?.profile;
   const firstName = profile?.firstName ?? "—";
-  const health    = isPatient(user!) ? user?.health : null;
+  const health    = user && isPatient(user!) ? user?.health : null;
   const weight    = health?.weight ?? null;
   const height    = health?.height ?? null;
   const bmi       = health?.bmi
@@ -78,18 +76,16 @@ const PatDash = () => {
       : null);
   const treatment = health?.currentMedications?.[0] ?? null;
 
-  // ── Prochain rendez-vous confirmé ─────────────────────────
-  const confirmed   = getByStatus("confirmed");
-  const inProgress  = getByStatus("in_progress");
-  const nextAppt    = inProgress[0] ?? confirmed[0] ?? null;
+  const confirmed  = getByStatus("confirmed");
+  const inProgress = getByStatus("in_progress");
+  const nextAppt   = inProgress[0] ?? confirmed[0] ?? null;
 
-  // ── Format date ───────────────────────────────────────────
   const formatDate = (dateStr: string | Date) => {
-    const d = new Date(dateStr);
+    const d   = new Date(dateStr);
     const now = new Date();
     const isToday =
-      d.getDate() === now.getDate() &&
-      d.getMonth() === now.getMonth() &&
+      d.getDate()     === now.getDate() &&
+      d.getMonth()    === now.getMonth() &&
       d.getFullYear() === now.getFullYear();
     const time = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
     return isToday
@@ -101,39 +97,12 @@ const PatDash = () => {
     <div className="flex flex-col flex-1 min-h-screen bg-[#f4f6fb]">
 
       {/* ── Header ── */}
-      <header className="flex items-center justify-between bg-white border-b border-gray-100 px-4 sm:px-6 py-4">
-        <h1 className="text-base font-bold text-gray-900">Tableau de bord</h1>
-        <div className="flex items-center gap-3">
-          <button className="relative p-2 rounded-xl text-gray-500 hover:bg-gray-50 transition-colors">
-            <Bell size={20} />
-            {consultations.length > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-            )}
-          </button>
-          <div className="flex items-center gap-3">
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-semibold text-gray-900 leading-tight">
-                {profile ? `${profile.firstName} ${profile.lastName}` : "—"}
-              </p>
-              <p className="text-xs text-gray-400">Patient</p>
-            </div>
-            <div className="w-9 h-9 rounded-full bg-gray-200 overflow-hidden shrink-0">
-              {profile?.photo ? (
-                <img src={profile.photo} alt="photo" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-sm font-bold text-gray-500">
-                  {profile?.firstName?.[0]}{profile?.lastName?.[0]}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
+      <PatHeader />
 
       {/* ── Corps ── */}
       <main className="flex flex-col gap-6 p-4 sm:p-6 max-w-5xl w-full mx-auto">
 
-        {/* ── Bienvenue + bouton ── */}
+        {/* Bienvenue */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold text-gray-900">
@@ -152,7 +121,7 @@ const PatDash = () => {
           </button>
         </div>
 
-        {/* ── Card prochain RDV ── */}
+        {/* Card prochain RDV */}
         {isLoading ? (
           <div className="bg-[#1e3a8a] rounded-2xl p-8 flex items-center justify-center gap-3 text-white/70">
             <Loader2 size={20} className="animate-spin" />
@@ -160,10 +129,7 @@ const PatDash = () => {
           </div>
         ) : nextAppt ? (
           <div className="bg-[#1e3a8a] rounded-2xl p-6 flex flex-col lg:flex-row gap-6 text-white">
-
-            {/* Infos RDV */}
             <div className="flex flex-col gap-4 flex-1">
-              {/* Badges */}
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-semibold bg-white/20 px-3 py-1 rounded-full">
                   Prochain rendez-vous
@@ -177,7 +143,6 @@ const PatDash = () => {
                 </span>
               </div>
 
-              {/* Date */}
               <div>
                 <p className="text-xs text-white/60 mb-1">Date et heure</p>
                 <p className="text-2xl font-bold capitalize">
@@ -185,13 +150,9 @@ const PatDash = () => {
                 </p>
               </div>
 
-              {/* Médecin — doctorId seulement, pas de populate */}
-              {nextAppt.doctorId && (
-                <DoctorInfo doctorId={nextAppt.doctorId} />
-              )}
+              {nextAppt.doctorId && <DoctorInfo doctorId={nextAppt.doctorId} />}
             </div>
 
-            {/* Téléconsultation / Cabinet */}
             <div className="flex flex-col gap-3 lg:w-56">
               <div className="bg-white/10 rounded-xl p-4 flex flex-col gap-2">
                 <div className="flex items-center gap-2">
@@ -234,12 +195,9 @@ const PatDash = () => {
             </div>
           </div>
         ) : (
-          /* Aucun RDV */
           <div className="bg-[#1e3a8a] rounded-2xl p-8 flex flex-col items-center gap-3 text-white text-center">
             <CalendarDays size={32} className="text-white/40" />
-            <p className="text-sm font-medium text-white/70">
-              Aucun rendez-vous à venir
-            </p>
+            <p className="text-sm font-medium text-white/70">Aucun rendez-vous à venir</p>
             <button
               onClick={() => router.push("/dashboard/patient/medecins")}
               className="flex items-center gap-2 bg-white text-[#1e3a8a] text-sm font-semibold px-5 py-2 rounded-xl hover:bg-blue-50 transition-colors"
@@ -250,10 +208,8 @@ const PatDash = () => {
           </div>
         )}
 
-        {/* ── Cards santé ── */}
+        {/* Cards santé */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-
-          {/* Tension */}
           <div className="bg-white rounded-2xl p-5 flex items-center gap-4 border border-gray-100 shadow-sm">
             <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
               <Activity size={18} className="text-[#1e3a8a]" />
@@ -266,7 +222,6 @@ const PatDash = () => {
             </div>
           </div>
 
-          {/* Poids / IMC */}
           <div className="bg-white rounded-2xl p-5 flex items-center gap-4 border border-gray-100 shadow-sm">
             <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center shrink-0">
               <Scale size={18} className="text-purple-600" />
@@ -275,14 +230,11 @@ const PatDash = () => {
               <p className="text-xs text-gray-400 mb-0.5">Poids (IMC)</p>
               <p className="text-base font-bold text-gray-900">
                 {weight ? `${weight} kg` : "—"}{" "}
-                {bmi && (
-                  <span className="text-xs font-normal text-gray-400">({bmi})</span>
-                )}
+                {bmi && <span className="text-xs font-normal text-gray-400">({bmi})</span>}
               </p>
             </div>
           </div>
 
-          {/* Traitement */}
           <div className="bg-white rounded-2xl p-5 flex items-center gap-4 border border-gray-100 shadow-sm">
             <div className="w-10 h-10 rounded-xl bg-yellow-50 flex items-center justify-center shrink-0">
               <Pill size={18} className="text-yellow-500" />
@@ -294,8 +246,8 @@ const PatDash = () => {
               </p>
             </div>
           </div>
-
         </div>
+
       </main>
     </div>
   );

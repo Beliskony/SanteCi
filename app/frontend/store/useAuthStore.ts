@@ -47,6 +47,7 @@ export interface PatientProfile extends BaseProfile {
   dateOfBirth: Date;
   gender: "male" | "female" | "other";
   bloodGroup?: "A+" | "A-" | "B+" | "B-" | "AB+" | "AB-" | "O+" | "O-";
+  photo?: string;
 }
 
 export interface PatientContact extends BaseContact {
@@ -117,6 +118,7 @@ export interface PatientUser {
 
 export interface DoctorProfile extends BaseProfile {
   title: "Dr" | "Pr" | "Médecin" | "Spécialiste";
+  photo?: string;
   specialty: string;
   bio: string;
   languages: "fr" | "en";
@@ -232,6 +234,9 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  
+  
+  updateProfilePhoto: (photoUrl: string) => void;
 
   // Actions
   setUser: (user: AuthUser, token: string) => void;
@@ -315,6 +320,28 @@ export const useAuthStore = create<AuthState>()(
             },
           });
         },
+
+        updateProfilePhoto: (photoUrl: string) => {
+  const { user, token } = get();
+  if (!user || !token) return;
+  
+  // Mettre à jour selon le rôle
+  if (isDoctor(user)) {
+    set({
+      user: {
+        ...user,
+        profile: { ...user.profile, photo: photoUrl }
+      }
+    });
+  } else if (isPatient(user)) {
+    set({
+      user: {
+        ...user,
+        profile: { ...user.profile, photo: photoUrl }
+      }
+    });
+  }
+},
 
         // Patient only — no-op si l'user n'est pas patient
         updateHealth: (health) => {

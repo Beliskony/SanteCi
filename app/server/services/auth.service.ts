@@ -223,6 +223,8 @@ class AuthService {
           role: 'doctor',
           isVerified: doctor.status.isVerified,
           accountStatus: doctor.status.accountStatus,
+          specialty: doctor.profile.specialty,
+          photo: doctor.profile.photo || null,
         },
       };
     }
@@ -276,6 +278,7 @@ class AuthService {
         email: patient.contact.email,
         role: 'patient',
         isVerified: patient.status.isVerified,
+        photo: patient.profile.photo || null,
       },
     };
   }

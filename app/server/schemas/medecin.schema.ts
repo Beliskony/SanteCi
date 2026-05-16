@@ -13,6 +13,7 @@ const ProfileSchema = z.object({
     'Cardiologie', 'Pédiatrie', 'Généraliste',
     'Dermatologie', 'Psychiatrie', 'Gynécologie', 'autres...',
   ]),
+  photo:     z.string().nullable().optional(), 
 });
 
 const CertificationSchema = z.object({

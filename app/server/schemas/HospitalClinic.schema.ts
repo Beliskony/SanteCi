@@ -87,6 +87,11 @@ const MetadataSchema = z.object({
   totalReviews: z.number().int().min(0).default(0),
 });
 
+const ImageCoverSchema = z.object({
+  url:      z.string().url(),
+  publicId: z.string().min(1),
+}).optional();
+
 // ── Schéma principal ───────────────────────────────────────────────────────────
 
 export const HospitalClinicSchema = z.object({
@@ -94,6 +99,7 @@ export const HospitalClinicSchema = z.object({
   name:         z.string().min(1),
   type:         z.string().min(1),
   category:     z.string().min(1),
+  imageCover:   ImageCoverSchema,
   location:     LocationSchema,
   contact:      ContactSchema,
   services:     z.array(ServiceSchema).default([]),

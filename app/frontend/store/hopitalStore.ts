@@ -9,37 +9,49 @@ import type {
   IHospitalClinic,
   HospitalFilters,
   HospitalSearchResponse,
+  CreateHospitalPayload,
+  UpdateHospitalPayload,
 } from "@/app/frontend/types/Etablisement";
 
 interface HospitalState {
-  // ── Données ──────────────────────────────────────────────
-  facilities: IHospitalClinic[];
+  // ── Données ───────────────────────────────────────────────
+  facilities:      IHospitalClinic[];
   currentFacility: IHospitalClinic | null;
-  isLoading: boolean;
-  error: string | null;
-  pagination: { total: number; page: number; pages: number };
-  activeFilters: HospitalFilters;
+  isLoading:       boolean;
+  error:           string | null;
+  pagination:      { total: number; page: number; pages: number };
+  activeFilters:   HospitalFilters;
 
   // ── Lecture ───────────────────────────────────────────────
-  search: (filters?: HospitalFilters) => Promise<void>;
-  loadMore: () => Promise<void>;
+  search:    (filters?: HospitalFilters) => Promise<void>;
+  initializeDefaultData: () => Promise<void>;
+  loadMore:  () => Promise<void>;
   fetchById: (id: string) => Promise<void>;
-  fetchByFacilityId: (facilityId: string) => Promise<void>;
+
+  // ── CRUD (admin) ──────────────────────────────────────────
+  create:    (payload: CreateHospitalPayload, image?: File) => Promise<void>;
+  update:    (id: string, payload: UpdateHospitalPayload, image?: File) => Promise<void>;
+  delete:    (id: string) => Promise<void>;
+  verify:    (id: string) => Promise<void>;
+
+  // ── Cover (admin) ─────────────────────────────────────────
+  updateCoverImage: (id: string, image: File) => Promise<void>;
+  deleteCoverImage: (id: string) => Promise<void>;
 
   // ── Staff (admin) ─────────────────────────────────────────
-  addDoctor: (facilityId: string, doctorId: string) => Promise<void>;
+  addDoctor:    (facilityId: string, doctorId: string) => Promise<void>;
   removeDoctor: (facilityId: string, doctorId: string) => Promise<void>;
 
   // ── Rating (patient) ──────────────────────────────────────
   submitReview: (id: string, data: { rating: number; comment?: string }) => Promise<void>;
 
   // ── Filtres ───────────────────────────────────────────────
-  setFilters: (filters: HospitalFilters) => void;
+  setFilters:   (filters: HospitalFilters) => void;
   resetFilters: () => void;
 
   // ── Utilitaires ───────────────────────────────────────────
   clearCurrent: () => void;
-  clearError: () => void;
+  clearError:   () => void;
 }
 
 const DEFAULT_FILTERS: HospitalFilters = { page: 1, limit: 10 };
@@ -47,12 +59,12 @@ const DEFAULT_FILTERS: HospitalFilters = { page: 1, limit: 10 };
 export const useHospitalStore = create<HospitalState>()(
   devtools(
     (set, get) => ({
-      facilities: [],
+      facilities:      [],
       currentFacility: null,
-      isLoading: false,
-      error: null,
-      pagination: { total: 0, page: 1, pages: 0 },
-      activeFilters: DEFAULT_FILTERS,
+      isLoading:       false,
+      error:           null,
+      pagination:      { total: 0, page: 1, pages: 0 },
+      activeFilters:   DEFAULT_FILTERS,
 
       // ── search — reset la liste ───────────────────────────
       search: async (filters) => {
@@ -63,17 +75,32 @@ export const useHospitalStore = create<HospitalState>()(
           set({
             facilities: res.facilities,
             pagination: { total: res.total, page: res.page, pages: res.pages },
-            isLoading: false,
+            isLoading:  false,
           });
         } catch (err) {
           set({
-            error: err instanceof Error ? err.message : "Erreur de recherche",
+            error:     err instanceof Error ? err.message : "Erreur de recherche",
             isLoading: false,
           });
         }
       },
 
-      // ── loadMore — append page suivante ──────────────────
+      
+      // ── initializeDefaultData — charge Abidjan par défaut ──────
+      initializeDefaultData: async () => {
+        const { facilities, search } = get();
+  
+      // Ne charger que si aucune donnée n'est présente
+        if (facilities.length === 0) {
+          await search({
+            city: "Abidjan",
+            limit: 12,
+          });
+        }
+      },
+      
+
+      // ── loadMore — append page suivante ───────────────────
       loadMore: async () => {
         const { pagination, activeFilters, facilities } = get();
         if (pagination.page >= pagination.pages) return;
@@ -85,20 +112,20 @@ export const useHospitalStore = create<HospitalState>()(
             page: pagination.page + 1,
           });
           set({
-            facilities: [...facilities, ...res.facilities],
-            pagination: { total: res.total, page: res.page, pages: res.pages },
+            facilities:    [...facilities, ...res.facilities],
+            pagination:    { total: res.total, page: res.page, pages: res.pages },
             activeFilters: { ...activeFilters, page: pagination.page + 1 },
-            isLoading: false,
+            isLoading:     false,
           });
         } catch (err) {
           set({
-            error: err instanceof Error ? err.message : "Erreur de chargement",
+            error:     err instanceof Error ? err.message : "Erreur de chargement",
             isLoading: false,
           });
         }
       },
 
-      // ── fetchById ────────────────────────────────────────
+      // ── fetchById ─────────────────────────────────────────
       fetchById: async (id) => {
         set({ isLoading: true, error: null });
         try {
@@ -106,88 +133,175 @@ export const useHospitalStore = create<HospitalState>()(
           set({ currentFacility: facility, isLoading: false });
         } catch (err) {
           set({
-            error: err instanceof Error ? err.message : "Établissement introuvable",
+            error:     err instanceof Error ? err.message : "Établissement introuvable",
             isLoading: false,
           });
         }
       },
 
-      // ── fetchByFacilityId ────────────────────────────────
-      fetchByFacilityId: async (facilityId) => {
+      // ── create ────────────────────────────────────────────
+      create: async (payload, image) => {
         set({ isLoading: true, error: null });
         try {
-          const facility = await hospitalService.getByFacilityId(facilityId);
-          set({ currentFacility: facility, isLoading: false });
+          const facility = await hospitalService.create(payload, image);
+          set((state) => ({
+            facilities: [facility, ...state.facilities],
+            isLoading:  false,
+          }));
         } catch (err) {
           set({
-            error: err instanceof Error ? err.message : "Établissement introuvable",
+            error:     err instanceof Error ? err.message : "Erreur lors de la création",
             isLoading: false,
           });
         }
       },
 
-      // ── addDoctor ────────────────────────────────────────
+      // ── update ────────────────────────────────────────────
+      update: async (id, payload, image) => {
+        set({ isLoading: true, error: null });
+        try {
+          const updated = await hospitalService.update(id, payload, image);
+          set((state) => ({
+            facilities:      state.facilities.map((f) => f._id.toString() === id ? updated : f),
+            currentFacility: state.currentFacility?._id.toString() === id ? updated : state.currentFacility,
+            isLoading:       false,
+          }));
+        } catch (err) {
+          set({
+            error:     err instanceof Error ? err.message : "Erreur lors de la mise à jour",
+            isLoading: false,
+          });
+        }
+      },
+
+      // ── delete ────────────────────────────────────────────
+      delete: async (id) => {
+        set({ isLoading: true, error: null });
+        try {
+          await hospitalService.delete(id);
+          set((state) => ({
+            facilities:      state.facilities.filter((f) => f._id.toString() !== id),
+            currentFacility: state.currentFacility?._id.toString() === id ? null : state.currentFacility,
+            isLoading:       false,
+          }));
+        } catch (err) {
+          set({
+            error:     err instanceof Error ? err.message : "Erreur lors de la suppression",
+            isLoading: false,
+          });
+        }
+      },
+
+      // ── verify ────────────────────────────────────────────
+      verify: async (id) => {
+        set({ isLoading: true, error: null });
+        try {
+          await hospitalService.verify(id);
+          // Rafraîchir pour refléter metadata.verified
+          await get().fetchById(id);
+          set({ isLoading: false });
+        } catch (err) {
+          set({
+            error:     err instanceof Error ? err.message : "Erreur lors de la vérification",
+            isLoading: false,
+          });
+        }
+      },
+
+      // ── updateCoverImage ──────────────────────────────────
+      updateCoverImage: async (id, image) => {
+        set({ isLoading: true, error: null });
+        try {
+          const updated = await hospitalService.updateCoverImage(id, image);
+          set((state) => ({
+            facilities:      state.facilities.map((f) => f._id.toString() === id ? updated : f),
+            currentFacility: state.currentFacility?._id.toString() === id ? updated : state.currentFacility,
+            isLoading:       false,
+          }));
+        } catch (err) {
+          set({
+            error:     err instanceof Error ? err.message : "Erreur lors du changement d'image",
+            isLoading: false,
+          });
+        }
+      },
+
+      // ── deleteCoverImage ──────────────────────────────────
+      deleteCoverImage: async (id) => {
+        set({ isLoading: true, error: null });
+        try {
+          await hospitalService.deleteCoverImage(id);
+          // Rafraîchir pour refléter la suppression
+          await get().fetchById(id);
+          set({ isLoading: false });
+        } catch (err) {
+          set({
+            error:     err instanceof Error ? err.message : "Erreur lors de la suppression de l'image",
+            isLoading: false,
+          });
+        }
+      },
+
+      // ── addDoctor ─────────────────────────────────────────
       addDoctor: async (facilityId, doctorId) => {
         set({ isLoading: true, error: null });
         try {
           await hospitalService.addDoctor(facilityId, doctorId);
-          // Rafraîchir le détail si c'est l'établissement courant
           const { currentFacility } = get();
-          if (currentFacility?.facilityId === facilityId) {
-            await get().fetchByFacilityId(facilityId);
+          if (currentFacility?._id.toString() === facilityId) {
+            await get().fetchById(facilityId);
           }
           set({ isLoading: false });
         } catch (err) {
           set({
-            error: err instanceof Error ? err.message : "Erreur lors de l'ajout du médecin",
+            error:     err instanceof Error ? err.message : "Erreur lors de l'ajout du médecin",
             isLoading: false,
           });
         }
       },
 
-      // ── removeDoctor ─────────────────────────────────────
+      // ── removeDoctor ──────────────────────────────────────
       removeDoctor: async (facilityId, doctorId) => {
         set({ isLoading: true, error: null });
         try {
           await hospitalService.removeDoctor(facilityId, doctorId);
           const { currentFacility } = get();
-          if (currentFacility?.facilityId === facilityId) {
-            await get().fetchByFacilityId(facilityId);
+          if (currentFacility?._id.toString() === facilityId) {
+            await get().fetchById(facilityId);
           }
           set({ isLoading: false });
         } catch (err) {
           set({
-            error: err instanceof Error ? err.message : "Erreur lors du retrait du médecin",
+            error:     err instanceof Error ? err.message : "Erreur lors du retrait du médecin",
             isLoading: false,
           });
         }
       },
 
-      // ── submitReview ─────────────────────────────────────
+      // ── submitReview ──────────────────────────────────────
       submitReview: async (id, data) => {
         set({ isLoading: true, error: null });
         try {
           await hospitalService.submitReview(id, data);
-          // Rafraîchir le détail pour mettre à jour le rating affiché
           await get().fetchById(id);
           set({ isLoading: false });
         } catch (err) {
           set({
-            error: err instanceof Error ? err.message : "Erreur lors de la soumission de l'avis",
+            error:     err instanceof Error ? err.message : "Erreur lors de la soumission de l'avis",
             isLoading: false,
           });
         }
       },
 
-      // ── setFilters ───────────────────────────────────────
+      // ── setFilters ────────────────────────────────────────
       setFilters: (filters) =>
         set((state) => ({ activeFilters: { ...state.activeFilters, ...filters } })),
 
       resetFilters: () => set({ activeFilters: DEFAULT_FILTERS }),
 
-      // ── Utilitaires ──────────────────────────────────────
+      // ── Utilitaires ───────────────────────────────────────
       clearCurrent: () => set({ currentFacility: null }),
-      clearError: () => set({ error: null }),
+      clearError:   () => set({ error: null }),
     }),
     { name: "HospitalStore" }
   )
