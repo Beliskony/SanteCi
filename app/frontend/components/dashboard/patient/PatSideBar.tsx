@@ -21,9 +21,9 @@ import { authService } from "@/app/frontend/services/authService";
 const NAV_ITEMS = [
   { label: "Tableau de bord",    href: "/patient",          icon: LayoutDashboard },
   { label: "Trouver un médecin", href: "/patient/medecins", icon: Search },
-  { label: "Mes rendez-vous",    href: "/dashboard/patient/rdv",      icon: CalendarDays },
+  { label: "Mes rendez-vous",    href: "/patient/rdv",      icon: CalendarDays },
   { label: "Messagerie",         href: "/patient/messages", icon: MessageSquare },
-  { label: "Dossier médical",    href: "/dashboard/patient/dossier",  icon: FolderHeart },
+  { label: "Dossier médical",    href: "/patient/dossier",  icon: FolderHeart },
 ];
 
 // ─── Contenu partagé (desktop + drawer mobile) ────────────────
@@ -34,7 +34,7 @@ const SidebarContent = ({ onClose }: { onClose?: () => void }) => {
   const handleLogout = () => {
     authService.logout();
     onClose?.();
-    router.push("/auth/login");
+    router.push("/login");
   };
 
   return (
@@ -91,17 +91,17 @@ const SidebarContent = ({ onClose }: { onClose?: () => void }) => {
       {/* Bas */}
       <div className="flex flex-col gap-1 pt-4 border-t border-gray-100">
         <Link
-          href="/dashboard/patient/parametres"
+          href="/patient/parametres"
           onClick={() => onClose?.()}
           className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors duration-150 ${
-            pathname === "/dashboard/patient/parametres"
+            pathname === "/patient/parametres"
               ? "bg-blue-50 text-[#1e3a8a]"
               : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
           }`}
         >
           <Settings
             size={18}
-            className={pathname === "/dashboard/patient/parametres" ? "text-[#1e3a8a]" : "text-gray-400"}
+            className={pathname === "/patient/parametres" ? "text-[#1e3a8a]" : "text-gray-400"}
             strokeWidth={1.8}
           />
           Paramètres

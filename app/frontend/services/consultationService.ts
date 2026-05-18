@@ -90,7 +90,7 @@ export const appointmentService = {
    */
   async create(dto: CreateAppointmentDTO): Promise<Appointment> {
     const res = await api.post<ApiResponse<Appointment>>(
-      "/api/appointments",
+      "/appointments",
       dto
     );
     return res.data;
@@ -104,7 +104,7 @@ export const appointmentService = {
    */
   async getById(id: string): Promise<Appointment> {
     const res = await api.get<ApiResponse<Appointment>>(
-      `/api/appointments/${id}`
+      `/appointments/${id}`
     );
     return res.data;
   },
@@ -132,7 +132,7 @@ export const appointmentService = {
     if (filters?.limit)     qs.append("limit",     String(filters.limit));
 
     const query = qs.toString();
-    return api.get(`/api/appointments${query ? `?${query}` : ""}`);
+    return api.get(`/appointments${query ? `?${query}` : ""}`);
   },
 
   // ── Confirmer (médecin) ───────────────────────────────────────────────────
@@ -143,7 +143,7 @@ export const appointmentService = {
    */
   async confirm(id: string): Promise<Appointment> {
     const res = await api.patch<ApiResponse<Appointment>>(
-      `/api/appointments/${id}/confirm`,
+      `/appointments/${id}/confirm`,
       {}
     );
     return res.data;
@@ -158,7 +158,7 @@ export const appointmentService = {
    */
   async start(id: string): Promise<Appointment> {
     const res = await api.patch<ApiResponse<Appointment>>(
-      `/api/appointments/${id}/start`,
+      `/appointments/${id}/start`,
       {}
     );
     return res.data;
@@ -173,7 +173,7 @@ export const appointmentService = {
    */
   async end(id: string, dto: UpdateConsultationDTO): Promise<Appointment> {
     const res = await api.patch<ApiResponse<Appointment>>(
-      `/api/appointments/${id}/end`,
+      `/appointments/${id}/end`,
       dto
     );
     return res.data;
@@ -194,7 +194,7 @@ export const appointmentService = {
     reason: string
   ): Promise<Appointment> {
     const res = await api.patch<ApiResponse<Appointment>>(
-      `/api/appointments/${id}/cancel`,
+      `/appointments/${id}/cancel`,
       { cancelledBy, reason }
     );
     return res.data;
@@ -208,7 +208,7 @@ export const appointmentService = {
    */
   async markNoShow(id: string): Promise<Appointment> {
     const res = await api.patch<ApiResponse<Appointment>>(
-      `/api/appointments/${id}/no-show`,
+      `/appointments/${id}/no-show`,
       {}
     );
     return res.data;
@@ -226,7 +226,7 @@ export const appointmentService = {
     id: string,
     role: "patient" | "doctor"
   ): Promise<{ message: string }> {
-    return api.post(`/api/appointments/${id}/join`, { role });
+    return api.post(`/appointments/${id}/join`, { role });
   },
 
   // ── Mettre à jour le paiement ─────────────────────────────────────────────
@@ -241,7 +241,7 @@ export const appointmentService = {
     dto: UpdatePaymentDTO
   ): Promise<Appointment> {
     const res = await api.patch<ApiResponse<Appointment>>(
-      `/api/appointments/${id}/payment`,
+      `/appointments/${id}/payment`,
       dto
     );
     return res.data;
@@ -256,7 +256,7 @@ export const appointmentService = {
    */
   async getAgenda(doctorId: string, date: string): Promise<Appointment[]> {
     const qs = new URLSearchParams({ doctorId, date });
-    return api.get(`/api/appointments/agenda?${qs.toString()}`);
+    return api.get(`/appointments/agenda?${qs.toString()}`);
   },
 
   // ── Statistiques du médecin ───────────────────────────────────────────────
@@ -268,7 +268,7 @@ export const appointmentService = {
    */
   async getStats(doctorId: string): Promise<DoctorStatsResponse> {
     return api.get(
-      `/api/appointments/stats?doctorId=${encodeURIComponent(doctorId)}`
+      `/appointments/stats?doctorId=${encodeURIComponent(doctorId)}`
     );
   },
 };

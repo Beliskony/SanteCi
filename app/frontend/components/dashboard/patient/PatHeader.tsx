@@ -2,12 +2,12 @@
 
 import { Bell } from "lucide-react";
 import { useAuthStore } from "@/app/frontend/store/useAuthStore";
-import { useConsultationStore } from "@/app/frontend/store/consultationStore";
+import { useAppointmentStore } from "@/app/frontend/store/appoitmentStore";
 
 const PatHeader = () => {
   const user         = useAuthStore((s) => s.user);
   const profile      = user && "profile" in user ? user.profile : null;
-  const consultations = useConsultationStore((s) => s.consultations);
+  const appointments = useAppointmentStore((s) => s.appointments);
 
   return (
     <header className="flex items-center justify-between bg-white border-b border-gray-100 px-4 sm:px-6 py-4">
@@ -17,7 +17,7 @@ const PatHeader = () => {
         {/* Cloche notifications */}
         <button className="relative p-2 rounded-xl text-gray-500 hover:bg-gray-50 transition-colors">
           <Bell size={20} />
-          {consultations.length > 0 && (
+          {appointments.length > 0 && (
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
           )}
         </button>

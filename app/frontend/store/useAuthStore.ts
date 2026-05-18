@@ -231,15 +231,16 @@ export const isDoctor = (user: AuthUser): user is DoctorUser =>
 interface AuthState {
   user: AuthUser | null;
   token: string | null;
+  refreshToken: string | null   // ← nouveau
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  
-  
+
   updateProfilePhoto: (photoUrl: string) => void;
 
   // Actions
-  setUser: (user: AuthUser, token: string) => void;
+  setUser: (user: AuthUser, token: string, refreshToken: string) => void;
+  setTokens: (token: string, refreshToken: string) => void;  // ← nouveau
   updatePatientProfile: (profile: Partial<PatientProfile>) => void;
   updateDoctorProfile: (profile: Partial<DoctorProfile>) => void;
   updateLocation: (location: Partial<BaseLocation>) => void;
@@ -268,12 +269,18 @@ export const useAuthStore = create<AuthState>()(
       (set, get) => ({
         user: null,
         token: null,
+        refreshToken: null,
         isAuthenticated: false,
         isLoading: false,
         error: null,
 
-        setUser: (user, token) =>
-          set({ user, token, isAuthenticated: true, error: null }),
+        // Appelé après login — stocke user + les deux tokens
+        setUser: (user, token, refreshToken) =>
+          set({ user, token, refreshToken, isAuthenticated: true, error: null }),
+
+        // Appelé après refresh — met à jour les tokens sans toucher au user
+        setTokens: (token, refreshToken) =>
+          set({ token, refreshToken }),
 
         updatePatientProfile: (profile) => {
           const { user } = get();
@@ -290,100 +297,58 @@ export const useAuthStore = create<AuthState>()(
         updateLocation: (location) => {
           const { user } = get();
           if (!user) return;
-          set({
-            user: {
-              ...user,
-              location: { ...user.location, ...location },
-            },
-          });
+          set({ user: { ...user, location: { ...user.location, ...location } } });
         },
 
-        // Doctor only — no-op si l'user n'est pas médecin
         setOnlineStatus: (isOnline) => {
           const { user } = get();
           if (!user || !isDoctor(user)) return;
-          set({
-            user: {
-              ...user,
-              status: { ...user.status, isOnline },
-            },
-          });
+          set({ user: { ...user, status: { ...user.status, isOnline } } });
         },
 
         updateTelemedicine: (data) => {
           const { user } = get();
           if (!user || !isDoctor(user)) return;
-          set({
-            user: {
-              ...user,
-              telemedicine: { ...user.telemedicine, ...data },
-            },
-          });
+          set({ user: { ...user, telemedicine: { ...user.telemedicine, ...data } } });
         },
 
         updateProfilePhoto: (photoUrl: string) => {
-  const { user, token } = get();
-  if (!user || !token) return;
-  
-  // Mettre à jour selon le rôle
-  if (isDoctor(user)) {
-    set({
-      user: {
-        ...user,
-        profile: { ...user.profile, photo: photoUrl }
-      }
-    });
-  } else if (isPatient(user)) {
-    set({
-      user: {
-        ...user,
-        profile: { ...user.profile, photo: photoUrl }
-      }
-    });
-  }
-},
+          const { user } = get();
+          if (!user) return;
+          // Met à jour la photo dans le profile du user, que ce soit patient ou médecin
+            if (isPatient(user)) {
+              set({ user: { ...user, profile: { ...user.profile, photo: photoUrl } } });
+            } else if (isDoctor(user)) {
+              set({ user: { ...user, profile: { ...user.profile, photo: photoUrl } } });
+          }
+        },
 
-        // Patient only — no-op si l'user n'est pas patient
         updateHealth: (health) => {
           const { user } = get();
           if (!user || !isPatient(user)) return;
-          set({
-            user: {
-              ...user,
-              health: { ...user.health, ...health },
-            },
-          });
+          set({ user: { ...user, health: { ...user.health, ...health } } });
         },
 
         updatePreferences: (prefs) => {
           const { user } = get();
           if (!user || !isPatient(user)) return;
-          set({
-            user: {
-              ...user,
-              preferences: { ...user.preferences, ...prefs },
-            },
-          });
+          set({ user: { ...user, preferences: { ...user.preferences, ...prefs } } });
         },
 
         logout: () =>
-          set({ user: null, token: null, isAuthenticated: false, error: null }),
+          set({ user: null, token: null, refreshToken: null, isAuthenticated: false, error: null }),
 
         setLoading: (isLoading) => set({ isLoading }),
-
         setError: (error) => set({ error }),
       }),
       {
         name: "auth-storage",
-        // Ne pas persister le mot de passe ni les données sensibles
         partialize: (state) => ({
-          token: state.token,
+          token:           state.token,
+          refreshToken:    state.refreshToken,  // ← persisté
           isAuthenticated: state.isAuthenticated,
           user: state.user
-            ? {
-                ...state.user,
-                security: undefined, // exclure security du localStorage
-              }
+            ? { ...state.user, security: undefined }
             : null,
         }),
       }

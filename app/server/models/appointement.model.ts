@@ -94,4 +94,4 @@ const AppointmentSchema: Schema = new Schema({
 
 });
 
-export const Appointment = mongoose.model<IAppointment>('Appointment', AppointmentSchema);
+export const Appointment = mongoose.models.Appointment || mongoose.model<IAppointment>('Appointment', AppointmentSchema);
