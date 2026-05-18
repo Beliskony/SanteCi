@@ -1,78 +1,141 @@
 // ============================================================
-// store/consultationStore.ts — État global des consultations
-// Compatible avec useAuthStore (PatientUser / DoctorUser)
+// store/appointmentStore.ts
+// Aligné sur appointmentService.ts + appointment.types.ts
 // ============================================================
 
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
-import { consultationService } from "../services/consultationService";
+import { appointmentService } from "../services/consultationService";
 import type {
-  Consultation,
-  CreateConsultationPayload,
-  ConsultationFilters,
-  ConsultationStatus,
-  Prescription,
-  PaginatedResponse,
-} from "../types";
+  Appointment,
+  AppointmentStatus,
+  AppointmentFiltersDTO,
+  CreateAppointmentDTO,
+  UpdateConsultationDTO,
+  UpdatePaymentDTO,
+  PaginatedAppointments,
+  DoctorStatsResponse,
+  CancelledBy,
+} from "../types/Appointment";
 
-interface ConsultationState {
-  // Données
-  consultations: Consultation[];
-  currentConsultation: Consultation | null;
-  currentPrescription: Prescription | null;
+// ─── State ────────────────────────────────────────────────────────────────────
+
+interface AppointmentState {
+  // ── Données ──────────────────────────────────────────────────────────────
+  appointments: Appointment[];
+  currentAppointment: Appointment | null;
+  agenda: Appointment[];
+  stats: DoctorStatsResponse | null;
+
+  // ── UI ────────────────────────────────────────────────────────────────────
   isLoading: boolean;
   error: string | null;
   pagination: {
     total: number;
     page: number;
-    limit: number;
-    totalPages: number;
+    pages: number;
   };
 
-  // Actions
-  fetchMine: (filters?: ConsultationFilters) => Promise<void>;
-  fetchById: (id: string) => Promise<void>;
-  book: (payload: CreateConsultationPayload) => Promise<Consultation>;
-  cancel: (id: string, reason?: string) => Promise<void>;
-  confirm: (id: string) => Promise<void>;
-  start: (id: string) => Promise<void>;
-  complete: (
-    id: string,
-    data: Parameters<typeof consultationService.complete>[1]
-  ) => Promise<void>;
-  fetchPrescription: (consultationId: string) => Promise<void>;
-  joinRoom: (id: string) => Promise<{ meetingUrl: string; roomToken: string }>;
-  leaveReview: (id: string, data: { rating: number; comment?: string }) => Promise<void>;
+  // ── Actions : lecture ─────────────────────────────────────────────────────
 
-  // Utils
-  getByStatus: (status: ConsultationStatus) => Consultation[];
+  /** GET /api/appointments?... — liste paginée avec filtres */
+  fetchList: (filters?: AppointmentFiltersDTO) => Promise<void>;
+
+  /** GET /api/appointments/[id] */
+  fetchById: (id: string) => Promise<void>;
+
+  /** GET /api/appointments/agenda?doctorId=...&date=... */
+  fetchAgenda: (doctorId: string, date: string) => Promise<void>;
+
+  /** GET /api/appointments/stats?doctorId=... */
+  fetchStats: (doctorId: string) => Promise<void>;
+
+  // ── Actions : mutations ───────────────────────────────────────────────────
+
+  /** POST /api/appointments */
+  create: (dto: CreateAppointmentDTO) => Promise<Appointment>;
+
+  /**
+   * PATCH /api/appointments/[id]/cancel
+   * ⚠️  cancelledBy requis — le backend vérifie l'autorisation via ce champ.
+   */
+  cancel: (id: string, cancelledBy: CancelledBy, reason: string) => Promise<void>;
+
+  /** PATCH /api/appointments/[id]/confirm — médecin uniquement */
+  confirm: (id: string) => Promise<void>;
+
+  /** PATCH /api/appointments/[id]/start — médecin uniquement */
+  start: (id: string) => Promise<void>;
+
+  /**
+   * PATCH /api/appointments/[id]/end — médecin uniquement
+   * ongoing → completed. Calcule actualDuration côté backend.
+   */
+  end: (id: string, dto: UpdateConsultationDTO) => Promise<void>;
+
+  /** PATCH /api/appointments/[id]/no-show — médecin uniquement */
+  markNoShow: (id: string) => Promise<void>;
+
+  /**
+   * POST /api/appointments/[id]/join
+   * Enregistre patientJoinedAt ou doctorJoinedAt.
+   * ⚠️  Aucune URL de salle retournée — la gestion vidéo est externe.
+   */
+  join: (id: string, role: "patient" | "doctor") => Promise<void>;
+
+  /** PATCH /api/appointments/[id]/payment */
+  updatePayment: (id: string, dto: UpdatePaymentDTO) => Promise<void>;
+
+  // ── Getters côté client (sans appel API) ─────────────────────────────────
+
+  getByStatus: (status: AppointmentStatus) => Appointment[];
+
+  // ── Utils ─────────────────────────────────────────────────────────────────
+
   clearCurrent: () => void;
   clearError: () => void;
 }
 
-export const useConsultationStore = create<ConsultationState>()(
+// ─── Helpers internes ─────────────────────────────────────────────────────────
+
+/** Remplace un rendez-vous dans la liste par sa version mise à jour */
+const replaceInList = (
+  list: Appointment[],
+  updated: Appointment
+): Appointment[] =>
+  list.map((a) => (a._id === updated._id ? updated : a));
+
+/** Met à jour currentAppointment si c'est le même _id */
+const maybeUpdateCurrent = (
+  current: Appointment | null,
+  updated: Appointment
+): Appointment | null =>
+  current?._id === updated._id ? updated : current;
+
+// ─── Store ────────────────────────────────────────────────────────────────────
+
+export const useAppointmentStore = create<AppointmentState>()(
   devtools(
     (set, get) => ({
-      consultations: [],
-      currentConsultation: null,
-      currentPrescription: null,
+      // ── État initial ────────────────────────────────────────────────────────
+      appointments: [],
+      currentAppointment: null,
+      agenda: [],
+      stats: null,
       isLoading: false,
       error: null,
-      pagination: { total: 0, page: 1, limit: 10, totalPages: 0 },
+      pagination: { total: 0, page: 1, pages: 0 },
 
-      fetchMine: async (filters) => {
+      // ── Lecture ─────────────────────────────────────────────────────────────
+
+      fetchList: async (filters) => {
         set({ isLoading: true, error: null });
         try {
-          const res: PaginatedResponse<Consultation> =
-            await consultationService.getMine(filters);
+          const res: PaginatedAppointments =
+            await appointmentService.list(filters);
           set({
-            consultations: res.data,
-            pagination: {
-              total: res.total,
-              page: res.page,
-              limit: res.limit,
-              totalPages: res.totalPages,
-            },
+            appointments: res.appointments,
+            pagination: { total: res.total, page: res.page, pages: res.pages },
             isLoading: false,
           });
         } catch (err) {
@@ -86,44 +149,74 @@ export const useConsultationStore = create<ConsultationState>()(
       fetchById: async (id) => {
         set({ isLoading: true, error: null });
         try {
-          const consultation = await consultationService.getById(id);
-          set({ currentConsultation: consultation, isLoading: false });
+          const appointment = await appointmentService.getById(id);
+          set({ currentAppointment: appointment, isLoading: false });
         } catch (err) {
           set({
-            error: err instanceof Error ? err.message : "Consultation introuvable",
+            error:
+              err instanceof Error ? err.message : "Rendez-vous introuvable",
             isLoading: false,
           });
         }
       },
 
-      book: async (payload) => {
+      fetchAgenda: async (doctorId, date) => {
         set({ isLoading: true, error: null });
         try {
-          const newConsultation = await consultationService.book(payload);
+          const agenda = await appointmentService.getAgenda(doctorId, date);
+          set({ agenda, isLoading: false });
+        } catch (err) {
+          set({
+            error:
+              err instanceof Error ? err.message : "Erreur de chargement de l'agenda",
+            isLoading: false,
+          });
+        }
+      },
+
+      fetchStats: async (doctorId) => {
+        set({ isLoading: true, error: null });
+        try {
+          const stats = await appointmentService.getStats(doctorId);
+          set({ stats, isLoading: false });
+        } catch (err) {
+          set({
+            error:
+              err instanceof Error ? err.message : "Erreur de chargement des statistiques",
+            isLoading: false,
+          });
+        }
+      },
+
+      // ── Mutations ───────────────────────────────────────────────────────────
+
+      create: async (dto) => {
+        set({ isLoading: true, error: null });
+        try {
+          const created = await appointmentService.create(dto);
           set((state) => ({
-            consultations: [newConsultation, ...state.consultations],
+            appointments: [created, ...state.appointments],
             isLoading: false,
           }));
-          return newConsultation;
+          return created;
         } catch (err) {
-          const message = err instanceof Error ? err.message : "Erreur de réservation";
+          const message =
+            err instanceof Error ? err.message : "Erreur de création";
           set({ error: message, isLoading: false });
           throw err;
         }
       },
 
-      cancel: async (id, reason) => {
+      cancel: async (id, cancelledBy, reason) => {
         set({ isLoading: true, error: null });
         try {
-          const updated = await consultationService.cancel(id, reason);
+          const updated = await appointmentService.cancel(id, cancelledBy, reason);
           set((state) => ({
-            consultations: state.consultations.map((c) =>
-              c._id === id ? updated : c
+            appointments: replaceInList(state.appointments, updated),
+            currentAppointment: maybeUpdateCurrent(
+              state.currentAppointment,
+              updated
             ),
-            currentConsultation:
-              state.currentConsultation?._id === id
-                ? updated
-                : state.currentConsultation,
             isLoading: false,
           }));
         } catch (err) {
@@ -138,16 +231,19 @@ export const useConsultationStore = create<ConsultationState>()(
       confirm: async (id) => {
         set({ isLoading: true, error: null });
         try {
-          const updated = await consultationService.confirm(id);
+          const updated = await appointmentService.confirm(id);
           set((state) => ({
-            consultations: state.consultations.map((c) =>
-              c._id === id ? updated : c
+            appointments: replaceInList(state.appointments, updated),
+            currentAppointment: maybeUpdateCurrent(
+              state.currentAppointment,
+              updated
             ),
             isLoading: false,
           }));
         } catch (err) {
           set({
-            error: err instanceof Error ? err.message : "Erreur de confirmation",
+            error:
+              err instanceof Error ? err.message : "Erreur de confirmation",
             isLoading: false,
           });
           throw err;
@@ -157,12 +253,13 @@ export const useConsultationStore = create<ConsultationState>()(
       start: async (id) => {
         set({ isLoading: true, error: null });
         try {
-          const updated = await consultationService.start(id);
+          const updated = await appointmentService.start(id);
           set((state) => ({
-            consultations: state.consultations.map((c) =>
-              c._id === id ? updated : c
+            appointments: replaceInList(state.appointments, updated),
+            currentAppointment: maybeUpdateCurrent(
+              state.currentAppointment,
+              updated
             ),
-            currentConsultation: updated,
             isLoading: false,
           }));
         } catch (err) {
@@ -174,56 +271,94 @@ export const useConsultationStore = create<ConsultationState>()(
         }
       },
 
-      complete: async (id, data) => {
+      end: async (id, dto) => {
         set({ isLoading: true, error: null });
         try {
-          const updated = await consultationService.complete(id, data);
+          const updated = await appointmentService.end(id, dto);
           set((state) => ({
-            consultations: state.consultations.map((c) =>
-              c._id === id ? updated : c
+            appointments: replaceInList(state.appointments, updated),
+            currentAppointment: maybeUpdateCurrent(
+              state.currentAppointment,
+              updated
             ),
-            currentConsultation: updated,
             isLoading: false,
           }));
         } catch (err) {
           set({
-            error: err instanceof Error ? err.message : "Erreur lors de la clôture",
+            error:
+              err instanceof Error ? err.message : "Erreur lors de la clôture",
             isLoading: false,
           });
           throw err;
         }
       },
 
-      fetchPrescription: async (consultationId) => {
+      markNoShow: async (id) => {
         set({ isLoading: true, error: null });
         try {
-          const prescription = await consultationService.getPrescription(consultationId);
-          set({ currentPrescription: prescription, isLoading: false });
+          const updated = await appointmentService.markNoShow(id);
+          set((state) => ({
+            appointments: replaceInList(state.appointments, updated),
+            currentAppointment: maybeUpdateCurrent(
+              state.currentAppointment,
+              updated
+            ),
+            isLoading: false,
+          }));
         } catch (err) {
           set({
-            error: err instanceof Error ? err.message : "Ordonnance introuvable",
+            error:
+              err instanceof Error ? err.message : "Erreur lors du marquage absent",
             isLoading: false,
           });
+          throw err;
         }
       },
 
-      joinRoom: async (id) => {
-        return consultationService.joinRoom(id);
+      join: async (id, role) => {
+        // Pas de isLoading — appel silencieux en arrière-plan
+        try {
+          await appointmentService.join(id, role);
+        } catch (err) {
+          // Non bloquant : on log mais on ne coupe pas l'expérience utilisateur
+          console.warn("[AppointmentStore] join échoué :", err);
+        }
       },
 
-      leaveReview: async (id, data) => {
-        await consultationService.leaveReview(id, data);
+      updatePayment: async (id, dto) => {
+        set({ isLoading: true, error: null });
+        try {
+          const updated = await appointmentService.updatePayment(id, dto);
+          set((state) => ({
+            appointments: replaceInList(state.appointments, updated),
+            currentAppointment: maybeUpdateCurrent(
+              state.currentAppointment,
+              updated
+            ),
+            isLoading: false,
+          }));
+        } catch (err) {
+          set({
+            error:
+              err instanceof Error
+                ? err.message
+                : "Erreur de mise à jour du paiement",
+            isLoading: false,
+          });
+          throw err;
+        }
       },
 
-      // Getter filtré côté client (pas d'appel API)
-      getByStatus: (status) => {
-        return get().consultations.filter((c) => c.status === status);
-      },
+      // ── Getters côté client ─────────────────────────────────────────────────
 
-      clearCurrent: () =>
-        set({ currentConsultation: null, currentPrescription: null }),
+      getByStatus: (status) =>
+        get().appointments.filter((a) => a.status.current === status),
+
+      // ── Utils ───────────────────────────────────────────────────────────────
+
+      clearCurrent: () => set({ currentAppointment: null }),
       clearError: () => set({ error: null }),
     }),
-    { name: "ConsultationStore" }
+    { name: "AppointmentStore" }
   )
 );

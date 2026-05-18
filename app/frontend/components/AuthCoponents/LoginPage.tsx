@@ -37,7 +37,7 @@ const LoginPage = () => {
     try {
       await authService.login({ email: form.identifier, password: form.password, role });
     await authService.refreshUser(); // ← fetch le profil complet
-    router.push(role === "doctor" ? "/dashboard/doctor" : "/dashboard/patient");
+    router.push(role === "doctor" ? "/doctor" : "/patient");
 
     } catch {
       // L'erreur est déjà dans le store via authService → setError()

@@ -70,7 +70,6 @@ const Prerequis = () => {
 
           {/* Warning banner */}
           <div className="bg-red-50 border border-red-100 rounded-xl p-4 flex items-start gap-3">
-            <AlertTriangle size={16} className="text-red-500 mt-0.5 shrink-0" strokeWidth={2} />
             <p className="text-xs text-red-600 leading-relaxed">
               <span className="font-semibold">La téléconsultation ne remplace pas les urgences.</span>{" "}
               En cas d'urgence vitale, contactez immédiatement le 185 ou le 180.
