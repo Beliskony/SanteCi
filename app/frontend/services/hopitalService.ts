@@ -58,7 +58,7 @@ export const hospitalService = {
 
   /**
    * Recherche avec filtres
-   * → GET /hopitaux
+   * GET /hopitaux
    */
   async search(filters?: HospitalFilters): Promise<HospitalSearchResponse> {
     const qs = new URLSearchParams();
@@ -93,7 +93,7 @@ export const hospitalService = {
 
   /**
    * Détail par _id MongoDB
-   * → GET /hopitaux/[id]
+   * GET /hopitaux/[id]
    */
   async getById(id: string): Promise<IHospitalClinic> {
     const res = await api.get<ApiResponse<IHospitalClinic>>(
@@ -107,7 +107,7 @@ export const hospitalService = {
 
   /**
    * Créer un établissement — FormData pour supporter l'image optionnelle
-   * → POST /hopitaux  (via uploadFile qui gère le multipart)
+   * POST /hopitaux  (via uploadFile qui gère le multipart)
    */
   async create(payload: CreateHospitalPayload, image?: File): Promise<IHospitalClinic> {
     const formData = new FormData();
@@ -123,7 +123,7 @@ export const hospitalService = {
 
   /**
    * Mettre à jour un établissement — FormData pour supporter l'image optionnelle
-   * → PUT /hopitaux/[id]
+   * PUT /hopitaux/[id]
    */
   async update(
     id: string,
@@ -144,7 +144,7 @@ export const hospitalService = {
 
   /**
    * Mettre à jour uniquement l'image de couverture
-   * → PATCH /hopitaux/[id]/cover
+   * PATCH /hopitaux/[id]/cover
    */
   async updateCoverImage(id: string, image: File): Promise<IHospitalClinic> {
     const formData = new FormData();
@@ -160,7 +160,7 @@ export const hospitalService = {
 
   /**
    * Supprimer l'image de couverture
-   * → DELETE /hopitaux/[id]/cover
+   * DELETE /hopitaux/[id]/cover
    */
   async deleteCoverImage(id: string): Promise<{ message: string }> {
     const res = await api.del<ApiResponse<{ message: string }>>(
@@ -171,7 +171,7 @@ export const hospitalService = {
 
   /**
    * Ajouter un médecin au staff
-   * → POST /hopitaux/[id]/doctors
+   * POST /hopitaux/[id]/doctors
    */
   async addDoctor(
     facilityId: string,
@@ -186,7 +186,7 @@ export const hospitalService = {
 
   /**
    * Retirer un médecin du staff
-   * → DELETE /hopitaux/[id]/doctors?doctorId=xxx
+   * DELETE /hopitaux/[id]/doctors?doctorId=xxx
    * api.del n'accepte pas de body → doctorId en query param
    */
   async removeDoctor(
@@ -201,7 +201,7 @@ export const hospitalService = {
 
   /**
    * Soumettre une note
-   * → POST /hopitaux/[id]/rating
+   * POST /hopitaux/[id]/rating
    */
   async submitReview(
     id: string,
@@ -216,7 +216,7 @@ export const hospitalService = {
 
   /**
    * Vérifier un établissement (admin)
-   * → PATCH /hopitaux/[id]/verify
+   * PATCH /hopitaux/[id]/verify
    */
   async verify(id: string): Promise<{ message: string }> {
     const res = await api.patch<ApiResponse<{ message: string }>>(
@@ -228,7 +228,7 @@ export const hospitalService = {
 
   /**
    * Supprimer un établissement (admin)
-   * → DELETE /hopitaux/[id]
+   * DELETE /hopitaux/[id]
    */
   async delete(id: string): Promise<{ message: string }> {
     const res = await api.del<ApiResponse<{ message: string }>>(

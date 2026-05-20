@@ -71,7 +71,7 @@ function generateTokens(payload: TokenPayload): AuthTokens {
   const accessToken = jwt.sign(payload, process.env.JWT_ACCESS_SECRET || "monSuperCodeSecretAxel123456@", {
     expiresIn: ACCESS_TOKEN_EXPIRY,
   });
-  const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET || "monSuperCodeSecretAxel123456@", {
+  const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET || "monSuperCodeSecretRefreshAxel123456@", {
     expiresIn: REFRESH_TOKEN_EXPIRY,
   });
   return { accessToken, refreshToken };
@@ -289,7 +289,7 @@ class AuthService {
     let payload: TokenPayload;
 
     try {
-      payload = jwt.verify(token, process.env.JWT_SECRET! || "monSuperCodeSecretAxel123456@"!) as TokenPayload;
+      payload = jwt.verify(token, process.env.JWT_REFRESH_SECRET! || "monSuperCodeSecretRefreshAxel123456@"!) as TokenPayload;
     } catch {
       throw new Error('Refresh token invalide ou expiré.');
     }

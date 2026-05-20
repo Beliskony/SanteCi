@@ -4,31 +4,40 @@ import { getAuthUser } from '@/app/server/middleware/auth.middleware';
 import connectDB from '@/app/server/config/databaseConnect';
 
 // GET /api/appointments?patientId=&doctorId=&status=&type=&from=&to=&page=&limit=
-export async function GET(req: NextRequest) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
 
     const authUser = await getAuthUser(req);
-    const { searchParams } = req.nextUrl;
+    const {id} = await params
+  
 
-    const filters: Record<string, unknown> = {
-      status:  searchParams.get('status') ?? undefined,
-      type:    searchParams.get('type') ?? undefined,
-      from:    searchParams.has('from') ? new Date(searchParams.get('from')!) : undefined,
-      to:      searchParams.has('to') ? new Date(searchParams.get('to')!) : undefined,
-      page:    searchParams.has('page') ? Number(searchParams.get('page')) : 1,
-      limit:   searchParams.has('limit') ? Number(searchParams.get('limit')) : 10,
-    };
+    const appointment = await appointmentService.getById(id);
 
-    // Forcer le filtre sur l'utilisateur connecté (sécurité)
-    if (authUser.role === 'patient') {
-      filters.patientId = String(authUser.data._id);
-    } else {
-      filters.doctorId = String(authUser.data._id);
+    // Récupérer l'ID utilisateur
+    const userId = authUser.data._id || authUser.data?._id;
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, message: 'ID utilisateur introuvable' },
+        { status: 401 }
+      );
     }
 
-    const result = await appointmentService.list(filters as Parameters<typeof appointmentService.list>[0]);
-    return NextResponse.json({ success: true, ...result });
+        // Vérifier que l'utilisateur est bien le patient ou le médecin du RDV
+    const isPatient = authUser.role === 'patient' && String(appointment.patientId) === String(authUser.data._id || authUser.data?._id);
+    const isDoctor = authUser.role === 'doctor' && String(appointment.doctorId) === String(authUser.data._id || authUser.data?._id);
+
+    if (!isPatient && !isDoctor) {
+      return NextResponse.json(
+        { success: false, message: 'Accès non autorisé.' },
+        { status: 403 }
+      );
+    }
+   
+
+
+
+    return NextResponse.json({ success: true, data: appointment });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
     const status = message === 'Unauthorized' ? 401 : 500;
@@ -49,7 +58,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     // Forcer patientId depuis le token
-    body.patientId = String(authUser.data._id);
+    const userId = authUser.data._id || authUser.data?._id;
+    body.patientId = userId;
 
     const appointment = await appointmentService.create(body);
     return NextResponse.json({ success: true, data: appointment }, { status: 201 });

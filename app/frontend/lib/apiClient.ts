@@ -34,6 +34,8 @@ let refreshQueue: Array<(token: string) => void> = [];
 
 async function refreshAccessToken(): Promise<string | null> {
   const refreshToken = getRefreshToken();
+  console.log("tentative de refrsh ", !!refreshToken);
+  
   if (!refreshToken) return null;
 
   try {
@@ -46,10 +48,17 @@ async function refreshAccessToken(): Promise<string | null> {
     if (!res.ok) throw new Error("Refresh échoué");
 
     const data = await res.json();
-    const { accessToken, refreshToken: newRefreshToken } = data.data ?? data;
+     // Format 1: { success: true, accessToken, refreshToken }
+    // Format 2: { accessToken, refreshToken }
+    const accessToken = data.accessToken ?? data.data?.accessToken;
+    const newRefreshToken = data.refreshToken ?? data.data?.refreshToken ?? refreshToken;
+
+    if (!accessToken) {
+      throw new Error("Format de réponse invalide");
+    }
 
     // Mettre à jour le store avec les nouveaux tokens
-    useAuthStore.getState().setTokens(accessToken, newRefreshToken ?? refreshToken);
+    useAuthStore.getState().setTokens(accessToken, newRefreshToken);
 
     return accessToken;
   } catch {

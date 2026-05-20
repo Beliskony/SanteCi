@@ -9,12 +9,10 @@ import {
   Video,
   Search,
   CalendarDays,
-  ChevronRight,
   Loader2,
 } from "lucide-react";
 import { useAuthStore, isPatient } from "@/app/frontend/store/useAuthStore";
 import { useAppointmentStore } from "@/app/frontend/store/appoitmentStore";
-import PatHeader from "@/app/frontend/components/dashboard/patient/PatHeader";
 import { isPopulatedDoctor } from "@/app/frontend/types/Appointment";
 
 // ─── PatDash ──────────────────────────────────────────────────
@@ -75,9 +73,6 @@ const PatDash = () => {
 
   return (
     <div className="flex flex-col flex-1 min-h-screen bg-[#f4f6fb]">
-
-      {/* ── Header ── */}
-      <PatHeader />
 
       {/* ── Corps ── */}
       <main className="flex flex-col gap-6 p-4 sm:p-6 max-w-5xl w-full mx-auto">

@@ -15,93 +15,101 @@ import type {
   BaseLocation,
 } from "@/app/frontend/types";
 
-export const patientService = {
-  /**
-   * Récupérer son propre profil complet
-   */
-  async getMe(): Promise<PatientUser> {
-    const res = await api.get<ApiResponse<PatientUser>>("/api/patients/me");
-    return res.data;
-  },
+export interface EmergencyContactDTO {
+  name: string;
+  phone: string;
+  relationship: string;
+}
 
-  /**
-   * Mettre à jour le profil de base
-   */
+export interface PatientStats {
+  totalConsultations: number;
+  totalPrescriptions: number;
+  lastMedicalUpdate: Date | null;
+  bmi: number | null;
+}
+
+export const patientService = {
+
+
   async updateProfile(data: Partial<PatientProfile>): Promise<PatientUser> {
     const res = await api.patch<ApiResponse<PatientUser>>(
-      "/patients/me/profile",
+      "/patients/uniquement/profile",
       data
     );
     useAuthStore.getState().updatePatientProfile(data);
     return res.data;
   },
 
-  /**
-   * Mettre à jour les infos de santé (allergies, maladies chroniques...)
-   */
+  // bmi recalculé par le backend → on sync avec res.data.health, pas data
   async updateHealth(data: Partial<PatientHealth>): Promise<PatientUser> {
     const res = await api.patch<ApiResponse<PatientUser>>(
-      "/patients/me/health",
+      "/patients/[id]/health",
       data
     );
-    useAuthStore.getState().updateHealth(data);
+    useAuthStore.getState().updateHealth(res.data.health);
     return res.data;
   },
 
-  /**
-   * Mettre à jour les préférences (langue, notifications, vie privée)
-   */
-  async updatePreferences(
-    data: Partial<PatientPreferences>
-  ): Promise<PatientUser> {
+  async updatePreferences(data: Partial<PatientPreferences>): Promise<PatientUser> {
     const res = await api.patch<ApiResponse<PatientUser>>(
-      "/patients/me/preferences",
+      "/patients/preferences",
       data
     );
     useAuthStore.getState().updatePreferences(data);
     return res.data;
   },
 
-  /**
-   * Mettre à jour la localisation
-   */
   async updateLocation(data: Partial<BaseLocation>): Promise<void> {
-    await api.patch("/api/patients/me/location", data);
+    await api.patch("/patients/uniquement/location", data);
     useAuthStore.getState().updateLocation(data);
   },
 
-  /**
-   * Upload photo de profil
-   */
   async uploadPhoto(file: File): Promise<{ photoUrl: string }> {
-  const formData = new FormData();
-  formData.append("photo", file);
-  const res = await api.uploadFile<ApiResponse<{ photoUrl: string }>>(
-    "/patients/uniquement/photo",  // ← corriger l'URL selon ta structure
-    formData
-  );
-  useAuthStore.getState().updatePatientProfile({ photo: res.data.photoUrl });
-  return res.data;
-},
+    const formData = new FormData();
+    formData.append("photo", file);
+    const res = await api.uploadFile<ApiResponse<{ photoUrl: string }>>(
+      "/patients/uniquement/photo",
+      formData
+    );
+    useAuthStore.getState().updateProfilePhoto(res.data.photoUrl);
+    return res.data;
+  },
 
-  /**
-   * Changer le mot de passe
-   */
-  async changePassword(
-    currentPassword: string,
-    newPassword: string
-  ): Promise<{ message: string }> {
-    const res = await api.patch<ApiResponse<{ message: string }>>(
-      "/patients/me/password",
-      { currentPassword, newPassword }
+  // Backend limite à 3 contacts, retourne le patient complet mis à jour
+  async addEmergencyContact(dto: EmergencyContactDTO): Promise<PatientUser> {
+    const res = await api.post<ApiResponse<PatientUser>>(
+      "/patients/emergency-contacts",
+      dto
+    );
+    useAuthStore.setState({ user: res.data });
+    return res.data;
+  },
+
+  async removeEmergencyContact(contactId: string): Promise<PatientUser> {
+    const res = await api.del<ApiResponse<PatientUser>>(
+      `/patients/emergency-contacts/${contactId}`
+    );
+    useAuthStore.setState({ user: res.data });
+    return res.data;
+  },
+
+  async getStats(): Promise<PatientStats> {
+    const res = await api.get<ApiResponse<PatientStats>>(
+      "/patients/stats"
     );
     return res.data;
   },
 
-  /**
-   * Mes ordonnances
-   */
-  async getMyPrescriptions(params?: {
+  // Soft delete : status → suspended + isActive → false, puis logout
+  async deleteAccount(): Promise<{ message: string }> {
+    const res = await api.del<ApiResponse<{ message: string }>>(
+      "/patients/delete"
+    );
+    useAuthStore.getState().logout();
+    return res.data;
+  },
+
+  async getMyPrescriptions(patientId: string, params?: {
     page?: number;
     limit?: number;
   }): Promise<PaginatedResponse<Prescription>> {
@@ -110,13 +118,10 @@ export const patientService = {
     if (params?.limit) qs.append("limit", String(params.limit));
     const query = qs.toString();
     return api.get<PaginatedResponse<Prescription>>(
-      `/patients/me/prescriptions${query ? `?${query}` : ""}`
+      `/appointments/${patientId}/${query ? `?${query}` : ""}`
     );
   },
 
-  /**
-   * Vérifier si l'utilisateur courant est un patient
-   */
   isCurrentUserPatient(): boolean {
     const { user } = useAuthStore.getState();
     return !!user && isPatient(user);

@@ -43,8 +43,8 @@ export const doctorService = {
 
   /**
    * Recherche de médecins
-   * → GET /doctor/search
-   * → searchDoctors() backend
+   * GET /doctor/search
+   * searchDoctors() backend
    */
   async search(filters?: DoctorFilters): Promise<DoctorSearchResponse> {
     const qs = new URLSearchParams();
@@ -74,8 +74,8 @@ export const doctorService = {
 
   /**
    * Profil public d'un médecin par doctorId
-   * → GET /doctor/[id]
-   * → getDoctorPublicProfile() backend
+   * GET /doctor/[id]
+   * getDoctorPublicProfile() backend
    */
   async getById(doctorId: string): Promise<Partial<DoctorUser>> {
     const res = await api.get<ApiResponse<Partial<DoctorUser>>>(
@@ -87,8 +87,8 @@ export const doctorService = {
 
   /**
    * Disponibilités d'un médecin
-   * → GET /doctor/[id]/profile  (ou availability selon ta route)
-   * → getAvailability() backend
+   * GET /doctor/[id]/profile  (ou availability selon ta route)
+   * getAvailability() backend
    */
   async getAvailability(doctorId: string): Promise<DoctorUser["telemedicine"]> {
     const res = await api.get<ApiResponse<DoctorUser["telemedicine"]>>(
@@ -100,7 +100,7 @@ export const doctorService = {
 
   /**
    * Créneaux disponibles pour un type donné
-   * → GET /doctor/teleconsultation/slot
+   * GET /doctor/teleconsultation/slot
    */
   async getAvailableSlots(
     doctorId: string,
@@ -116,7 +116,7 @@ export const doctorService = {
 
   /**
    * Spécialités disponibles (déduit des données existantes)
-   * → GET /doctor/search?distinct=specialty
+   * GET /doctor/search?distinct=specialty
    */
   async getSpecialties(): Promise<string[]> {
     const res = await api.get<ApiResponse<string[]>>(
@@ -130,7 +130,7 @@ export const doctorService = {
 
   /**
    * Mon profil complet
-   * → GET /doctor/(auth)/[id]/profile
+   * GET /doctor/(auth)/[id]/profile
    */
   async getMyProfile(): Promise<DoctorUser> {
     const res = await api.get<ApiResponse<DoctorUser>>(
@@ -141,7 +141,7 @@ export const doctorService = {
 
   /**
    * Mettre à jour mon profil
-   * → PATCH /doctor/(auth)/[id]/profile
+   * PATCH /doctor/(auth)/[id]/profile
    */
   async updateMyProfile(data: Partial<DoctorProfile>): Promise<DoctorUser> {
     const res = await api.patch<ApiResponse<DoctorUser>>(
@@ -154,7 +154,7 @@ export const doctorService = {
 
   /**
    * Mettre à jour les paramètres de télémédecine
-   * → PATCH /doctor/(auth)/telemedicine
+   * PATCH /doctor/(auth)/telemedicine
    */
   async updateTelemedicine(data: Partial<DoctorTelemedicine>): Promise<DoctorUser> {
     const res = await api.patch<ApiResponse<DoctorUser>>(
@@ -167,7 +167,7 @@ export const doctorService = {
 
   /**
    * Passer en ligne / hors ligne
-   * → PATCH /doctor/(auth)/ligne
+   * PATCH /doctor/(auth)/ligne
    */
   async setOnlineStatus(isOnline: boolean): Promise<void> {
     await api.patch("/doctor/auth/ligne", { isOnline });
@@ -176,7 +176,7 @@ export const doctorService = {
 
   /**
    * Upload photo de profil
-   * → POST /doctor/(auth)/photo
+   * POST /doctor/(auth)/photo
    */
   async uploadPhoto(file: File): Promise<{ photoUrl: string }> {
     const formData = new FormData();
@@ -191,7 +191,7 @@ export const doctorService = {
 
   /**
    * Ajouter une certification
-   * → POST /doctor/(auth)/ligne/certifications/[certId]
+   * POST /doctor/(auth)/ligne/certifications/[certId]
    */
   async addCertification(data: {
     name: string;
@@ -207,7 +207,7 @@ export const doctorService = {
 
   /**
    * Supprimer une certification
-   * → DELETE /doctor/(auth)/ligne/certifications/[certId]
+   * DELETE /doctor/(auth)/ligne/certifications/[certId]
    */
   async removeCertification(certId: string): Promise<DoctorUser> {
     const res = await api.del<ApiResponse<DoctorUser>>(
@@ -218,7 +218,7 @@ export const doctorService = {
 
   /**
    * Supprimer mon compte
-   * → DELETE /doctor/(auth)/ligne/delete
+   * DELETE /doctor/(auth)/ligne/delete
    */
   async deleteAccount(): Promise<{ message: string }> {
     const res = await api.del<ApiResponse<{ message: string }>>(
@@ -229,7 +229,7 @@ export const doctorService = {
 
   /**
    * Mettre à jour le statut d'un créneau
-   * → PATCH /doctor/creneau/status
+   * PATCH /doctor/creneau/status
    */
   async updateSlotStatus(
     doctorId: string,

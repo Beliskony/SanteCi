@@ -36,6 +36,16 @@ export default function AppointmentPage() {
 
         {/* Header */}
         <div className="flex items-center justify-between">
+
+          {/* Onglets */}
+          <div className="flex">
+            <AppointmentTabs
+              activeTab={activeTab}
+              onChange={setActiveTab}
+              counts={counts}
+            />
+          </div>
+
           <div />
           <button className="flex items-center gap-2 px-4 py-2.5 bg-blue-900 text-white text-sm font-semibold rounded-xl hover:bg-blue-800 transition-colors shadow-sm">
             <Plus size={15} />
@@ -46,14 +56,6 @@ export default function AppointmentPage() {
         {/* Card conteneur */}
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
 
-          {/* Onglets */}
-          <div className="px-5 pt-1">
-            <AppointmentTabs
-              activeTab={activeTab}
-              onChange={setActiveTab}
-              counts={counts}
-            />
-          </div>
 
           {/* Erreur */}
           {error && (

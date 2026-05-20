@@ -8,7 +8,7 @@ import * as api from "@/app/frontend/lib/apiClient";
 import type {
   ApiResponse,
 } from "@/app/frontend/types";
-import { Appointment } from "../types/Appointment";
+import { Appointment, PaginatedAppointments } from "../types/Appointment";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -115,24 +115,18 @@ export const appointmentService = {
    * GET /api/appointments?patientId=...&status=...&page=...
    * Réponse paginée : { appointments, total, page, pages }
    */
-  async list(filters?: AppointmentFiltersDTO): Promise<{
-    appointments: Appointment[];
-    total: number;
-    page: number;
-    pages: number;
-  }> {
+  async list(filters?: AppointmentFiltersDTO): Promise<PaginatedAppointments> {
     const qs = new URLSearchParams();
-    if (filters?.patientId) qs.append("patientId", filters.patientId);
-    if (filters?.doctorId)  qs.append("doctorId",  filters.doctorId);
-    if (filters?.status)    qs.append("status",    filters.status);
-    if (filters?.type)      qs.append("type",      filters.type);
-    if (filters?.from)      qs.append("from",      filters.from);
-    if (filters?.to)        qs.append("to",        filters.to);
-    if (filters?.page)      qs.append("page",      String(filters.page));
-    if (filters?.limit)     qs.append("limit",     String(filters.limit));
+    if (filters?.page) qs.append('page', String(filters.page));
+    if (filters?.limit) qs.append('limit', String(filters.limit));
+    if (filters?.status) qs.append('status', filters.status);
+    if (filters?.patientId) qs.append('patientId', filters.patientId);
+    if (filters?.doctorId) qs.append('doctorId', filters.doctorId);
+    if (filters?.from) qs.append('from', filters.from);
+    if (filters?.to) qs.append('to', filters.to);
 
     const query = qs.toString();
-    return api.get(`/appointments${query ? `?${query}` : ""}`);
+    return api.get<PaginatedAppointments>(`/appointments${query ? `?${query}` : ""}`);
   },
 
   // ── Confirmer (médecin) ───────────────────────────────────────────────────
@@ -185,8 +179,8 @@ export const appointmentService = {
    * PATCH /api/appointments/[id]/cancel
    * Statuts annulables : pending, confirmed.
    * Si déjà payé → paymentStatus bascule à "refunded".
-   * ⚠️  cancelledBy est requis — le backend vérifie que le requester
-   *     est bien le patient ou le médecin du rendez-vous.
+   * cancelledBy est requis — le backend vérifie que le requester
+   * est bien le patient ou le médecin du rendez-vous.
    */
   async cancel(
     id: string,
@@ -219,8 +213,8 @@ export const appointmentService = {
   /**
    * POST /api/appointments/[id]/join
    * Enregistre patientJoinedAt ou doctorJoinedAt selon le rôle.
-   * ⚠️  Aucune URL de salle retournée — le backend enregistre juste
-   *     l'horodatage. La gestion de la salle vidéo est externe (ex: Daily.co).
+   * Aucune URL de salle retournée — le backend enregistre juste
+   * l'horodatage. La gestion de la salle vidéo est externe (ex: Daily.co).
    */
   async join(
     id: string,

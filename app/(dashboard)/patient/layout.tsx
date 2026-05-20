@@ -1,5 +1,6 @@
 // app/dashboard/patient/layout.tsx
 
+import PatHeader from "@/app/frontend/components/dashboard/patient/PatHeader";
 import PatSideBar from "@/app/frontend/components/dashboard/patient/PatSideBar";
 
 export default function PatientDashboardLayout({
@@ -14,6 +15,7 @@ export default function PatientDashboardLayout({
 
       {/* Contenu scrollable */}
       <div className="flex-1 overflow-y-auto">
+        <PatHeader />
         {children}
       </div>
     </div>

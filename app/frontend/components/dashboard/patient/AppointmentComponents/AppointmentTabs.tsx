@@ -24,7 +24,7 @@ const TABS: { key: TabKey; label: string }[] = [
 
 export default function AppointmentTabs({ activeTab, onChange, counts }: AppointmentTabsProps) {
   return (
-    <div className="flex items-center gap-0 border-b border-slate-200">
+    <div className="flex items-center gap-1 p-1 bg-white rounded-lg shadow-sm">
       {TABS.map(({ key, label }) => {
         const isActive = activeTab === key
         const count    = counts?.[key]
@@ -32,16 +32,18 @@ export default function AppointmentTabs({ activeTab, onChange, counts }: Appoint
           <button
             key={key}
             onClick={() => onChange(key)}
-            className={`relative px-5 py-3 text-sm font-medium transition-colors duration-150 ${
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 ${
               isActive
-                ? "text-slate-900 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-slate-900 after:rounded-t"
+                ? "bg-[#1e3a8a]/20 text-[#1e3a8a]"
                 : "text-slate-400 hover:text-slate-600"
             }`}
           >
             {label}
             {count !== undefined && count > 0 && (
-              <span className={`ml-1.5 text-xs font-bold px-1.5 py-0.5 rounded-full ${
-                isActive ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500"
+              <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
+                isActive
+                  ? "bg-[#1e3a8a]/20 text-[#1e3a8a]"
+                  : "bg-slate-100 text-slate-400"
               }`}>
                 {count}
               </span>

@@ -74,7 +74,6 @@ export interface PatientSecurity {
   lastLogin?: Date;
   failedAttempts: number;
   lockUntil?: Date;
-  pinCode?: string;
 }
 
 export interface PatientPreferences {

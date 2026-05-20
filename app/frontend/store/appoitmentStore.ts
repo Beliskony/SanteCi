@@ -57,7 +57,7 @@ interface AppointmentState {
 
   /**
    * PATCH /api/appointments/[id]/cancel
-   * ⚠️  cancelledBy requis — le backend vérifie l'autorisation via ce champ.
+   * cancelledBy requis — le backend vérifie l'autorisation via ce champ.
    */
   cancel: (id: string, cancelledBy: CancelledBy, reason: string) => Promise<void>;
 
@@ -79,7 +79,7 @@ interface AppointmentState {
   /**
    * POST /api/appointments/[id]/join
    * Enregistre patientJoinedAt ou doctorJoinedAt.
-   * ⚠️  Aucune URL de salle retournée — la gestion vidéo est externe.
+   * Aucune URL de salle retournée — la gestion vidéo est externe.
    */
   join: (id: string, role: "patient" | "doctor") => Promise<void>;
 

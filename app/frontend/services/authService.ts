@@ -2,6 +2,7 @@ import * as api from "@/app/frontend/lib/apiClient";
 import { useAuthStore } from "../store/useAuthStore";
 import type { AuthUser, PatientUser, DoctorUser } from "../store/useAuthStore";
 import type { ApiResponse } from "@/app/frontend/types";
+import { refresh } from "next/cache";
 
 // ── Types backend (ce que le serveur retourne réellement) ────
 interface BackendUser {
@@ -185,7 +186,7 @@ export const authService = {
 
       // Adapter l'objet plat backend → structure store
       const authUser = mapToAuthUser(user);
-      setUser(authUser, accessToken);
+      setUser(authUser, accessToken, refreshToken);
 
       // Stocker aussi le refreshToken
       if (typeof window !== "undefined") {
@@ -299,12 +300,12 @@ export const authService = {
 
   // Rafraîchir le profil complet depuis l'API après login
   async refreshUser(): Promise<void> {
-    const { setUser, token } = useAuthStore.getState();
+    const { setUser, token, refreshToken } = useAuthStore.getState();
     if (!token) return;
     try {
       const res = await api.get<ApiResponse<BackendUser>>("/api/users/me");
       const authUser = mapToAuthUser(res.data);
-      setUser(authUser, token);
+      setUser(authUser, token, refreshToken ?? localStorage.getItem("refresh-token") ?? "");
     } catch {
       // silencieux
     }
