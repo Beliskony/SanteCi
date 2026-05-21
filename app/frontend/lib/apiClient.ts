@@ -21,16 +21,20 @@ function getToken(): string | null {
 function getRefreshToken(): string | null {
   if (typeof window === "undefined") return null;
   try {
+    // Priorité 1 : Zustand persist store
     const raw = localStorage.getItem("auth-storage");
-    if (!raw) return null;
-    return JSON.parse(raw)?.state?.refreshToken ?? null;
+    const fromStore = raw ? (JSON.parse(raw)?.state?.refreshToken ?? null) : null;
+    if (fromStore) return fromStore;
+ 
+    // Priorité 2 : clé séparée écrite par authService.login()
+    return localStorage.getItem("refresh-token");
   } catch { return null; }
 }
 
 // ── Refresh ───────────────────────────────────────────────────
 
 let isRefreshing = false;
-let refreshQueue: Array<(token: string) => void> = [];
+let refreshQueue: Array<(token: string | null) => void> = [];
 
 async function refreshAccessToken(): Promise<string | null> {
   const refreshToken = getRefreshToken();

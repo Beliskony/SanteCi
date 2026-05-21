@@ -21,8 +21,8 @@ export async function GET(req: NextRequest) {
     
     // Construire les filtres selon le rôle
     const filters: any = {
-      page: searchParams.get('page') ? parseInt(searchParams.get('page')!) : 1,
-      limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 10,
+      page:  Math.max(1, parseInt(searchParams.get('page')  ?? '1')),
+      limit: Math.min(50, Math.max(1, parseInt(searchParams.get('limit') ?? '10'))),
     };
 
     if (authUser.role === 'patient') {

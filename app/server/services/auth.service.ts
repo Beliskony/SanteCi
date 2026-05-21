@@ -56,8 +56,8 @@ export interface LoginDTO {
 
 const SALT_ROUNDS = 12;
 const OTP_EXPIRY_MINUTES = 10;
-const ACCESS_TOKEN_EXPIRY = '15m';
-const REFRESH_TOKEN_EXPIRY = '7d';
+const ACCESS_TOKEN_EXPIRY = '7d';
+const REFRESH_TOKEN_EXPIRY = '21d';
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_DURATION_MINUTES = 30;
 

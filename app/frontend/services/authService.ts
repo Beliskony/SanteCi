@@ -299,15 +299,18 @@ export const authService = {
   },
 
   // Rafraîchir le profil complet depuis l'API après login
-  async refreshUser(): Promise<void> {
-    const { setUser, token, refreshToken } = useAuthStore.getState();
-    if (!token) return;
-    try {
-      const res = await api.get<ApiResponse<BackendUser>>("/api/users/me");
-      const authUser = mapToAuthUser(res.data);
-      setUser(authUser, token, refreshToken ?? localStorage.getItem("refresh-token") ?? "");
-    } catch {
-      // silencieux
-    }
-  },
+async refreshUser(): Promise<void> {
+  const { user, setUser, token, refreshToken } = useAuthStore.getState();
+  if (!token || !user) return;
+  try {
+    const endpoint = user.role === "doctor"
+      ? `/doctor/${user._id}/profile`
+      : `/patients/${user._id}`;
+    const res = await api.get<ApiResponse<BackendUser>>(endpoint);
+    const authUser = mapToAuthUser(res.data);
+    setUser(authUser, token, refreshToken ?? localStorage.getItem("refresh-token") ?? "");
+  } catch {
+    // silencieux
+  }
+}
 };

@@ -4,6 +4,8 @@ import { Appointment } from '../models/appointement.model';
 import { Doctor } from '../models/medcin.model';
 import { Patient } from '../models/patient.model';
 import { IAppointment } from '../interfaces/appointement.interface';
+import { startOfDay, endOfDay } from 'date-fns';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -80,15 +82,20 @@ class AppointmentService {
     if (!patient) throw new Error('Patient introuvable.');
     if (patient.status.accountStatus !== 'active') throw new Error('Compte patient inactif.');
 
-    // Vérifier qu'il n'y a pas de conflit de créneau pour le médecin
-    const conflict = await Appointment.findOne({
-      doctorId: new Types.ObjectId(dto.doctorId),
-      'status.current': { $in: ['pending', 'confirmed', 'ongoing'] },
-      'details.scheduledFor': {
-        $lt: new Date(dto.scheduledFor.getTime() + dto.duration * 60000),
-        $gt: new Date(dto.scheduledFor.getTime() - dto.duration * 60000),
-      },
-    });
+   const newStart = dto.scheduledFor;
+const newEnd   = new Date(newStart.getTime() + dto.duration * 60000);
+
+const conflict = await Appointment.findOne({
+  doctorId: new Types.ObjectId(dto.doctorId),
+  'status.current': { $in: ['pending', 'confirmed', 'ongoing'] },
+  'details.scheduledFor': { $lt: newEnd },
+  $expr: {
+    $gt: [
+      { $add: ['$details.scheduledFor', { $multiply: ['$details.duration', 60000] }] },
+      newStart,
+    ],
+  },
+});
     if (conflict) throw new Error('Ce créneau est déjà réservé pour ce médecin.');
 
     const appointmentId = `APT-${crypto.randomBytes(5).toString('hex').toUpperCase()}`;
@@ -182,7 +189,7 @@ class AppointmentService {
 
     const appointments = await Appointment.find(query)
       .populate('patientId', 'profile.firstName profile.lastName profile.photo')
-      .populate('doctorId', 'profile.firstName profile.lastName profile.specialty profile.title')
+      .populate('doctorId', 'profile.firstName profile.lastName profile.photo profile.specialty profile.title')
       .sort({ 'details.scheduledFor': -1 })
       .skip(skip)
       .limit(limit);
@@ -240,6 +247,11 @@ class AppointmentService {
     }
 
     const endedAt = new Date();
+
+    if (!appointment.consultation.startedAt) {
+      throw new Error('La consultation n\'a pas été démarrée correctement.');
+    }
+
     const startedAt = appointment.consultation.startedAt!;
     const actualDuration = Math.round((endedAt.getTime() - startedAt.getTime()) / 60000);
 
@@ -277,8 +289,8 @@ class AppointmentService {
 
     // Vérifier que c'est bien le patient ou le médecin concerné
     if (
-      cancelledBy === 'patient' && String(appointment.patientId) !== requesterId ||
-      cancelledBy === 'doctor' && String(appointment.doctorId) !== requesterId
+      (cancelledBy === 'patient' && String(appointment.patientId) !== requesterId) ||
+      (cancelledBy === 'doctor'  && String(appointment.doctorId)  !== requesterId)
     ) {
       throw new Error('Action non autorisée.');
     }
@@ -363,25 +375,21 @@ class AppointmentService {
     requesterId: string
   ): Promise<IAppointment> {
     const appointment = await Appointment.findById(appointmentId);
-    if (!appointment) throw new Error('Rendez-vous introuvable.');
+      if (!appointment) throw new Error('Rendez-vous introuvable.');
 
-    const isAuthorized =
-      (doc.uploadedBy === 'patient' && String(appointment.patientId) === requesterId) ||
-      (doc.uploadedBy === 'doctor' && String(appointment.doctorId) === requesterId);
+      const isAuthorized =
+        (doc.uploadedBy === 'patient' && String(appointment.patientId) === requesterId) ||
+        (doc.uploadedBy === 'doctor'  && String(appointment.doctorId)  === requesterId);
 
-    if (!isAuthorized) throw new Error('Action non autorisée.');
+      if (!isAuthorized) throw new Error('Action non autorisée.');
 
-    const updated = await Appointment.findByIdAndUpdate(
-      appointmentId,
-      {
-        $push: { 'communication.sharedDocuments': doc },
-        $set: { 'metadata.updatedAt': new Date() },
-      },
-      { new: true }
-    );
+      // Modifier directement l'objet en mémoire
+        appointment.communication.sharedDocuments.push(doc);
+        appointment.metadata.updatedAt = new Date();
+          await appointment.save();
 
-    return updated!;
-  }
+      return appointment;
+    }
 
   // ── Add recording ──────────────────────────────────────────────────────────
 
@@ -422,10 +430,9 @@ class AppointmentService {
   // ── Get doctor agenda for a day ────────────────────────────────────────────
 
   async getDoctorAgenda(doctorId: string, date: Date): Promise<IAppointment[]> {
-    const start = new Date(date);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(date);
-    end.setHours(23, 59, 59, 999);
+    const TIMEZONE = 'Africa/Abidjan';
+    const start = toZonedTime(startOfDay(date), TIMEZONE);
+    const end   = fromZonedTime(endOfDay(date),   TIMEZONE);
 
     return Appointment.find({
       doctorId: new Types.ObjectId(doctorId),

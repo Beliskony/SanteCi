@@ -8,7 +8,7 @@ const connectDB = async () => {
 
   try {
     await mongoose.connect(DATABASE_URL, { dbName: DATABASE_NAME });
-    console.log("Connecté à la DB taskmanager");
+    console.log("Connecté à la DB SanteCI");
   } catch (error) {
     console.log("Erreur de connexion", error);
     process.exit(1);

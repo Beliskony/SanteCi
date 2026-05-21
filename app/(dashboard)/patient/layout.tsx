@@ -13,11 +13,6 @@ export default function PatientDashboardLayout({
       {/* Sidebar fixe à gauche */}
       <PatSideBar />
 
-      {/* Contenu scrollable */}
-      <div className="flex-1 overflow-y-auto">
-        <PatHeader />
-        {children}
-      </div>
     </div>
   );
 }
