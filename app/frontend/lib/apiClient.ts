@@ -53,7 +53,7 @@ async function refreshAccessToken(): Promise<string | null> {
 
     const data = await res.json();
      // Format 1: { success: true, accessToken, refreshToken }
-    // Format 2: { accessToken, refreshToken }
+     // Format 2: { accessToken, refreshToken }
     const accessToken = data.accessToken ?? data.data?.accessToken;
     const newRefreshToken = data.refreshToken ?? data.data?.refreshToken ?? refreshToken;
 

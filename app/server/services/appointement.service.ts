@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { Types, QueryFilter } from 'mongoose';
+import mongoose from 'mongoose';
 import { Appointment } from '../models/appointement.model';
 import { Doctor } from '../models/medcin.model';
 import { Patient } from '../models/patient.model';
@@ -142,10 +143,15 @@ const conflict = await Appointment.findOne({
 
   // ── Get by ID ──────────────────────────────────────────────────────────────
 
-  async getById(appointmentId: string): Promise<IAppointment> {
-    const appointment = await Appointment.findById(appointmentId)
+  async getById(id: string): Promise<IAppointment> {
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new Error('ID MongoDB invalide');
+    }
+
+    const appointment = await Appointment.findOne({ id })
       .populate('patientId', 'profile.firstName profile.lastName contact.phone profile.photo')
-      .populate('doctorId', 'profile.firstName profile.lastName profile.specialty profile.title');
+      .populate('doctorId', 'profile.firstName profile.lastName profile.specialty profile.title profile.photo');
 
     if (!appointment) throw new Error('Rendez-vous introuvable.');
     return appointment;

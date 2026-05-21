@@ -28,4 +28,4 @@ const ChatMessageSchema: Schema = new Schema({
   },
 });
 
-export const ChatMessage = mongoose.model<IChatMessage>('ChatMessage', ChatMessageSchema);
+export const ChatMessage = mongoose.models.ChatMessage || mongoose.model<IChatMessage>('ChatMessage', ChatMessageSchema);

@@ -53,11 +53,6 @@ export default function DossierPage() {
 
   return (
     <main className="max-w-5xl mx-auto px-4 py-6">
-      {patientStore.error && (
-        <div className="mb-4 px-4 py-2.5 bg-red-50 border border-red-100 rounded-lg text-xs text-red-700">
-          {patientStore.error}
-        </div>
-      )}
 
       <DossierHeader
         patientName={patientName}
