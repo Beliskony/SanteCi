@@ -18,18 +18,29 @@ async function assertRoomAccess(chatRoomId: string, userId: string): Promise<voi
 // PATCH /api/chat/rooms/[roomId]/read — marquer tous les messages de la room comme lus
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { roomId: string } }
+  { params }: { params: Promise<{ roomId: string }> }
 ) {
   try {
     await connectDB();
 
     const authUser = await getAuthUser(req);
+    
+    if (!authUser || !authUser.data?._id) {
+      return NextResponse.json(
+        { success: false, message: 'Non authentifié.' },
+        { status: 401 }
+      );
+    }
+
+    const { roomId } = await params;
     const userId = String(authUser.data._id);
 
-    await assertRoomAccess(params.roomId, userId);
+    await assertRoomAccess(roomId, userId);
 
-    const result = await chatMessageService.markAllRead(params.roomId, userId);
+    const result = await chatMessageService.markAllRead(roomId, userId);
+    
     return NextResponse.json({ success: true, ...result });
+    
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
     const status = message === 'Unauthorized' ? 401

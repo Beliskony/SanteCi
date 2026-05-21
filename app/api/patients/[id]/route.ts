@@ -6,24 +6,36 @@ import connectDB from '@/app/server/config/databaseConnect';
 // GET /api/patients/[id] — profil public côté médecin ou profil complet côté patient
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
 
     const authUser = await getAuthUser(req);
+    
+    if (!authUser || !authUser.data?._id) {
+      return NextResponse.json(
+        { success: false, message: 'Non authentifié.' },
+        { status: 401 }
+      );
+    }
+
+    const { id } = await params;
 
     // Le patient accède à son propre profil complet
     if (authUser.role === 'patient') {
-      if (String(authUser.data._id) !== params.id) {
-        return NextResponse.json({ success: false, message: 'Accès non autorisé.' }, { status: 403 });
+      if (String(authUser.data._id) !== id) {
+        return NextResponse.json(
+          { success: false, message: 'Accès non autorisé.' },
+          { status: 403 }
+        );
       }
-      const patient = await patientService.getProfile(params.id);
+      const patient = await patientService.getProfile(id);
       return NextResponse.json({ success: true, data: patient });
     }
 
     // Le médecin accède à la vue partielle du patient
-    const patient = await patientService.getPatientForDoctor(params.id);
+    const patient = await patientService.getPatientForDoctor(id);
     return NextResponse.json({ success: true, data: patient });
 
   } catch (error: unknown) {

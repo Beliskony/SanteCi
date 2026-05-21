@@ -6,15 +6,25 @@ import connectDB from '@/app/server/config/databaseConnect';
 // PATCH /api/appointments/[id]/confirm — médecin uniquement
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
 
     const authDoctor = await getAuthDoctor(req);
-    const appointment = await appointmentService.confirm(params.id, String(authDoctor._id));
+    
+    if (!authDoctor || !authDoctor._id) {
+      return NextResponse.json(
+        { success: false, message: 'Accès réservé aux médecins.' },
+        { status: 401 }
+      );
+    }
+
+    const { id } = await params;
+    const appointment = await appointmentService.confirm(id, String(authDoctor._id));
 
     return NextResponse.json({ success: true, data: appointment });
+    
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
     const status = message === 'Unauthorized' || message === 'Accès réservé aux médecins.' ? 401

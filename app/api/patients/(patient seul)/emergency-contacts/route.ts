@@ -7,14 +7,27 @@ import connectDB from '@/app/server/config/databaseConnect';
 // body: { name: string, phone: string, relationship: string }
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
 
     const authPatient = await getAuthPatient(req);
-    if (String(authPatient._id) !== params.id) {
-      return NextResponse.json({ success: false, message: 'Accès non autorisé.' }, { status: 403 });
+    
+    if (!authPatient || !authPatient._id) {
+      return NextResponse.json(
+        { success: false, message: 'Accès réservé aux patients.' },
+        { status: 401 }
+      );
+    }
+
+    const { id } = await params;
+    
+    if (String(authPatient._id) !== id) {
+      return NextResponse.json(
+        { success: false, message: 'Accès non autorisé.' },
+        { status: 403 }
+      );
     }
 
     const { name, phone, relationship } = await req.json();
@@ -25,11 +38,19 @@ export async function POST(
       );
     }
 
-    const updated = await patientService.addEmergencyContact(params.id, { name, phone, relationship });
-    return NextResponse.json({ success: true, data: updated.contact.emergencyContacts }, { status: 201 });
+    const updated = await patientService.addEmergencyContact(id, { name, phone, relationship });
+    
+    return NextResponse.json(
+      { success: true, data: updated.contact.emergencyContacts },
+      { status: 201 }
+    );
+    
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
-    const status = message === 'Unauthorized' ? 401 : message.includes('Maximum') ? 400 : message === 'Patient introuvable.' ? 404 : 500;
+    const status = message === 'Unauthorized' ? 401 
+      : message.includes('Maximum') ? 400 
+      : message === 'Patient introuvable.' ? 404 
+      : 500;
     return NextResponse.json({ success: false, message }, { status });
   }
 }

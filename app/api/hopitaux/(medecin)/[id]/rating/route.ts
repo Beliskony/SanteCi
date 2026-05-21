@@ -7,13 +7,21 @@ import connectDB from '@/app/server/config/databaseConnect';
 // body: { rating: number } — entre 0 et 5
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
 
-    await getAuthUser(req);
+    const authUser = await getAuthUser(req);
+    
+    if (!authUser || !authUser.data?._id) {
+      return NextResponse.json(
+        { success: false, message: 'Non authentifié.' },
+        { status: 401 }
+      );
+    }
 
+    const { id } = await params;
     const { rating } = await req.json();
 
     if (rating === undefined || typeof rating !== 'number' || rating < 0 || rating > 5) {
@@ -23,8 +31,10 @@ export async function PATCH(
       );
     }
 
-    await hospitalClinicService.updateRating(params.id, rating);
+    await hospitalClinicService.updateRating(id, rating);
+    
     return NextResponse.json({ success: true, message: 'Note enregistrée.' });
+    
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
     const status = message === 'Unauthorized' ? 401

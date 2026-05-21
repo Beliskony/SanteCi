@@ -18,18 +18,29 @@ async function assertRoomAccess(chatRoomId: string, userId: string): Promise<voi
 // GET /api/chat/rooms/[roomId]/files — tous les fichiers partagés dans la room
 export async function GET(
   req: NextRequest,
-  { params }: { params: { roomId: string } }
+  { params }: { params: Promise<{ roomId: string }> }
 ) {
   try {
     await connectDB();
 
     const authUser = await getAuthUser(req);
+    
+    if (!authUser || !authUser.data?._id) {
+      return NextResponse.json(
+        { success: false, message: 'Non authentifié.' },
+        { status: 401 }
+      );
+    }
+
+    const { roomId } = await params;
     const userId = String(authUser.data._id);
 
-    await assertRoomAccess(params.roomId, userId);
+    await assertRoomAccess(roomId, userId);
 
-    const files = await chatMessageService.getSharedFiles(params.roomId);
+    const files = await chatMessageService.getSharedFiles(roomId);
+    
     return NextResponse.json({ success: true, data: files });
+    
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
     const status = message === 'Unauthorized' ? 401

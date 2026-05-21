@@ -3,41 +3,52 @@ import { appointmentService } from '@/app/server/services/appointement.service';
 import { getAuthUser } from '@/app/server/middleware/auth.middleware';
 import connectDB from '@/app/server/config/databaseConnect';
 
-// GET /api/appointments?patientId=&doctorId=&status=&type=&from=&to=&page=&limit=
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+// GET /api/appointments?patientId=xxx&doctorId=xxx&status=xxx&page=1&limit=10
+export async function GET(req: NextRequest) {
   try {
     await connectDB();
 
     const authUser = await getAuthUser(req);
-    const {id} = await params
-  
-
-    const appointment = await appointmentService.getById(id);
-
-    // Récupérer l'ID utilisateur
-    const userId = authUser.data._id || authUser.data?._id;
-    if (!userId) {
+    
+    if (!authUser || !authUser.data?._id) {
       return NextResponse.json(
-        { success: false, message: 'ID utilisateur introuvable' },
+        { success: false, message: 'Non authentifié.' },
         { status: 401 }
       );
     }
 
-        // Vérifier que l'utilisateur est bien le patient ou le médecin du RDV
-    const isPatient = authUser.role === 'patient' && String(appointment.patientId) === String(authUser.data._id || authUser.data?._id);
-    const isDoctor = authUser.role === 'doctor' && String(appointment.doctorId) === String(authUser.data._id || authUser.data?._id);
+    const searchParams = req.nextUrl.searchParams;
+    
+    // Construire les filtres selon le rôle
+    const filters: any = {
+      page: searchParams.get('page') ? parseInt(searchParams.get('page')!) : 1,
+      limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 10,
+    };
 
-    if (!isPatient && !isDoctor) {
-      return NextResponse.json(
-        { success: false, message: 'Accès non autorisé.' },
-        { status: 403 }
-      );
+    if (authUser.role === 'patient') {
+      filters.patientId = String(authUser.data._id);
+    } else if (authUser.role === 'doctor') {
+      filters.doctorId = String(authUser.data._id);
     }
-   
 
+    // Filtres optionnels
+    if (searchParams.has('status')) {
+      filters.status = searchParams.get('status') as any;
+    }
+    if (searchParams.has('type')) {
+      filters.type = searchParams.get('type') as any;
+    }
+    if (searchParams.has('from')) {
+      filters.from = new Date(searchParams.get('from')!);
+    }
+    if (searchParams.has('to')) {
+      filters.to = new Date(searchParams.get('to')!);
+    }
 
-
-    return NextResponse.json({ success: true, data: appointment });
+    const result = await appointmentService.list(filters);
+    
+    return NextResponse.json({ success: true, ...result });
+    
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
     const status = message === 'Unauthorized' ? 401 : 500;
@@ -45,27 +56,51 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 }
 
-// POST /api/appointments — créer un rendez-vous (patient uniquement)
+// POST /api/appointments - Créer un rendez-vous
 export async function POST(req: NextRequest) {
   try {
     await connectDB();
 
     const authUser = await getAuthUser(req);
+    
+    if (!authUser || !authUser.data?._id) {
+      return NextResponse.json(
+        { success: false, message: 'Non authentifié.' },
+        { status: 401 }
+      );
+    }
+
+    // Seul un patient peut créer un rendez-vous
     if (authUser.role !== 'patient') {
-      return NextResponse.json({ success: false, message: 'Seul un patient peut créer un rendez-vous.' }, { status: 403 });
+      return NextResponse.json(
+        { success: false, message: 'Seuls les patients peuvent créer un rendez-vous.' },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();
+    
+    const appointment = await appointmentService.create({
+      patientId: String(authUser.data._id),
+      doctorId: body.doctorId,
+      type: body.type,
+      scheduledFor: new Date(body.scheduledFor),
+      duration: body.duration,
+      reason: body.reason,
+      symptoms: body.symptoms || [],
+      priority: body.priority || 'medium',
+      payment: body.payment,
+    });
 
-    // Forcer patientId depuis le token
-    const userId = authUser.data._id || authUser.data?._id;
-    body.patientId = userId;
-
-    const appointment = await appointmentService.create(body);
     return NextResponse.json({ success: true, data: appointment }, { status: 201 });
+    
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
-    const status = message === 'Unauthorized' ? 401 : message.includes('introuvable') ? 404 : message.includes('créneau') ? 409 : 500;
+    let status = 500;
+    if (message === 'Unauthorized') status = 401;
+    else if (message.includes('introuvable')) status = 404;
+    else if (message.includes('disponible') || message.includes('réservé')) status = 409;
+    
     return NextResponse.json({ success: false, message }, { status });
   }
 }

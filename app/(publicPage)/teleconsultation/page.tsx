@@ -1,7 +1,6 @@
 import HerosectionTele from '@/app/frontend/components/teleconsultation/HerosectionTele'
 import HowItWork from '@/app/frontend/components/teleconsultation/HowItWork'
 import Prerequis from '@/app/frontend/components/teleconsultation/Prerequis'
-import React from 'react'
 
 function page() {
   return (

@@ -7,23 +7,41 @@ import connectDB from '@/app/server/config/databaseConnect';
 // body: { pin: string }
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
 
     const authPatient = await getAuthPatient(req);
-    if (String(authPatient._id) !== params.id) {
-      return NextResponse.json({ success: false, message: 'Accès non autorisé.' }, { status: 403 });
+    
+    if (!authPatient || !authPatient._id) {
+      return NextResponse.json(
+        { success: false, message: 'Accès réservé aux patients.' },
+        { status: 401 }
+      );
+    }
+
+    const { id } = await params;
+    
+    if (String(authPatient._id) !== id) {
+      return NextResponse.json(
+        { success: false, message: 'Accès non autorisé.' },
+        { status: 403 }
+      );
     }
 
     const { pin } = await req.json();
     if (!pin) {
-      return NextResponse.json({ success: false, message: 'pin est requis.' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: 'pin est requis.' },
+        { status: 400 }
+      );
     }
 
-    const result = await patientService.setPinCode(params.id, pin);
+    const result = await patientService.setPinCode(id, pin);
+    
     return NextResponse.json({ success: true, ...result });
+    
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
     const status = message === 'Unauthorized' ? 401 : message.includes('PIN') ? 400 : 500;
@@ -35,23 +53,41 @@ export async function POST(
 // body: { pin: string }
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
 
     const authPatient = await getAuthPatient(req);
-    if (String(authPatient._id) !== params.id) {
-      return NextResponse.json({ success: false, message: 'Accès non autorisé.' }, { status: 403 });
+    
+    if (!authPatient || !authPatient._id) {
+      return NextResponse.json(
+        { success: false, message: 'Accès réservé aux patients.' },
+        { status: 401 }
+      );
+    }
+
+    const { id } = await params;
+    
+    if (String(authPatient._id) !== id) {
+      return NextResponse.json(
+        { success: false, message: 'Accès non autorisé.' },
+        { status: 403 }
+      );
     }
 
     const { pin } = await req.json();
     if (!pin) {
-      return NextResponse.json({ success: false, message: 'pin est requis.' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: 'pin est requis.' },
+        { status: 400 }
+      );
     }
 
-    const result = await patientService.verifyPinCode(params.id, pin);
+    const result = await patientService.verifyPinCode(id, pin);
+    
     return NextResponse.json({ success: true, ...result });
+    
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
     const status = message === 'Unauthorized' ? 401 : message.includes('PIN') ? 400 : 500;

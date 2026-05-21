@@ -27,15 +27,24 @@ async function assertRoomAccess(chatRoomId: string, userId: string): Promise<str
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { roomId: string } }
+  { params }: { params: Promise<{ roomId: string }> }
 ) {
   try {
     await connectDB();
 
     const authUser = await getAuthUser(req);
+    
+    if (!authUser || !authUser.data?._id) {
+      return NextResponse.json(
+        { success: false, message: 'Non authentifié.' },
+        { status: 401 }
+      );
+    }
+
+    const { roomId } = await params;
     const userId = String(authUser.data._id);
 
-    const appointmentId = await assertRoomAccess(params.roomId, userId);
+    const appointmentId = await assertRoomAccess(roomId, userId);
 
     const { receiverId, audioUrl, fileName, fileSize, fileMimeType, durationSeconds } = await req.json();
 
@@ -74,7 +83,7 @@ export async function POST(
     const msg = await chatMessageService.send({
       senderId: userId,
       receiverId,
-      chatRoomId: params.roomId,
+      chatRoomId: roomId,
       messageType: 'audio',
       content: durationSeconds
         ? `Message vocal (${Math.ceil(durationSeconds)}s)`
@@ -89,6 +98,7 @@ export async function POST(
     });
 
     return NextResponse.json({ success: true, data: msg }, { status: 201 });
+    
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
     const status = message === 'Unauthorized' ? 401

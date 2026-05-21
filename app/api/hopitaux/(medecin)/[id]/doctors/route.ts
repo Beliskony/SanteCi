@@ -7,20 +7,34 @@ import connectDB from '@/app/server/config/databaseConnect';
 // body: { doctorId: string }
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
 
-    await getAuthDoctor(req);
-
-    const { doctorId } = await req.json();
-    if (!doctorId) {
-      return NextResponse.json({ success: false, message: 'doctorId est requis.' }, { status: 400 });
+    const authDoctor = await getAuthDoctor(req);
+    
+    if (!authDoctor || !authDoctor._id) {
+      return NextResponse.json(
+        { success: false, message: 'Accès réservé aux médecins.' },
+        { status: 401 }
+      );
     }
 
-    const result = await hospitalClinicService.addDoctor(params.id, doctorId);
+    const { id } = await params;
+    const { doctorId } = await req.json();
+    
+    if (!doctorId) {
+      return NextResponse.json(
+        { success: false, message: 'doctorId est requis.' },
+        { status: 400 }
+      );
+    }
+
+    const result = await hospitalClinicService.addDoctor(id, doctorId);
+    
     return NextResponse.json({ success: true, ...result });
+    
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
     const status = message === 'Unauthorized' || message === 'Accès réservé aux médecins.' ? 401
@@ -35,20 +49,34 @@ export async function POST(
 // body: { doctorId: string }
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
 
-    await getAuthDoctor(req);
-
-    const { doctorId } = await req.json();
-    if (!doctorId) {
-      return NextResponse.json({ success: false, message: 'doctorId est requis.' }, { status: 400 });
+    const authDoctor = await getAuthDoctor(req);
+    
+    if (!authDoctor || !authDoctor._id) {
+      return NextResponse.json(
+        { success: false, message: 'Accès réservé aux médecins.' },
+        { status: 401 }
+      );
     }
 
-    const result = await hospitalClinicService.removeDoctor(params.id, doctorId);
+    const { id } = await params;
+    const { doctorId } = await req.json();
+    
+    if (!doctorId) {
+      return NextResponse.json(
+        { success: false, message: 'doctorId est requis.' },
+        { status: 400 }
+      );
+    }
+
+    const result = await hospitalClinicService.removeDoctor(id, doctorId);
+    
     return NextResponse.json({ success: true, ...result });
+    
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
     const status = message === 'Unauthorized' || message === 'Accès réservé aux médecins.' ? 401 : 500;

@@ -18,15 +18,24 @@ async function assertRoomAccess(chatRoomId: string, userId: string): Promise<voi
 // GET /api/chat/rooms/[roomId]/partage/search?q=keyword — recherche dans les messages texte
 export async function GET(
   req: NextRequest,
-  { params }: { params: { roomId: string } }
+  { params }: { params: Promise<{ roomId: string }> }
 ) {
   try {
     await connectDB();
 
     const authUser = await getAuthUser(req);
+    
+    if (!authUser || !authUser.data?._id) {
+      return NextResponse.json(
+        { success: false, message: 'Non authentifié.' },
+        { status: 401 }
+      );
+    }
+
+    const { roomId } = await params;
     const userId = String(authUser.data._id);
 
-    await assertRoomAccess(params.roomId, userId);
+    await assertRoomAccess(roomId, userId);
 
     const keyword = req.nextUrl.searchParams.get('q');
     if (!keyword || keyword.trim().length < 2) {
@@ -36,8 +45,10 @@ export async function GET(
       );
     }
 
-    const results = await chatMessageService.searchInRoom(params.roomId, keyword.trim());
+    const results = await chatMessageService.searchInRoom(roomId, keyword.trim());
+    
     return NextResponse.json({ success: true, data: results, total: results.length });
+    
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
     const status = message === 'Unauthorized' ? 401

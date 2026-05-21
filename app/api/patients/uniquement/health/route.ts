@@ -6,20 +6,34 @@ import connectDB from '@/app/server/config/databaseConnect';
 // GET /api/patients/[id]/health — patient (lui-même) ou médecin
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
 
     const authUser = await getAuthUser(req);
-
-    // Patient : accès à ses propres données uniquement
-    if (authUser.role === 'patient' && String(authUser.data._id) !== params.id) {
-      return NextResponse.json({ success: false, message: 'Accès non autorisé.' }, { status: 403 });
+    
+    if (!authUser || !authUser.data?._id) {
+      return NextResponse.json(
+        { success: false, message: 'Non authentifié.' },
+        { status: 401 }
+      );
     }
 
-    const patient = await patientService.getProfile(params.id);
+    const { id } = await params;
+
+    // Patient : accès à ses propres données uniquement
+    if (authUser.role === 'patient' && String(authUser.data._id) !== id) {
+      return NextResponse.json(
+        { success: false, message: 'Accès non autorisé.' },
+        { status: 403 }
+      );
+    }
+
+    const patient = await patientService.getProfile(id);
+    
     return NextResponse.json({ success: true, data: patient.health });
+    
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
     const status = message === 'Unauthorized' ? 401 : message === 'Patient introuvable.' ? 404 : 500;
@@ -30,21 +44,34 @@ export async function GET(
 // PUT /api/patients/[id]/health — patient uniquement
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
 
     const authUser = await getAuthUser(req);
+    
+    if (!authUser || !authUser.data?._id) {
+      return NextResponse.json(
+        { success: false, message: 'Non authentifié.' },
+        { status: 401 }
+      );
+    }
 
-    if (authUser.role !== 'patient' || String(authUser.data._id) !== params.id) {
-      return NextResponse.json({ success: false, message: 'Accès non autorisé.' }, { status: 403 });
+    const { id } = await params;
+
+    if (authUser.role !== 'patient' || String(authUser.data._id) !== id) {
+      return NextResponse.json(
+        { success: false, message: 'Accès non autorisé.' },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();
-    const updated = await patientService.updateHealthInfo(params.id, body);
+    const updated = await patientService.updateHealthInfo(id, body);
 
     return NextResponse.json({ success: true, data: updated.health });
+    
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
     const status = message === 'Unauthorized' ? 401 : message === 'Patient introuvable.' ? 404 : 500;

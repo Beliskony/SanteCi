@@ -9,12 +9,21 @@ import connectDB from '@/app/server/config/databaseConnect';
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { messageId: string } }
+  { params }: { params: Promise<{ messageId: string }> }
 ) {
   try {
     await connectDB();
 
     const authUser = await getAuthUser(req);
+    
+    if (!authUser || !authUser.data?._id) {
+      return NextResponse.json(
+        { success: false, message: 'Non authentifié.' },
+        { status: 401 }
+      );
+    }
+
+    const { messageId } = await params;
     const userId = String(authUser.data._id);
 
     const scope = req.nextUrl.searchParams.get('scope') ?? 'me';
@@ -27,10 +36,11 @@ export async function DELETE(
     }
 
     const result = scope === 'everyone'
-      ? await chatMessageService.deleteForEveryone(params.messageId, userId)
-      : await chatMessageService.deleteForMe(params.messageId, userId);
+      ? await chatMessageService.deleteForEveryone(messageId, userId)
+      : await chatMessageService.deleteForMe(messageId, userId);
 
     return NextResponse.json({ success: true, ...result });
+    
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
     const status = message === 'Unauthorized' ? 401

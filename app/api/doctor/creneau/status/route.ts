@@ -3,27 +3,35 @@ import { doctorService } from '@/app/server/services/doctor.service';
 import { getAuthDoctor } from '@/app/server/middleware/auth.middleware';
 import connectDB from '@/app/server/config/databaseConnect';
 
-// PATCH /api/doctors/crenau/status — passer en ligne / hors ligne
+// PATCH /api/doctor/creneau/status — passer en ligne / hors ligne
 // body: { isOnline: boolean }
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(req: NextRequest) {
   try {
     await connectDB();
 
     const authDoctor = await getAuthDoctor(req);
-    if (String(authDoctor._id) !== params.id) {
-      return NextResponse.json({ success: false, message: 'Accès non autorisé.' }, { status: 403 });
+    
+    if (!authDoctor || !authDoctor._id) {
+      return NextResponse.json(
+        { success: false, message: 'Accès réservé aux médecins.' },
+        { status: 401 }
+      );
     }
 
     const { isOnline } = await req.json();
+    
     if (isOnline === undefined) {
-      return NextResponse.json({ success: false, message: 'isOnline est requis.' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: 'isOnline est requis.' },
+        { status: 400 }
+      );
     }
 
-    const result = await doctorService.toggleOnlineStatus(params.id, isOnline);
+    // Utiliser l'ID du médecin authentifié
+    const result = await doctorService.toggleOnlineStatus(String(authDoctor._id), isOnline);
+    
     return NextResponse.json({ success: true, ...result });
+    
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
     const status = message === 'Unauthorized' ? 401 : 500;

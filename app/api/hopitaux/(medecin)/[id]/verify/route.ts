@@ -6,15 +6,25 @@ import connectDB from '@/app/server/config/databaseConnect';
 // PATCH /api/hospitals/[id]/verify — vérifier un établissement (admin/médecin)
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
 
-    await getAuthDoctor(req);
+    const authDoctor = await getAuthDoctor(req);
+    
+    if (!authDoctor || !authDoctor._id) {
+      return NextResponse.json(
+        { success: false, message: 'Accès réservé aux médecins.' },
+        { status: 401 }
+      );
+    }
 
-    const result = await hospitalClinicService.verify(params.id);
+    const { id } = await params;
+    const result = await hospitalClinicService.verify(id);
+    
     return NextResponse.json({ success: true, ...result });
+    
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
     const status = message === 'Unauthorized' || message === 'Accès réservé aux médecins.' ? 401

@@ -7,22 +7,33 @@ import connectDB from '@/app/server/config/databaseConnect';
 // body: { name: string, url: string }
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
 
     const authUser = await getAuthUser(req);
+
+     if (!authUser) {
+      return NextResponse.json(
+        { success: false, message: 'Non authentifié.' },
+        { status: 401 }
+      );
+    }
+
+    const { id } = await params;
     const { name, url } = await req.json();
 
     if (!name || !url) {
       return NextResponse.json({ success: false, message: 'name et url sont requis.' }, { status: 400 });
     }
 
+    const userId = authUser.data?._id || authUser.data._id;
+
     const appointment = await appointmentService.shareDocument(
-      params.id,
+      id,
       { name, url, uploadedBy: authUser.role },
-      String(authUser.data._id)
+      String(userId)
     );
 
     return NextResponse.json({ success: true, data: appointment.communication.sharedDocuments }, { status: 201 });

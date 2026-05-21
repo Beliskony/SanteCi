@@ -24,27 +24,37 @@ async function assertRoomAccess(chatRoomId: string, userId: string): Promise<voi
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { roomId: string } }
+  { params }: { params: Promise<{ roomId: string }> }
 ) {
   try {
     await connectDB();
 
     const authUser = await getAuthUser(req);
+    
+    if (!authUser || !authUser.data?._id) {
+      return NextResponse.json(
+        { success: false, message: 'Non authentifié.' },
+        { status: 401 }
+      );
+    }
+
+    const { roomId } = await params;
     const userId = String(authUser.data._id);
 
-    await assertRoomAccess(params.roomId, userId);
+    await assertRoomAccess(roomId, userId);
 
     const { searchParams } = req.nextUrl;
     const before = searchParams.has('before') ? new Date(searchParams.get('before')!) : undefined;
-    const limit  = searchParams.has('limit') ? Number(searchParams.get('limit')) : 30;
+    const limit = searchParams.has('limit') ? Number(searchParams.get('limit')) : 30;
 
     const messages = await chatMessageService.getMessages({
-      chatRoomId: params.roomId,
+      chatRoomId: roomId,
       before,
       limit,
     });
 
     return NextResponse.json({ success: true, data: messages });
+    
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
     const status = message === 'Unauthorized' ? 401
@@ -61,15 +71,24 @@ export async function GET(
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { roomId: string } }
+  { params }: { params: Promise<{ roomId: string }> }
 ) {
   try {
     await connectDB();
 
     const authUser = await getAuthUser(req);
+    
+    if (!authUser || !authUser.data?._id) {
+      return NextResponse.json(
+        { success: false, message: 'Non authentifié.' },
+        { status: 401 }
+      );
+    }
+
+    const { roomId } = await params;
     const userId = String(authUser.data._id);
 
-    await assertRoomAccess(params.roomId, userId);
+    await assertRoomAccess(roomId, userId);
 
     const { receiverId, content, appointmentId } = await req.json();
 
@@ -83,13 +102,14 @@ export async function POST(
     const msg = await chatMessageService.send({
       senderId: userId,
       receiverId,
-      chatRoomId: params.roomId,
+      chatRoomId: roomId,
       messageType: 'text',
       content,
       appointmentId,
     });
 
     return NextResponse.json({ success: true, data: msg }, { status: 201 });
+    
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
     const status = message === 'Unauthorized' ? 401

@@ -7,23 +7,37 @@ import connectDB from '@/app/server/config/databaseConnect';
 // body: { reason: string }
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
 
     const authUser = await getAuthUser(req);
+    
+    if (!authUser || !authUser.data?._id) {
+      return NextResponse.json(
+        { success: false, message: 'Non authentifié.' },
+        { status: 401 }
+      );
+    }
+
+    const { id } = await params;
     const { reason } = await req.json();
 
     if (!reason) {
-      return NextResponse.json({ success: false, message: 'La raison d\'annulation est requise.' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: 'La raison d\'annulation est requise.' },
+        { status: 400 }
+      );
     }
 
     const cancelledBy = authUser.role; // 'patient' | 'doctor'
     const requesterId = String(authUser.data._id);
 
-    const appointment = await appointmentService.cancel(params.id, cancelledBy, reason, requesterId);
+    const appointment = await appointmentService.cancel(id, cancelledBy, reason, requesterId);
+    
     return NextResponse.json({ success: true, data: appointment });
+    
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
     const status = message === 'Unauthorized' ? 401
