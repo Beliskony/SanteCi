@@ -16,7 +16,7 @@ const NavItems: { name: string; href: string }[] = [
   { name: "FAQ",                href: "/FAQ" },
 ];
 
-// ✅ FIX #3 — Statique → hors du composant, jamais recréé
+//  FIX #3 — Statique → hors du composant, jamais recréé
 const PLACEHOLDER_NOTIFICATIONS = [
   { id: 1, text: "Votre RDV du 15 mai est confirmé.",   time: "Il y a 5 min", read: false },
   { id: 2, text: "Dr. Kouamé a accepté votre demande.", time: "Il y a 1h",    read: false },
@@ -27,7 +27,7 @@ const Header = () => {
   const pathname = usePathname();
   const router   = useRouter();
 
-  // ✅ FIX #1 — Sélecteurs atomiques : chaque valeur ne re-render que si ELLE change
+  //  FIX #1 — Sélecteurs atomiques : chaque valeur ne re-render que si ELLE change
   // Le Header entier ne re-render plus à chaque update du store (health, location, etc.)
   const role      = useAuthStore((s) => s.user?.role);
   const firstName = useAuthStore((s) => s.user?.profile?.firstName);
@@ -59,10 +59,10 @@ const Header = () => {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // ✅ FIX #1 (suite) — isAuthenticated basé sur des valeurs atomiques
+  //  FIX #1 (suite) — isAuthenticated basé sur des valeurs atomiques
   const isAuthenticated = hydrated && !!role && !!firstName;
 
-  // ✅ FIX #3 — unreadCount mémorisé (sera utile quand tu brancheras les vraies notifs)
+  //  FIX #3 — unreadCount mémorisé (sera utile quand tu brancheras les vraies notifs)
   const unreadCount = useMemo(
     () => PLACEHOLDER_NOTIFICATIONS.filter((n) => !n.read).length,
     [] // statique pour l'instant
@@ -79,7 +79,7 @@ const Header = () => {
   const dashboardHref = role === "doctor" ? "/doctor"          : "/patient";
   const settingsHref  = role === "doctor" ? "/doctor/settings" : "/patient/settings";
 
-  // ✅ FIX #2 — console.log supprimés (ils s'exécutaient à chaque render !)
+  //  FIX #2 — console.log supprimés (ils s'exécutaient à chaque render !)
 
   const handleLogout = () => {
     authService.logout();

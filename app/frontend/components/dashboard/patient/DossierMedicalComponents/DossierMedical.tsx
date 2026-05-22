@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { usePatientStore } from "@/app/frontend/store/patientStore";
 import { useAuthStore, isPatient } from "@/app/frontend/store/useAuthStore";
-import { useAppointmentStore } from "@/app/frontend/store/appoitmentStore";
 
 import { DossierHeader } from "./DossierHeader";
 import { VitalesCard } from "./VitalesCard";
@@ -14,17 +13,35 @@ import { TraitementsCard } from "./TraitementsCard";
 import { DocumentsCard } from "./DocumentsCard";
 
 export default function DossierPage() {
+  //  FIX #1 — Sélecteurs atomiques au lieu de usePatientStore() entier
+  const fetchHealth        = usePatientStore((s) => s.fetchHealth);
+  const fetchPrescriptions = usePatientStore((s) => s.fetchPrescriptions);
+
+  //  FIX #1 — Sélecteurs atomiques depuis useAuthStore
   const user = useAuthStore((s) => s.user);
-  const patient = user && isPatient(user) ? user : null;
+
+  const patient = useMemo(
+    () => (user && isPatient(user) ? user : null),
+    [user]
+  );
+
+  //  FIX #2 — patientId correctement extrait, stable (string primitive)
+  const patientId = useMemo(() => {
+    if (!patient) return null;
+    const raw = patient._id;
+    return typeof raw === "string" ? raw : raw.toString();
+  }, [patient]);
+
   const profile = patient?.profile ?? null;
-  const health = patient?.health ?? null;
+  const health  = patient?.health  ?? null;
 
-  const patientStore = usePatientStore();
-  const appointmentStore = useAppointmentStore();
-
+  //  FIX #2 + #3 — fetchPrescriptions appelé avec le bon patientId
+  // fetchPrescriptions est une ref stable Zustand → safe comme dépendance
   useEffect(() => {
-    patientStore.fetchPrescriptions(1, 10);
-  }, []);
+    if (!patientId) return;
+    fetchHealth();
+    fetchPrescriptions(patientId, 1, 10);
+  }, [patientId, fetchHealth, fetchPrescriptions]);
 
   const patientName = patient
     ? `${patient.profile.firstName} ${patient.profile.lastName}`

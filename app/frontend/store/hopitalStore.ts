@@ -88,10 +88,10 @@ export const useHospitalStore = create<HospitalState>()(
       
       // ── initializeDefaultData — charge Abidjan par défaut ──────
       initializeDefaultData: async () => {
-        const { facilities, search } = get();
+        const { facilities, isLoading, search } = get();
   
       // Ne charger que si aucune donnée n'est présente
-        if (facilities.length === 0) {
+        if (facilities.length > 0 || isLoading) return;{
           await search({
             city: "Abidjan",
             limit: 12,
@@ -102,7 +102,7 @@ export const useHospitalStore = create<HospitalState>()(
 
       // ── loadMore — append page suivante ───────────────────
       loadMore: async () => {
-        const { pagination, activeFilters, facilities } = get();
+        const { pagination, activeFilters, facilities, isLoading } = get();
         if (pagination.page >= pagination.pages) return;
 
         set({ isLoading: true, error: null });
@@ -199,7 +199,6 @@ export const useHospitalStore = create<HospitalState>()(
           await hospitalService.verify(id);
           // Rafraîchir pour refléter metadata.verified
           await get().fetchById(id);
-          set({ isLoading: false });
         } catch (err) {
           set({
             error:     err instanceof Error ? err.message : "Erreur lors de la vérification",
@@ -233,7 +232,6 @@ export const useHospitalStore = create<HospitalState>()(
           await hospitalService.deleteCoverImage(id);
           // Rafraîchir pour refléter la suppression
           await get().fetchById(id);
-          set({ isLoading: false });
         } catch (err) {
           set({
             error:     err instanceof Error ? err.message : "Erreur lors de la suppression de l'image",
@@ -249,9 +247,11 @@ export const useHospitalStore = create<HospitalState>()(
           await hospitalService.addDoctor(facilityId, doctorId);
           const { currentFacility } = get();
           if (currentFacility?._id.toString() === facilityId) {
-            await get().fetchById(facilityId);
+            await get().fetchById(facilityId); // fetchById gère isLoading: false
+          } else {
+            // Si on n'a pas rafraîchi via fetchById, on remet isLoading manuellement
+            set({ isLoading: false });
           }
-          set({ isLoading: false });
         } catch (err) {
           set({
             error:     err instanceof Error ? err.message : "Erreur lors de l'ajout du médecin",
@@ -267,9 +267,10 @@ export const useHospitalStore = create<HospitalState>()(
           await hospitalService.removeDoctor(facilityId, doctorId);
           const { currentFacility } = get();
           if (currentFacility?._id.toString() === facilityId) {
-            await get().fetchById(facilityId);
+            await get().fetchById(facilityId); // fetchById gère isLoading: false
+          } else {
+            set({ isLoading: false });
           }
-          set({ isLoading: false });
         } catch (err) {
           set({
             error:     err instanceof Error ? err.message : "Erreur lors du retrait du médecin",
@@ -284,7 +285,6 @@ export const useHospitalStore = create<HospitalState>()(
         try {
           await hospitalService.submitReview(id, data);
           await get().fetchById(id);
-          set({ isLoading: false });
         } catch (err) {
           set({
             error:     err instanceof Error ? err.message : "Erreur lors de la soumission de l'avis",

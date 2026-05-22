@@ -263,7 +263,7 @@ class PatientService {
   }> {
     const { city, bloodGroup, accountStatus, page = 1, limit = 10 } = filters;
 
-    const query: QueryFilter<IPatient> = {};
+    const query: Record<string, unknown> = {};
 
     if (city) query['location.city'] = { $regex: city, $options: 'i' };
     if (bloodGroup) query['profile.bloodGroup'] = bloodGroup;

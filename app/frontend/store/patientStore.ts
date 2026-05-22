@@ -45,6 +45,7 @@ interface PatientState {
 
   // ── Santé ─────────────────────────────────────────────────────────────────
   updateHealth: (data: Partial<PatientHealth>) => Promise<void>;
+  fetchHealth: () => Promise<void>;
 
   // ── Localisation ──────────────────────────────────────────────────────────
   updateLocation: (data: Partial<BaseLocation>) => Promise<void>;
@@ -60,7 +61,7 @@ interface PatientState {
   fetchStats: () => Promise<void>;
 
   // ── Ordonnances ───────────────────────────────────────────────────────────
-  fetchPrescriptions: (page?: number, limit?: number) => Promise<void>;
+  fetchPrescriptions: (patientId: string, page?: number, limit?: number) => Promise<void>;
 
   // ── Compte ────────────────────────────────────────────────────────────────
   deleteAccount: () => Promise<void>;
@@ -102,6 +103,21 @@ export const usePatientStore = create<PatientState>()(
       ...initialState,
 
 
+      // Appelle patientService.getProfile() puis sync useAuthStore
+      fetchProfile: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const patient = await patientService.getProfile();
+          if (patient) {
+            useAuthStore.getState().updatePatientProfile(patient.profile);
+          }
+        } catch (err) {
+          set({ error: toMessage(err) });
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
       // ── updateProfile ───────────────────────────────────────────────────────
       updateProfile: async (data) => {
         set({ isSaving: true, error: null });
@@ -128,6 +144,19 @@ export const usePatientStore = create<PatientState>()(
         } finally {
           set({ isSaving: false });
         }
+      },
+
+      // ── fetchHealth ───────────────────────────────────────────────────────
+      fetchHealth: async () => {
+        set({ isLoading: true, error: null });
+          try {
+            await patientService.getHealth();
+            // getHealth sync useAuthStore.updateHealth en interne
+          } catch (err) {
+            set({ error: toMessage(err) });
+          } finally {
+            set({ isLoading: false });
+          }
       },
 
       // ── updateHealth ────────────────────────────────────────────────────────

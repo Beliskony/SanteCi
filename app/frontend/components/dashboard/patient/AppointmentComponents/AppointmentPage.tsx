@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { Plus } from "lucide-react"
 import { useAppointmentStore } from "@/app/frontend/store/appoitmentStore"
 import { useAuthStore, isPatient } from "@/app/frontend/store/useAuthStore"
@@ -10,25 +10,40 @@ import AppointmentList from "./Appointmentlist"
 export default function AppointmentPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("upcoming")
 
-  const { user }                                          = useAuthStore()
-  const { appointments, isLoading, error, fetchList }     = useAppointmentStore()
+  //  FIX #1 — Sélecteurs atomiques
+  const user         = useAuthStore((s) => s.user)
+  const appointments = useAppointmentStore((s) => s.appointments)
+  const isLoading    = useAppointmentStore((s) => s.isLoading)
+  const error        = useAppointmentStore((s) => s.error)
+  const fetchList    = useAppointmentStore((s) => s.fetchList)
 
-  const patientId = user && isPatient(user) ? String(user._id) : undefined
+  //  patientId stable (string primitive)
+  const patientId = useMemo(() => {
+    if (!user || !isPatient(user)) return undefined
+    const raw = user._id
+    return typeof raw === "string" ? raw : raw.toString()
+  }, [user])
 
+  //  FIX #3 — fetchList ajouté dans les dépendances (ref stable Zustand → pas de boucle)
   useEffect(() => {
     if (!patientId) return
     fetchList({ patientId, limit: 50 })
-  }, [patientId])
+  }, [patientId, fetchList])
 
-  const filtered = appointments.filter((a) =>
-    TAB_STATUSES[activeTab].includes(a.status.current)
+  //  FIX #2 — Mémoïsation des calculs sur appointments
+  const filtered = useMemo(
+    () => appointments.filter((a) => TAB_STATUSES[activeTab].includes(a.status.current)),
+    [appointments, activeTab]
   )
 
-  const counts: Partial<Record<TabKey, number>> = {
-    upcoming:  appointments.filter((a) => TAB_STATUSES.upcoming.includes(a.status.current)).length,
-    past:      appointments.filter((a) => TAB_STATUSES.past.includes(a.status.current)).length,
-    cancelled: appointments.filter((a) => TAB_STATUSES.cancelled.includes(a.status.current)).length,
-  }
+  const counts = useMemo<Partial<Record<TabKey, number>>>(
+    () => ({
+      upcoming:  appointments.filter((a) => TAB_STATUSES.upcoming.includes(a.status.current)).length,
+      past:      appointments.filter((a) => TAB_STATUSES.past.includes(a.status.current)).length,
+      cancelled: appointments.filter((a) => TAB_STATUSES.cancelled.includes(a.status.current)).length,
+    }),
+    [appointments]
+  )
 
   return (
     <div className="min-h-screen bg-slate-50 py-8 px-4">
@@ -55,7 +70,6 @@ export default function AppointmentPage() {
 
         {/* Card conteneur */}
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-
 
           {/* Erreur */}
           {error && (

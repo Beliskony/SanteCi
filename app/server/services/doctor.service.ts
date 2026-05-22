@@ -1,7 +1,12 @@
 import { Doctor } from '../models/medcin.model';
 import { QueryFilter, Types } from 'mongoose';
+import crypto from 'crypto';
 import { IDoctor } from '../interfaces/medecin.interface';
+import { Prescription } from '../models/prescription.model';
+import { IPrescription } from '../interfaces/prescription.interface';
+import { Patient } from '../models/patient.model';
 import { cloudinaryService } from './cloudinary.service';
+import { CreatePrescriptionDTO, UpdatePrescriptionDTO } from '../schemas/prescription.schema';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -298,6 +303,165 @@ async updatePhoto(doctorId: string, buffer: Buffer): Promise<{ photoUrl: string 
 
     return { message: 'Compte désactivé. Contactez le support pour une suppression définitive.' };
   }
+
+
+  // ── Create prescription ────────────────────────────────────────────────────────
+
+async createPrescription(
+  doctorId: string,
+  dto: CreatePrescriptionDTO
+): Promise<IPrescription> {
+
+  // Vérifier que le médecin existe
+  const doctor = await Doctor.findById(doctorId).select('status.accountStatus profile.firstName profile.lastName');
+  if (!doctor) throw new Error('Médecin introuvable.');
+  if (doctor.status.accountStatus !== 'active') throw new Error('Compte médecin inactif.');
+
+  // Vérifier que le patient existe
+  const patient = await Patient.findById(dto.patientId).select('status.accountStatus');
+  if (!patient) throw new Error('Patient introuvable.');
+  if (patient.status.accountStatus !== 'active') throw new Error('Compte patient inactif.');
+
+  const prescriptionId = `PRX-${crypto.randomBytes(5).toString('hex').toUpperCase()}`;
+
+  const prescription = await Prescription.create({
+    prescriptionId,
+    doctorId:      new Types.ObjectId(doctorId),
+    patientId:     new Types.ObjectId(dto.patientId),
+    appointmentId: dto.appointmentId ? new Types.ObjectId(dto.appointmentId) : undefined,
+    date:          new Date(),
+    validityDays:  dto.validityDays ?? 90,
+    diagnosis:     dto.diagnosis,
+    medications:   dto.medications,
+    testsRequested: dto.testsRequested ?? [],
+    notes:         dto.notes,
+    refillsAllowed: dto.refillsAllowed ?? 0,
+    refillsUsed:   0,
+    followUp:      dto.followUp ?? { required: false },
+    sharing: {
+      sharedWithPharmacies: [],
+      patientAcknowledged:  false,
+    },
+    metadata: {
+      createdAt:   new Date(),
+      updatedAt:   new Date(),
+      generatedBy: 'doctor',
+    },
+  });
+
+  // Pousser la référence dans le dossier patient
+  await Patient.findByIdAndUpdate(dto.patientId, {
+    $push: {
+      prescriptions: {
+        prescriptionId: prescription._id,
+        doctorId:       new Types.ObjectId(doctorId),
+        appointmentId:  dto.appointmentId ? new Types.ObjectId(dto.appointmentId) : undefined,
+        issuedAt:       new Date(),
+        expiresAt:      dto.validityDays
+          ? new Date(Date.now() + dto.validityDays * 86400000)
+          : undefined,
+      },
+    },
+    $inc: { 'metadata.totalPrescriptions': 1 },
+  });
+
+  return prescription;
+}
+
+// ── Update prescription ────────────────────────────────────────────────────────
+
+async updatePrescription(
+  prescriptionId: string,
+  doctorId: string,
+  dto: UpdatePrescriptionDTO
+): Promise<IPrescription> {
+
+  const prescription = await Prescription.findById(prescriptionId);
+  if (!prescription) throw new Error('Ordonnance introuvable.');
+
+  // Seul le médecin auteur peut modifier
+  if (String(prescription.doctorId) !== doctorId) {
+    throw new Error('Action non autorisée.');
+  }
+
+  // Une ordonnance annulée ou complétée ne peut plus être modifiée
+  if (['cancelled', 'completed'].includes(prescription.status)) {
+    throw new Error(`Impossible de modifier une ordonnance au statut "${prescription.status}".`);
+  }
+
+  const updateFields: Record<string, unknown> = {
+    'metadata.updatedAt': new Date(),
+  };
+
+  if (dto.notes         !== undefined) updateFields['notes']          = dto.notes;
+  if (dto.validityDays  !== undefined) updateFields['validityDays']   = dto.validityDays;
+  if (dto.refillsAllowed !== undefined) updateFields['refillsAllowed'] = dto.refillsAllowed;
+  if (dto.status        !== undefined) updateFields['status']         = dto.status;
+  if (dto.followUp) {
+    if (dto.followUp.required !== undefined) updateFields['followUp.required'] = dto.followUp.required;
+    if (dto.followUp.date     !== undefined) updateFields['followUp.date']     = dto.followUp.date;
+    if (dto.followUp.notes    !== undefined) updateFields['followUp.notes']    = dto.followUp.notes;
+  }
+
+  // Recalculer expiresAt si validityDays change
+  if (dto.validityDays !== undefined) {
+    const expiry = new Date(prescription.date);
+    expiry.setDate(expiry.getDate() + dto.validityDays);
+    updateFields['status'] = expiry < new Date() ? 'expired' : (dto.status ?? prescription.status);
+
+    // Mettre à jour aussi la référence dans le patient
+    await Patient.findOneAndUpdate(
+      {
+        _id: prescription.patientId,
+        'prescriptions.prescriptionId': prescription._id,
+      },
+      {
+        $set: { 'prescriptions.$.expiresAt': expiry },
+      }
+    );
+  }
+
+  const updated = await Prescription.findByIdAndUpdate(
+    prescriptionId,
+    { $set: updateFields },
+    { new: true }
+  )
+    .populate('doctorId',     'profile.firstName profile.lastName profile.title profile.specialty')
+    .populate('appointmentId','details.scheduledFor details.type details.reason');
+
+  return updated!;
+}
+
+// ── Delete prescription ────────────────────────────────────────────────────────
+
+async deletePrescription(
+  prescriptionId: string,
+  doctorId: string
+): Promise<{ message: string }> {
+
+  const prescription = await Prescription.findById(prescriptionId);
+  if (!prescription) throw new Error('Ordonnance introuvable.');
+
+  // Seul le médecin auteur peut supprimer
+  if (String(prescription.doctorId) !== doctorId) {
+    throw new Error('Action non autorisée.');
+  }
+
+  // Bloquer la suppression si déjà acquittée par le patient
+  if (prescription.sharing.patientAcknowledged) {
+    throw new Error('Impossible de supprimer une ordonnance déjà reçue par le patient.');
+  }
+
+  await Prescription.findByIdAndDelete(prescriptionId);
+
+  // Retirer la référence du dossier patient
+  await Patient.findByIdAndUpdate(prescription.patientId, {
+    $pull: { prescriptions: { prescriptionId: prescription._id } },
+    $inc:  { 'metadata.totalPrescriptions': -1 },
+  });
+
+  return { message: 'Ordonnance supprimée.' };
+}
 }
 
 export const doctorService = new DoctorService();

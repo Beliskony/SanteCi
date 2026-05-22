@@ -20,7 +20,7 @@ import { isPopulatedDoctor } from "@/app/frontend/types/Appointment";
 const PatDash = () => {
   const router = useRouter();
 
-  // ✅ FIX #1 — Sélecteurs atomiques au lieu de `const { user } = useAuthStore()`
+  //  FIX #1 — Sélecteurs atomiques au lieu de `const { user } = useAuthStore()`
   // Chaque sélecteur ne re-render que si SA valeur change, pas à chaque update du store
   const user      = useAuthStore((s) => s.user);
   const firstName = useAuthStore((s) => s.user?.profile?.firstName ?? "—");
@@ -28,13 +28,13 @@ const PatDash = () => {
     s.user && isPatient(s.user) ? s.user.health : null
   );
 
-  // ✅ FIX #2 — Sélecteurs atomiques pour le store appointments
+  //  FIX #2 — Sélecteurs atomiques pour le store appointments
   const appointments = useAppointmentStore((s) => s.appointments);
   const isLoading    = useAppointmentStore((s) => s.isLoading);
   const fetchList    = useAppointmentStore((s) => s.fetchList);
   const getByStatus  = useAppointmentStore((s) => s.getByStatus);
 
-  // ✅ FIX #3 — Lecture sécurisée de _id : après rehydration depuis localStorage,
+  //  FIX #3 — Lecture sécurisée de _id : après rehydration depuis localStorage,
   // _id peut être une string ou un ObjectId. On normalise proprement.
   const patientId = useMemo(() => {
     if (!user || !isPatient(user)) return undefined;
@@ -52,7 +52,7 @@ const PatDash = () => {
     // fetchList est stable (référence Zustand), patientId est une string primitive → pas de boucle
   }, [patientId, fetchList]);
 
-  // ✅ FIX #4 — getByStatus mémorisé pour éviter des re-renders en cascade
+  //  FIX #4 — getByStatus mémorisé pour éviter des re-renders en cascade
   // si ces tableaux sont passés comme props ou utilisés comme dépendances ailleurs
   const ongoing   = useMemo(() => getByStatus("ongoing"),   [appointments, getByStatus]);
   const confirmed = useMemo(() => getByStatus("confirmed"), [appointments, getByStatus]);
