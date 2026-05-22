@@ -24,7 +24,6 @@ export default function DossierPage() {
 
   useEffect(() => {
     patientStore.fetchPrescriptions(1, 10);
-    appointmentStore.fetchList({});
   }, []);
 
   const patientName = patient

@@ -126,7 +126,10 @@ export const appointmentService = {
     if (filters?.to) qs.append('to', filters.to);
 
     const query = qs.toString();
-    return api.get<PaginatedAppointments>(`/appointments${query ? `?${query}` : ""}`);
+    const res = await api.get<ApiResponse<PaginatedAppointments>>(
+      `/appointments${query ? `?${query}` : ""}`
+    );
+    return res.data;
   },
 
   // ── Confirmer (médecin) ───────────────────────────────────────────────────

@@ -45,7 +45,14 @@ const PatientSchema: Schema = new Schema({
     weight: { type: Number },
     bmi: { type: Number },
     },
-security: {
+  prescriptions: [{
+    prescriptionId: { type: mongoose.Types.ObjectId, ref: 'Prescription', required: true },
+    doctorId: { type: mongoose.Types.ObjectId, ref: 'Doctor', required: true },
+    appointmentId: { type: mongoose.Types.ObjectId, ref: 'Appointment' },
+    issuedAt: { type: Date, required: true },
+    expiresAt: { type: Date },
+  }],
+  security: {
     password: { type: String, required: true },
     isPatient: { type: Boolean, default: true },
     pinCode: { type: String },

@@ -113,6 +113,14 @@ const MetadataSchema = z.object({
   totalPrescriptions: z.number().int().min(0).default(0),
 });
 
+const PrescriptionSchema = z.object({
+  prescriptionId: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid ObjectId'),
+  doctorId:       z.string().regex(/^[a-f\d]{24}$/i, 'Invalid ObjectId'),
+  appointmentId:  z.string().regex(/^[a-f\d]{24}$/i, 'Invalid ObjectId').optional(),
+  issuedAt:       z.date(),
+  expiresAt:      z.date().optional(),
+});
+
 // ── Schéma principal ───────────────────────────────────────────────────────────
 
 export const PatientSchema = z.object({
@@ -124,6 +132,8 @@ export const PatientSchema = z.object({
     allergies: [], chronicDiseases: [],
     currentMedications: [], disabilities: [],
   })),
+
+  prescriptions: z.array(PrescriptionSchema).default([]),
   security:    SecuritySchema,
   preferences: PreferencesSchema.default(() => ({
     language:      'fr' as const,

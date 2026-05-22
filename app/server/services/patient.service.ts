@@ -2,6 +2,8 @@ import { Patient } from '../models/patient.model';
 import { QueryFilter, Types } from 'mongoose';
 import { IPatient } from '../interfaces/patient.interface';
 import { cloudinaryService } from './cloudinary.service';
+import { IPrescription } from '../interfaces/prescription.interface';
+import { Prescription } from '../models/prescription.model';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -327,6 +329,57 @@ class PatientService {
       bmi: patient.health?.bmi ?? null,
     };
   }
+
+
+  // ── Get all prescriptions (patient) ───────────────────────────────────────────
+
+async getMyPrescriptions(
+  patientId: string,
+  params: { page?: number; limit?: number }
+): Promise<{
+  prescriptions: IPrescription[];
+  total: number;
+  page: number;
+  pages: number;
+}> {
+  const { page = 1, limit = 10 } = params;
+  const skip = (page - 1) * limit;
+
+  const query = { patientId: new Types.ObjectId(patientId) };
+  const total = await Prescription.countDocuments(query);
+
+  const prescriptions = await Prescription.find(query)
+    .populate('doctorId',     'profile.firstName profile.lastName profile.title profile.specialty')
+    .populate('appointmentId','details.scheduledFor details.type details.reason')
+    .sort({ 'metadata.createdAt': -1 })
+    .skip(skip)
+    .limit(limit)
+    .lean();
+
+  return { prescriptions, total, page, pages: Math.ceil(total / limit) };
+}
+
+// ── Get prescription by ID ─────────────────────────────────────────────────────
+
+async getPrescriptionById(
+  prescriptionId: string,
+  requesterId: string,
+  requesterRole: 'patient' | 'doctor'
+): Promise<IPrescription> {
+  const prescription = await Prescription.findById(prescriptionId)
+    .populate('doctorId',     'profile.firstName profile.lastName profile.title profile.specialty')
+    .populate('appointmentId','details.scheduledFor details.type details.reason');
+
+  if (!prescription) throw new Error('Ordonnance introuvable.');
+
+  const isOwner =
+    (requesterRole === 'patient' && String(prescription.patientId) === requesterId) ||
+    (requesterRole === 'doctor'  && String(prescription.doctorId)  === requesterId);
+
+  if (!isOwner) throw new Error('Accès non autorisé.');
+
+  return prescription;
+}
 }
 
 export const patientService = new PatientService();

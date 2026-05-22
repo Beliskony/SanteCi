@@ -234,6 +234,8 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  _hasHydrated: boolean; // pour vérifier que le store a été rechargé depuis le localStorage
+  setHasHydrated: (hydrated: boolean) => void; // action pour mettre à jour _hasHydrated
 
   updateProfilePhoto: (photoUrl: string) => void;
 
@@ -272,7 +274,8 @@ export const useAuthStore = create<AuthState>()(
         isAuthenticated: false,
         isLoading: false,
         error: null,
-
+        _hasHydrated: false,
+        setHasHydrated: (hydrated) => set({ _hasHydrated: hydrated }),
         // Appelé après login — stocke user + les deux tokens
         setUser: (user, token, refreshToken) =>
           set({ user, token, refreshToken, isAuthenticated: true, error: null }),
@@ -340,14 +343,18 @@ export const useAuthStore = create<AuthState>()(
         setLoading: (isLoading) => set({ isLoading }),
         setError: (error) => set({ error }),
       }),
+
       {
         name: "auth-storage",
+        onRehydrateStorage: () => (state) => {
+          state?.setHasHydrated(true); // Indique que le store a été rechargé depuis le localStorage
+        },
         partialize: (state) => ({
           token:           state.token,
           refreshToken:    state.refreshToken,  // ← persisté
           isAuthenticated: state.isAuthenticated,
           user: state.user
-            ? { ...state.user, security: undefined }
+            ? { ...state.user,_id: state.user._id.toString(), security: undefined }
             : null,
         }),
       }

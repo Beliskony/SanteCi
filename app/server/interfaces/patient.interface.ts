@@ -46,6 +46,14 @@ export interface IPatient extends Document {
     weight?: number; // en kg
     bmi?: number;
   };
+
+  prescriptions?: Array<{
+    prescriptionId: Types.ObjectId;  // ref → Prescription
+    doctorId: Types.ObjectId;        // ref → Doctor
+    appointmentId?: Types.ObjectId;  // ref → Appointment (optionnel)
+    issuedAt: Date;
+    expiresAt?: Date;
+  }>;
   
   // Sécurité
   security: {

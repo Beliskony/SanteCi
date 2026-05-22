@@ -42,8 +42,16 @@ export const patientService = {
 
   // bmi recalculé par le backend → on sync avec res.data.health, pas data
   async updateHealth(data: Partial<PatientHealth>): Promise<PatientUser> {
-    const res = await api.patch<ApiResponse<PatientUser>>(
-      "/patients/[id]/health",
+      // Récupérer l'ID du patient connecté depuis le store
+  const user = useAuthStore.getState().user;
+  const patientId = user?._id.toString();
+
+  if (!patientId) {
+    throw new Error("Utilisateur non authentifié.");
+  }
+
+    const res = await api.put<ApiResponse<PatientUser>>(
+      `/patients/${patientId}/health`,
       data
     );
     useAuthStore.getState().updateHealth(res.data.health);
@@ -64,11 +72,11 @@ export const patientService = {
     useAuthStore.getState().updateLocation(data);
   },
 
-  async uploadPhoto(file: File): Promise<{ photoUrl: string }> {
+  async uploadPhoto(file: File, patientId?: string): Promise<{ photoUrl: string }> {
     const formData = new FormData();
     formData.append("photo", file);
     const res = await api.uploadFile<ApiResponse<{ photoUrl: string }>>(
-      "/patients/uniquement/photo",
+      `/patients/${patientId || useAuthStore.getState().user?._id}/photo`,
       formData
     );
     useAuthStore.getState().updateProfilePhoto(res.data.photoUrl);

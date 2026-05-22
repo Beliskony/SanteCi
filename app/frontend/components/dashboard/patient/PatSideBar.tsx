@@ -60,6 +60,8 @@ const SidebarContent = ({
   const handleLogout = () => {
     authService.logout();
     onClose?.();
+    //redirection vers acceuil
+    window.location.href = "/"; // redirige vers la page d'accueil
   };
 
   const handleNav = (key: ActivePage) => {

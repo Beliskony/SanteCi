@@ -2,7 +2,6 @@ import * as api from "@/app/frontend/lib/apiClient";
 import { useAuthStore } from "../store/useAuthStore";
 import type { AuthUser, PatientUser, DoctorUser } from "../store/useAuthStore";
 import type { ApiResponse } from "@/app/frontend/types";
-import { refresh } from "next/cache";
 
 // ── Types backend (ce que le serveur retourne réellement) ────
 interface BackendUser {
@@ -63,7 +62,7 @@ function mapToAuthUser(backendUser: BackendUser): AuthUser {
 
   if (backendUser.role === "doctor") {
     return {
-      _id: backendUser.id as any,
+      _id: backendUser.id as unknown as any,
       role: "doctor",
       doctorId: backendUser.id,
       profile: {
