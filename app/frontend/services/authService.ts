@@ -29,7 +29,7 @@ interface BackendAuthResponse {
 }
 
 export interface LoginPayload {
-  email: string;
+  identifiantLogin: string; // email ou téléphone
   password: string;
   role: "doctor" | "patient";
 }

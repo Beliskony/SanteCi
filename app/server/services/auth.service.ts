@@ -46,8 +46,9 @@ interface RegisterPatientDTO {
   city: string;
 }
 
+
 export interface LoginDTO {
-  email: string;
+  identifiantLogin: string;  // comment signifie email ou téléphone
   password: string;
   role: Role;
 }
@@ -192,7 +193,10 @@ class AuthService {
 
   async login(dto: LoginDTO): Promise<AuthTokens & { user: object }> {
     if (dto.role === 'doctor') {
-      const doctor = await Doctor.findOne({ 'contact.email': dto.email }).select('+security.password');
+      const doctor = await Doctor.findOne({$or: [
+        { 'contact.email': dto.identifiantLogin },
+        { 'contact.phone': dto.identifiantLogin }
+      ]}).select('+security.password');
       if (!doctor) throw new Error('Email ou mot de passe incorrect.');
 
       if (doctor.status.accountStatus === 'suspended' || doctor.status.accountStatus === 'blocked') {
@@ -230,7 +234,12 @@ class AuthService {
     }
 
     // Patient login
-    const patient = await Patient.findOne({ 'contact.email': dto.email }).select('+security.password');
+    const patient = await Patient.findOne({ 
+      $or: [
+        { 'contact.email': dto.identifiantLogin },
+        { 'contact.phone': dto.identifiantLogin }
+      ]
+     }).select('+security.password');
     if (!patient) throw new Error('Email ou mot de passe incorrect.');
 
     // Vérification verrouillage compte

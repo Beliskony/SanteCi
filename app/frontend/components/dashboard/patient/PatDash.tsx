@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Activity,
@@ -18,33 +18,54 @@ import { isPopulatedDoctor } from "@/app/frontend/types/Appointment";
 // ─── PatDash ──────────────────────────────────────────────────
 
 const PatDash = () => {
-  const router   = useRouter();
-  const { user } = useAuthStore();
-  const { appointments, isLoading, fetchList, getByStatus } = useAppointmentStore();
+  const router = useRouter();
 
-  const patientId = user && isPatient(user) ? String(user._id) : undefined;
+  // ✅ FIX #1 — Sélecteurs atomiques au lieu de `const { user } = useAuthStore()`
+  // Chaque sélecteur ne re-render que si SA valeur change, pas à chaque update du store
+  const user      = useAuthStore((s) => s.user);
+  const firstName = useAuthStore((s) => s.user?.profile?.firstName ?? "—");
+  const health    = useAuthStore((s) =>
+    s.user && isPatient(s.user) ? s.user.health : null
+  );
+
+  // ✅ FIX #2 — Sélecteurs atomiques pour le store appointments
+  const appointments = useAppointmentStore((s) => s.appointments);
+  const isLoading    = useAppointmentStore((s) => s.isLoading);
+  const fetchList    = useAppointmentStore((s) => s.fetchList);
+  const getByStatus  = useAppointmentStore((s) => s.getByStatus);
+
+  // ✅ FIX #3 — Lecture sécurisée de _id : après rehydration depuis localStorage,
+  // _id peut être une string ou un ObjectId. On normalise proprement.
+  const patientId = useMemo(() => {
+    if (!user || !isPatient(user)) return undefined;
+    const raw = user._id;
+    if (!raw) return undefined;
+    // Après rehydration, _id est une string ; en runtime c'est un ObjectId
+    if (typeof raw === "string") return raw;
+    if (typeof raw === "object" && "toString" in raw) return raw.toString();
+    return undefined;
+  }, [user]);
 
   useEffect(() => {
     if (!patientId) return;
     fetchList({ patientId, status: "confirmed", limit: 5 });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patientId]);
+    // fetchList est stable (référence Zustand), patientId est une string primitive → pas de boucle
+  }, [patientId, fetchList]);
 
-  const profile   = user?.profile;
-  const firstName = profile?.firstName ?? "—";
-  const health    = user && isPatient(user) ? user.health : null;
-  const weight    = health?.weight ?? null;
-  const height    = health?.height ?? null;
-  const bmi       = health?.bmi
+  // ✅ FIX #4 — getByStatus mémorisé pour éviter des re-renders en cascade
+  // si ces tableaux sont passés comme props ou utilisés comme dépendances ailleurs
+  const ongoing   = useMemo(() => getByStatus("ongoing"),   [appointments, getByStatus]);
+  const confirmed = useMemo(() => getByStatus("confirmed"), [appointments, getByStatus]);
+  const nextAppt  = ongoing[0] ?? confirmed[0] ?? null;
+
+  // Données de santé
+  const weight = health?.weight ?? null;
+  const height = health?.height ?? null;
+  const bmi    = health?.bmi
     ?? (weight && height
       ? parseFloat((weight / ((height / 100) ** 2)).toFixed(1))
       : null);
   const treatment = health?.currentMedications?.[0] ?? null;
-
-  // Prochain RDV : ongoing en priorité, sinon confirmed
-  const ongoing   = getByStatus("ongoing");
-  const confirmed = getByStatus("confirmed");
-  const nextAppt  = ongoing[0] ?? confirmed[0] ?? null;
 
   // Médecin peuplé ou non
   const doctor = nextAppt && isPopulatedDoctor(nextAppt.doctorId)

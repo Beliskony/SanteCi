@@ -89,14 +89,14 @@ const RegisterDoctorPage = () => {
     e.preventDefault();
     if (!acceptTerms || !acceptPro) return;
     try {
-      await authService.register({
-        role: "doctor",
+      await authService.registerDoctor({
         firstName: form.firstName,
         lastName: form.lastName,
         title: form.title as typeof TITLES[number],
         specialty: form.specialty,
         email: form.email,
         phone: `+225${form.phone.replace(/\s/g, "")}`,
+        city: form.city,
         licenseNumber: form.licenseNumber,
         university: form.university,
         graduationYear: Number(form.graduationYear),

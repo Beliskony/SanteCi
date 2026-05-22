@@ -3,23 +3,42 @@
 import { Phone, Bell, Menu, X, Video, LayoutDashboard, Settings, LogOut, ChevronDown } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { useAuthStore, isDoctor } from "@/app/frontend/store/useAuthStore";
 import { authService } from "@/app/frontend/services/authService";
 
 const NavItems: { name: string; href: string }[] = [
-  { name: "Accueil", href: "/" },
-  { name: "Médecins", href: "/medecins" },
-  { name: "Hôpitaux", href: "/hospitals" },
-  { name: "Teleconsultation", href: "/teleconsultation" },
-  { name: "Comment ça marche", href: "/how-it-works" },
-  { name: "FAQ", href: "/FAQ" },
+  { name: "Accueil",            href: "/" },
+  { name: "Médecins",           href: "/medecins" },
+  { name: "Hôpitaux",           href: "/hospitals" },
+  { name: "Teleconsultation",   href: "/teleconsultation" },
+  { name: "Comment ça marche",  href: "/how-it-works" },
+  { name: "FAQ",                href: "/FAQ" },
+];
+
+// ✅ FIX #3 — Statique → hors du composant, jamais recréé
+const PLACEHOLDER_NOTIFICATIONS = [
+  { id: 1, text: "Votre RDV du 15 mai est confirmé.",   time: "Il y a 5 min", read: false },
+  { id: 2, text: "Dr. Kouamé a accepté votre demande.", time: "Il y a 1h",    read: false },
+  { id: 3, text: "Votre ordonnance est disponible.",    time: "Hier",         read: true  },
 ];
 
 const Header = () => {
   const pathname = usePathname();
   const router   = useRouter();
-  const { user } = useAuthStore();
+
+  // ✅ FIX #1 — Sélecteurs atomiques : chaque valeur ne re-render que si ELLE change
+  // Le Header entier ne re-render plus à chaque update du store (health, location, etc.)
+  const role      = useAuthStore((s) => s.user?.role);
+  const firstName = useAuthStore((s) => s.user?.profile?.firstName);
+  const lastName  = useAuthStore((s) => s.user?.profile?.lastName);
+  const photo     = useAuthStore((s) => s.user?.profile?.photo);
+  const title     = useAuthStore((s) =>
+    s.user?.role === "doctor" ? (s.user as any).profile?.title : undefined
+  );
+  const specialty = useAuthStore((s) =>
+    s.user?.role === "doctor" ? (s.user as any).profile?.specialty : undefined
+  );
 
   const [hydrated,      setHydrated]      = useState(false);
   const [menuOpen,      setMenuOpen]      = useState(false);
@@ -31,7 +50,6 @@ const Header = () => {
 
   useEffect(() => { setHydrated(true); }, []);
 
-  // Fermer les dropdowns si clic en dehors
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (userRef.current  && !userRef.current.contains(e.target as Node))  setUserDropdown(false);
@@ -41,20 +59,27 @@ const Header = () => {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const isAuthenticated = hydrated && !!user && !!user?.profile;
-  // Dans Header, testez différentes manières d'accéder à la photo
-console.log('Manière 1:', user?.profile?.photo);
-console.log('Manière 2:', user?.profile?.photo ?? 'Pas de photo');
-console.log('Manière 3:', (user as any)?.profile?.photo);
+  // ✅ FIX #1 (suite) — isAuthenticated basé sur des valeurs atomiques
+  const isAuthenticated = hydrated && !!role && !!firstName;
 
-  const roleLabel = !isAuthenticated
-    ? ""
-    : isDoctor(user!)
-    ? `${user!.profile?.title ?? ""} · ${user!.profile?.specialty ?? ""}`.trim().replace(/^·\s*/, "")
-    : "Patient";
+  // ✅ FIX #3 — unreadCount mémorisé (sera utile quand tu brancheras les vraies notifs)
+  const unreadCount = useMemo(
+    () => PLACEHOLDER_NOTIFICATIONS.filter((n) => !n.read).length,
+    [] // statique pour l'instant
+  );
 
-  const dashboardHref = !user ? "/" : isDoctor(user) ? "/doctor" : "/patient";
-  const settingsHref  = !user ? "/" : isDoctor(user) ? "/doctor/settings" : "/patient/settings";
+  const roleLabel = useMemo(() => {
+    if (!isAuthenticated) return "";
+    if (role === "doctor") {
+      return `${title ?? ""} · ${specialty ?? ""}`.trim().replace(/^·\s*/, "");
+    }
+    return "Patient";
+  }, [isAuthenticated, role, title, specialty]);
+
+  const dashboardHref = role === "doctor" ? "/doctor"          : "/patient";
+  const settingsHref  = role === "doctor" ? "/doctor/settings" : "/patient/settings";
+
+  // ✅ FIX #2 — console.log supprimés (ils s'exécutaient à chaque render !)
 
   const handleLogout = () => {
     authService.logout();
@@ -62,14 +87,6 @@ console.log('Manière 3:', (user as any)?.profile?.photo);
     setMenuOpen(false);
     router.push("/");
   };
-
-  // Fausses notifs placeholder — à remplacer par les vraies depuis l'API
-  const notifications = [
-    { id: 1, text: "Votre RDV du 15 mai est confirmé.",       time: "Il y a 5 min",  read: false },
-    { id: 2, text: "Dr. Kouamé a accepté votre demande.",     time: "Il y a 1h",     read: false },
-    { id: 3, text: "Votre ordonnance est disponible.",         time: "Hier",          read: true  },
-  ];
-  const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
     <header className="w-full">
@@ -113,7 +130,7 @@ console.log('Manière 3:', (user as any)?.profile?.photo);
 
         {/* Actions desktop */}
         <div className="hidden lg:flex items-center gap-3">
-          {isAuthenticated && user ? (
+          {isAuthenticated ? (
             <div className="flex items-center gap-3">
 
               {/* Statut en ligne */}
@@ -136,7 +153,6 @@ console.log('Manière 3:', (user as any)?.profile?.photo);
                   )}
                 </button>
 
-                {/* Dropdown notifications */}
                 {notifDropdown && (
                   <div className="absolute right-0 top-10 w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
                     <div className="flex justify-between items-center px-4 py-3 border-b border-gray-100">
@@ -144,7 +160,7 @@ console.log('Manière 3:', (user as any)?.profile?.photo);
                       <button className="text-xs text-[#1e3a8a] hover:underline">Tout marquer lu</button>
                     </div>
                     <div className="flex flex-col max-h-72 overflow-y-auto">
-                      {notifications.map((n) => (
+                      {PLACEHOLDER_NOTIFICATIONS.map((n) => (
                         <div
                           key={n.id}
                           className={`flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-none ${
@@ -179,13 +195,13 @@ console.log('Manière 3:', (user as any)?.profile?.photo);
                   className="flex items-center gap-2.5 hover:bg-gray-50 rounded-xl px-2 py-1 transition-colors"
                 >
                   <img
-                    src={user?.profile?.photo || "/default_profile_photo.jpg"}
+                    src={photo || "/default_profile_photo.jpg"}
                     alt="Avatar"
                     className="w-9 h-9 rounded-full object-cover border-2 border-[#1e3a8a]/20"
                   />
                   <div className="flex flex-col items-start leading-tight">
                     <span className="text-sm font-semibold text-[#1e3a8a]">
-                      {user?.profile?.firstName ?? "Utilisateur"} {user?.profile?.lastName ?? ""}
+                      {firstName ?? "Utilisateur"} {lastName ?? ""}
                     </span>
                     <span className="text-xs text-gray-400">{roleLabel}</span>
                   </div>
@@ -195,7 +211,6 @@ console.log('Manière 3:', (user as any)?.profile?.photo);
                   />
                 </button>
 
-                {/* Dropdown user */}
                 {userDropdown && (
                   <div className="absolute right-0 top-12 w-52 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden py-1">
                     <Link
@@ -274,25 +289,23 @@ console.log('Manière 3:', (user as any)?.profile?.photo);
           ))}
 
           <div className="mt-3 flex flex-col gap-2">
-            {isAuthenticated && user ? (
+            {isAuthenticated ? (
               <>
-                {/* Profil mobile */}
                 <div className="flex items-center gap-3 px-3 py-3 rounded-xl border border-gray-200 bg-gray-50">
                   <img
-                    src={user?.profile?.photo || "/default_profile_photo.jpg"}
+                    src={photo || "/default_profile_photo.jpg"}
                     alt="Avatar"
                     className="w-9 h-9 rounded-full object-cover"
                   />
                   <div className="flex flex-col items-start leading-tight">
                     <span className="text-sm font-semibold text-[#1e3a8a]">
-                      {user?.profile?.firstName} {user?.profile?.lastName}
+                      {firstName} {lastName}
                     </span>
                     <span className="text-xs text-gray-400">{roleLabel}</span>
                   </div>
                   <span className="ml-auto w-2 h-2 rounded-full bg-[#10b981]" />
                 </div>
 
-                {/* Actions mobile */}
                 <Link
                   href={dashboardHref}
                   onClick={() => setMenuOpen(false)}

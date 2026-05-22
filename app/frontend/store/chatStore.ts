@@ -230,15 +230,32 @@ export const useChatStore = create<ChatState>()(
       // ── sendText ──────────────────────────────────────────
       sendText: async (roomId, payload) => {
         set({ isSending: true, error: null });
-        try {
-          const msg = await chatService.sendText(roomId, payload);
-          set((state) => ({ messages: [toPlain(msg), ...state.messages], isSending: false }));
-          get().fetchConversations();
-        } catch (err) {
-          set({ error: err instanceof Error ? err.message : "Erreur d'envoi", isSending: false });
-          throw err;
-        }
-      },
+          try {
+            const msg = await chatService.sendText(roomId, payload);
+            const plainMsg = toPlain(msg);
+    
+          set((state) => {
+            // Met à jour les messages
+            const newMessages = [plainMsg, ...state.messages];
+      
+            // Met à jour la conversation localement
+            const updatedConversations = state.conversations.map(c =>
+              c.chatRoomId === roomId
+                ? { ...c, lastMessage: plainMsg, unreadCount: 0 }
+                : c
+            );
+      
+          return {
+            messages: newMessages,
+            conversations: updatedConversations,
+            isSending: false
+          };
+        });
+      } catch (err) {
+        set({ error: err instanceof Error ? err.message : "Erreur d'envoi", isSending: false });
+      throw err;
+      }
+    },
 
       // ── sendMedia ─────────────────────────────────────────
       sendMedia: async (roomId, payload) => {
