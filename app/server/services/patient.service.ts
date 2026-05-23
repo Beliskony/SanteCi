@@ -110,11 +110,22 @@ class PatientService {
 
   // ── Update photo ───────────────────────────────────────────────────────────
 
-  async updatePhoto(patientId: string, buffer: Buffer): Promise<{ message: string; url: string }> {
+ async updatePhoto(patientId: string, file: File): Promise<{ message: string; url: string }> {
+  // Convertir le File en Buffer
+  const buffer = Buffer.from(await file.arrayBuffer());
+  
+  // Upload vers Cloudinary
   const { url } = await cloudinaryService.uploadProfilePhoto(buffer, patientId, 'patient');
-  await Patient.findByIdAndUpdate(patientId, { 'profile.photo': url });
+  
+  // Mettre à jour la base de données
+  await Patient.findByIdAndUpdate(patientId, { 
+    'profile.photo': url,
+    'metadata.updatedAt': new Date()
+  });
+  
   return { message: 'Photo de profil mise à jour.', url };
 }
+
 
   // ── Update health info ─────────────────────────────────────────────────────
 

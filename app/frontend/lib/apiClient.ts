@@ -197,3 +197,23 @@ export async function uploadFile<T>(
   });
   return handleResponse<T>(res, () => uploadFile<T>(endpoint, formData));
 }
+
+
+// app/frontend/lib/apiClient.ts
+
+// Ajoutez cette fonction
+export async function putFile<T>(
+  endpoint: string,
+  formData: FormData
+): Promise<T> {
+  const token = getToken();
+  const headers: HeadersInit = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${BASE_URL}${endpoint}`, {
+    method: "PUT",  // ← Changement clé : PUT au lieu de POST
+    headers,
+    body: formData,
+  });
+  return handleResponse<T>(res, () => putFile<T>(endpoint, formData));
+}

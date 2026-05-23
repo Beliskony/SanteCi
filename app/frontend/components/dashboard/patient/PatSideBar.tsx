@@ -21,6 +21,8 @@ import AppointmentPage from "@/app/frontend/components/dashboard/patient/Appoint
 import DossierMedical from "@/app/frontend/components/dashboard/patient/DossierMedicalComponents/DossierMedical";
 import MesagerieLayout from "@/app/frontend/components/dashboard/messagesComponents/MessagerieLayout";
 import { authService } from "@/app/frontend/services/authService";
+import FindDoctorPage from "./findDoctor/FindDoctorPage";
+import  SettingsPage  from "./SettingPat/SettingsPage";
 
 type ActivePage = "dashboard" | "medecins" | "rdv" | "messages" | "dossier" | "parametres";
 
@@ -39,8 +41,8 @@ const renderPage = (active: ActivePage) => {
     case "rdv":        return <AppointmentPage />;
     case "dossier":    return <DossierMedical />;
     case "messages":   return <MesagerieLayout />;
-    case "medecins":   return <div>Trouver un médecin (à implémenter)</div>;
-    case "parametres": return <div>Paramètres (à implémenter)</div>;
+    case "medecins":   return <FindDoctorPage />;
+    case "parametres": return <SettingsPage />;
     default:           return <PatDash />;
   }
 };

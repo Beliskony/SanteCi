@@ -60,8 +60,9 @@ export const patientService = {
   // ── updateProfile ─────────────────────────────────────────────────────────
   //  FIX #4 — Sync avec res.data.profile (réponse serveur) et non `data` (input)
   async updateProfile(data: Partial<PatientProfile>): Promise<PatientUser> {
+    const patientId = getPatientId();
     const res = await api.patch<ApiResponse<PatientUser>>(
-      "/patients/profile",
+      `/patients/${patientId}`,
       data
     );
     useAuthStore.getState().updatePatientProfile(res.data.profile);
@@ -111,18 +112,46 @@ export const patientService = {
   },
 
   // ── uploadPhoto ───────────────────────────────────────────────────────────
-  async uploadPhoto(file: File): Promise<{ photoUrl: string }> {
-    const patientId = getPatientId();
-    const formData = new FormData();
-    formData.append("photo", file);
-    const res = await api.uploadFile<ApiResponse<{ photoUrl: string }>>(
-      `/patients/${patientId}/photo`,
-      formData
-    );
-    useAuthStore.getState().updateProfilePhoto(res.data.photoUrl);
-    return res.data;
-  },
-
+async uploadPhoto(file: File): Promise<{ photoUrl: string }> {
+  const patientId = getPatientId();
+  
+  // Validation côté client
+  const maxSize = 5 * 1024 * 1024;
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+  
+  if (!allowedTypes.includes(file.type)) {
+    throw new Error("Format non supporté. Utilisez JPG, PNG ou WEBP.");
+  }
+  
+  if (file.size > maxSize) {
+    throw new Error("L'image ne doit pas dépasser 5MB.");
+  }
+  
+  const formData = new FormData();
+  formData.append("photo", file);
+  
+  const token = useAuthStore.getState().token;
+  
+  const response = await fetch(`/api/patients/${patientId}/photo`, {
+    method: "PUT",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+    },
+    body: formData,
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || `Erreur ${response.status}`);
+  }
+  
+  const res = await response.json();
+  
+  // Mettre à jour le store
+  useAuthStore.getState().updateProfilePhoto(res.data.photoUrl);
+  
+  return res.data;
+},
   // ── addEmergencyContact ───────────────────────────────────────────────────
   //  FIX #2 — Ne plus écraser tout le user avec setState({ user: res.data })
   // On merge proprement via updatePatientProfile pour ne toucher qu'au contact
