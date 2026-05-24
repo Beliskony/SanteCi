@@ -1,6 +1,7 @@
 import { Types, QueryFilter } from 'mongoose';
 import { ChatMessage } from '../models/chatMessage.model';
 import { Appointment } from '../models/appointement.model';
+import { notificationService } from './notification.service';
 import { Doctor } from '../models/medcin.model';
 import { Patient } from '../models/patient.model';
 import { IChatMessage } from '../interfaces/chatMessage.interface';
@@ -55,6 +56,7 @@ class ChatMessageService {
   // ── Send message ───────────────────────────────────────────────────────────
 
   async send(dto: SendMessageDTO): Promise<IChatMessage> {
+
     if (dto.appointmentId) {
       const appointment = await Appointment.findById(dto.appointmentId)
         .select('communication.chatRoomId status.current');
@@ -92,6 +94,52 @@ class ChatMessageService {
         deletedFor: [],
       },
     });
+
+    // ── Notification au destinataire ──────────────────────────────────────────
+try {
+  // Résoudre le nom de l'expéditeur
+  let senderName = 'Quelqu\'un';
+
+  const doctor = await Doctor.findById(dto.senderId)
+    .select('profile.firstName profile.lastName profile.title')
+    .lean();
+
+  if (doctor) {
+    senderName = `${doctor.profile.title} ${doctor.profile.firstName} ${doctor.profile.lastName}`;
+  } else {
+    const patient = await Patient.findById(dto.senderId)
+      .select('profile.firstName profile.lastName')
+      .lean();
+    if (patient) {
+      senderName = `${patient.profile.firstName} ${patient.profile.lastName}`;
+    }
+  }
+
+  // Déterminer le userType du destinataire
+  const receiverIsDoctor = await Doctor.exists({ _id: dto.receiverId });
+  const receiverUserType = receiverIsDoctor ? 'doctor' : 'patient';
+
+  // Construire le preview selon le type de message
+  const preview =
+    dto.messageType === 'text'
+      ? dto.content
+      : dto.messageType === 'image'       ? '📷 Image'
+      : dto.messageType === 'audio'       ? '🎙️ Message vocal'
+      : dto.messageType === 'video'       ? '🎥 Vidéo'
+      : dto.messageType === 'file'        ? '📎 Fichier'
+      : dto.messageType === 'prescription'? '💊 Ordonnance'
+      : dto.content;
+
+  await notificationService.notifyNewMessage(
+    dto.receiverId,
+    receiverUserType,
+    senderName,
+    preview
+  );
+} catch (err) {
+  // Ne pas bloquer l'envoi du message si la notif échoue
+  console.error('[ChatMessageService] Notification échec :', err);
+}
 
     return message;
   }
@@ -180,7 +228,7 @@ class ChatMessageService {
     if (!msg) throw new Error('Message introuvable.');
 
     const alreadyDeleted = msg.metadata.deletedFor?.some(
-      (id) => String(id) === userId
+      (id: any) => String(id) === userId
     );
     if (alreadyDeleted) return { message: 'Message déjà supprimé.' };
 

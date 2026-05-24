@@ -1,7 +1,7 @@
-// app/dashboard/patient/layout.tsx
-import PatSideBar from "@/app/frontend/components/dashboard/patient/PatSideBar";
+// app/dashboard/doctor/layout.tsx
+import DocSideBar from "@/app/frontend/components/dashboard/doctor/DocSideBar";
 
-export default function PatientDashboardLayout({
+export default function DoctorDashboardLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -9,7 +9,7 @@ export default function PatientDashboardLayout({
   return (
     <div className="flex h-screen w-full overflow-hidden bg-[#f4f6fb]">
       {/* Sidebar fixe à gauche */}
-      <PatSideBar />
+      <DocSideBar />
 
     </div>
   );

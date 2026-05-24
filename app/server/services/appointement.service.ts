@@ -7,6 +7,7 @@ import { Patient } from '../models/patient.model';
 import { IAppointment } from '../interfaces/appointement.interface';
 import { startOfDay, endOfDay } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
+import { notificationService } from './notification.service';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -83,20 +84,20 @@ class AppointmentService {
     if (!patient) throw new Error('Patient introuvable.');
     if (patient.status.accountStatus !== 'active') throw new Error('Compte patient inactif.');
 
-   const newStart = dto.scheduledFor;
-const newEnd   = new Date(newStart.getTime() + dto.duration * 60000);
+    const newStart = dto.scheduledFor;
+    const newEnd   = new Date(newStart.getTime() + dto.duration * 60000);
 
-const conflict = await Appointment.findOne({
-  doctorId: new Types.ObjectId(dto.doctorId),
-  'status.current': { $in: ['pending', 'confirmed', 'ongoing'] },
-  'details.scheduledFor': { $lt: newEnd },
-  $expr: {
-    $gt: [
-      { $add: ['$details.scheduledFor', { $multiply: ['$details.duration', 60000] }] },
-      newStart,
-    ],
-  },
-});
+    const conflict = await Appointment.findOne({
+      doctorId: new Types.ObjectId(dto.doctorId),
+      'status.current': { $in: ['pending', 'confirmed', 'ongoing'] },
+      'details.scheduledFor': { $lt: newEnd },
+      $expr: {
+        $gt: [
+          { $add: ['$details.scheduledFor', { $multiply: ['$details.duration', 60000] }] },
+          newStart,
+        ],
+      },
+    });
     if (conflict) throw new Error('Ce créneau est déjà réservé pour ce médecin.');
 
     const appointmentId = `APT-${crypto.randomBytes(5).toString('hex').toUpperCase()}`;
@@ -138,15 +139,37 @@ const conflict = await Appointment.findOne({
       },
     });
 
+    // ── Notifier le médecin d'une nouvelle demande de RDV ──────────────────
+    try {
+      const patientDoc = await Patient.findById(dto.patientId)
+        .select('profile.firstName profile.lastName')
+        .lean();
+
+      const patientName = patientDoc
+        ? `${patientDoc.profile.firstName} ${patientDoc.profile.lastName}`
+        : 'Un patient';
+
+      await notificationService.notifySystem(
+        dto.doctorId,
+        'doctor',
+        'Nouvelle demande de rendez-vous',
+        `${patientName} a demandé un rendez-vous le ${dto.scheduledFor.toLocaleDateString('fr-FR', {
+          weekday: 'long', day: 'numeric', month: 'long',
+        })} à ${dto.scheduledFor.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}.`,
+        'high'
+      );
+    } catch (err) {
+      console.error('[AppointmentService.create] Notification échec :', err);
+    }
+
     return appointment;
   }
 
   // ── Get by ID ──────────────────────────────────────────────────────────────
 
   async getById(id: string): Promise<IAppointment> {
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
-        throw new Error('ID MongoDB invalide');
+      throw new Error('ID MongoDB invalide');
     }
 
     const appointment = await Appointment.findOne({ id })
@@ -217,6 +240,27 @@ const conflict = await Appointment.findOne({
     appointment.metadata.updatedAt = new Date();
     await appointment.save();
 
+    // ── Notifier le patient que son RDV est confirmé ───────────────────────
+    try {
+      const doctor = await Doctor.findById(doctorId)
+        .select('profile.firstName profile.lastName profile.title')
+        .lean();
+
+      const doctorName = doctor
+        ? `${doctor.profile.title} ${doctor.profile.firstName} ${doctor.profile.lastName}`
+        : 'votre médecin';
+
+      await notificationService.notifyAppointmentConfirmed(
+        String(appointment.patientId),
+        'patient',
+        String(appointment._id),
+        doctorName,
+        appointment.details.scheduledFor
+      );
+    } catch (err) {
+      console.error('[AppointmentService.confirm] Notification échec :', err);
+    }
+
     return appointment;
   }
 
@@ -234,6 +278,19 @@ const conflict = await Appointment.findOne({
     appointment.consultation.startedAt = new Date();
     appointment.metadata.updatedAt = new Date();
     await appointment.save();
+
+    // ── Notifier le patient que la consultation a démarré ─────────────────
+    try {
+      await notificationService.notifySystem(
+        String(appointment.patientId),
+        'patient',
+        'Consultation démarrée',
+        'Votre médecin vous attend. Rejoignez la consultation maintenant.',
+        'high'
+      );
+    } catch (err) {
+      console.error('[AppointmentService.startConsultation] Notification échec :', err);
+    }
 
     return appointment;
   }
@@ -274,6 +331,19 @@ const conflict = await Appointment.findOne({
     appointment.metadata.updatedAt = new Date();
     await appointment.save();
 
+    // ── Notifier le patient que la consultation est terminée ──────────────
+    try {
+      await notificationService.notifySystem(
+        String(appointment.patientId),
+        'patient',
+        'Consultation terminée',
+        'Votre consultation est terminée. Retrouvez le compte-rendu dans votre dossier médical.',
+        'normal' as any
+      );
+    } catch (err) {
+      console.error('[AppointmentService.endConsultation] Notification échec :', err);
+    }
+
     return appointment;
   }
 
@@ -313,6 +383,45 @@ const conflict = await Appointment.findOne({
     appointment.metadata.updatedAt = new Date();
     await appointment.save();
 
+    // ── Notifier l'autre partie de l'annulation ────────────────────────────
+    try {
+      if (cancelledBy === 'patient') {
+        // Le patient annule → notifier le médecin
+        await notificationService.notifyAppointmentCancelled(
+          String(appointment.doctorId),
+          'doctor',
+          String(appointment._id),
+          reason
+        );
+      } else if (cancelledBy === 'doctor') {
+        // Le médecin annule → notifier le patient
+        await notificationService.notifyAppointmentCancelled(
+          String(appointment.patientId),
+          'patient',
+          String(appointment._id),
+          reason
+        );
+      } else {
+        // Annulation système → notifier les deux parties
+        await Promise.all([
+          notificationService.notifyAppointmentCancelled(
+            String(appointment.patientId),
+            'patient',
+            String(appointment._id),
+            reason
+          ),
+          notificationService.notifyAppointmentCancelled(
+            String(appointment.doctorId),
+            'doctor',
+            String(appointment._id),
+            reason
+          ),
+        ]);
+      }
+    } catch (err) {
+      console.error('[AppointmentService.cancel] Notification échec :', err);
+    }
+
     return appointment;
   }
 
@@ -329,6 +438,19 @@ const conflict = await Appointment.findOne({
     appointment.status.current = 'no_show';
     appointment.metadata.updatedAt = new Date();
     await appointment.save();
+
+    // ── Notifier le patient qu'il a été marqué absent ─────────────────────
+    try {
+      await notificationService.notifySystem(
+        String(appointment.patientId),
+        'patient',
+        'Absence enregistrée',
+        'Vous avez été marqué absent pour votre rendez-vous. Contactez votre médecin si c\'est une erreur.',
+        'high'
+      );
+    } catch (err) {
+      console.error('[AppointmentService.markNoShow] Notification échec :', err);
+    }
 
     return appointment;
   }
@@ -357,6 +479,32 @@ const conflict = await Appointment.findOne({
     );
 
     if (!appointment) throw new Error('Rendez-vous introuvable.');
+
+    // ── Notifier le médecin si paiement reçu ──────────────────────────────
+    try {
+      if (data.paymentStatus === 'paid') {
+        await notificationService.notifyPaymentReceived(
+          String(appointment.doctorId),
+          appointment.payment.amount,
+          appointment.payment.currency,
+          String(appointment._id)
+        );
+      }
+
+      // ── Notifier le patient si remboursement déclenché ─────────────────
+      if (data.paymentStatus === 'refunded') {
+        await notificationService.notifySystem(
+          String(appointment.patientId),
+          'patient',
+          'Remboursement en cours',
+          `Votre remboursement de ${appointment.payment.amount.toLocaleString('fr-FR')} ${appointment.payment.currency} est en cours de traitement.`,
+          'normal' as any
+        );
+      }
+    } catch (err) {
+      console.error('[AppointmentService.updatePayment] Notification échec :', err);
+    }
+
     return appointment;
   }
 
@@ -381,21 +529,38 @@ const conflict = await Appointment.findOne({
     requesterId: string
   ): Promise<IAppointment> {
     const appointment = await Appointment.findById(appointmentId);
-      if (!appointment) throw new Error('Rendez-vous introuvable.');
+    if (!appointment) throw new Error('Rendez-vous introuvable.');
 
-      const isAuthorized =
-        (doc.uploadedBy === 'patient' && String(appointment.patientId) === requesterId) ||
-        (doc.uploadedBy === 'doctor'  && String(appointment.doctorId)  === requesterId);
+    const isAuthorized =
+      (doc.uploadedBy === 'patient' && String(appointment.patientId) === requesterId) ||
+      (doc.uploadedBy === 'doctor'  && String(appointment.doctorId)  === requesterId);
 
-      if (!isAuthorized) throw new Error('Action non autorisée.');
+    if (!isAuthorized) throw new Error('Action non autorisée.');
 
-      // Modifier directement l'objet en mémoire
-        appointment.communication.sharedDocuments.push(doc);
-        appointment.metadata.updatedAt = new Date();
-          await appointment.save();
+    appointment.communication.sharedDocuments.push(doc);
+    appointment.metadata.updatedAt = new Date();
+    await appointment.save();
 
-      return appointment;
+    // ── Notifier l'autre partie qu'un document a été partagé ──────────────
+    try {
+      const recipientId   = doc.uploadedBy === 'patient'
+        ? String(appointment.doctorId)
+        : String(appointment.patientId);
+      const recipientType = doc.uploadedBy === 'patient' ? 'doctor' : 'patient';
+
+      await notificationService.notifySystem(
+        recipientId,
+        recipientType,
+        'Nouveau document partagé',
+        `Un document "${doc.name}" a été partagé dans votre rendez-vous.`,
+        'normal' as any
+      );
+    } catch (err) {
+      console.error('[AppointmentService.shareDocument] Notification échec :', err);
     }
+
+    return appointment;
+  }
 
   // ── Add recording ──────────────────────────────────────────────────────────
 
@@ -431,6 +596,38 @@ const conflict = await Appointment.findOne({
     })
       .populate('patientId', 'profile.firstName contact.email preferences.notifications')
       .populate('doctorId', 'profile.firstName contact.email');
+  }
+
+  // ── Send reminders for upcoming appointments (cron job) ───────────────────
+  // À appeler depuis ton scheduler, ex: toutes les 5 minutes
+
+  async sendUpcomingReminders(minutesBefore: number = 30): Promise<void> {
+    const upcoming = await this.getUpcoming(minutesBefore);
+
+    for (const appt of upcoming) {
+      try {
+        await Promise.all([
+          notificationService.notifyAppointmentReminder(
+            String(appt.patientId),
+            'patient',
+            String(appt._id),
+            minutesBefore,
+            appt.details.scheduledFor
+          ),
+          notificationService.notifyAppointmentReminder(
+            String(appt.doctorId),
+            'doctor',
+            String(appt._id),
+            minutesBefore,
+            appt.details.scheduledFor
+          ),
+        ]);
+
+        await this.incrementReminder(String(appt._id));
+      } catch (err) {
+        console.error('[AppointmentService.sendUpcomingReminders] Échec pour', appt._id, ':', err);
+      }
+    }
   }
 
   // ── Get doctor agenda for a day ────────────────────────────────────────────
