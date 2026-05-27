@@ -124,7 +124,7 @@ export const useNotificationStore = create<NotificationState>()(
       fetchAll: async () => {
         set({ isLoading: true });
         try {
-          const res = await api.get<ApiResponse<Notification[]>>("/api/notifications");
+          const res = await api.get<ApiResponse<Notification[]>>("/notifications");
           const notifications = res.data;
           set({
             notifications,
@@ -138,7 +138,7 @@ export const useNotificationStore = create<NotificationState>()(
 
       markAsRead: async (id) => {
         try {
-          await api.patch(`/api/notifications/${id}/read`, {});
+          await api.patch(`/notifications/${id}/read`, {});
           set((state) => {
             const notifications = state.notifications.map((n) =>
               n._id === id ? { ...n, read: true } : n
@@ -153,7 +153,7 @@ export const useNotificationStore = create<NotificationState>()(
 
       markAllAsRead: async () => {
         try {
-          await api.patch("/api/notifications/read-all", {});
+          await api.patch("/notifications/read-all", {});
           set((state) => ({
             notifications: state.notifications.map((n) => ({ ...n, read: true })),
             unreadCount: 0,
@@ -163,7 +163,7 @@ export const useNotificationStore = create<NotificationState>()(
 
       remove: async (id) => {
         try {
-          await api.del(`/api/notifications/${id}`);
+          await api.del(`/notifications/${id}`);
           set((state) => {
             const notifications = state.notifications.filter((n) => n._id !== id);
             return {

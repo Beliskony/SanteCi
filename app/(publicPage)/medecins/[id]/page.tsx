@@ -42,7 +42,7 @@ export default async function page({ params }: PageProps) {
               <BookingCard
                 telemedicine={doctor.telemedicine}
                 location={doctor.location}
-                doctorId={doctor.doctorId}
+                doctor={doctor}
               />
             </div>
           </div>

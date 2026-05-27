@@ -3,19 +3,19 @@ import connectDB from '@/app/server/config/databaseConnect';
 import { getAuthUser } from '@/app/server/middleware/auth.middleware';
 import { callService } from '@/app/server/services/Call.service';
 
-// ─── GET /api/appointments/[appointmentId]/calls ──────────────────────────
+// ─── GET /api/appointments/[id]/calls ──────────────────────────
 // Récupérer toutes les sessions d'appel d'un rendez-vous
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ appointmentId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
     await getAuthUser(req);
 
-    const { appointmentId } = await params;
-    const calls = await callService.getByAppointment(appointmentId);
+    const { id } = await params;
+    const calls = await callService.getByAppointment(id);
 
     return NextResponse.json({ calls }, { status: 200 });
   } catch (err: any) {

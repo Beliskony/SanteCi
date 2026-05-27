@@ -57,7 +57,7 @@ export default function handler(
   // Stocker l'instance pour le guard
   res.socket.server.io = io;
 
-  console.log("[Socket] ✅ Socket.IO initialisé");
+  console.log("[Socket] Socket.IO initialisé");
   res.end();
 }
 

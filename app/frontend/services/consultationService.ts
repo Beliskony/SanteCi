@@ -28,6 +28,7 @@ export const appointmentService = {
 
   async getById(id: string): Promise<Appointment> {
     const res = await api.get<ApiResponse<Appointment>>(`/appointments/${id}`);
+    console.log(`📝 [getById] ${id}:`, res.data);
     return res.data;
   },
 

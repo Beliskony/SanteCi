@@ -69,7 +69,7 @@ export const useSocketStore = create<SocketState>()(
 
         // ── Connexion ──────────────────────────────────────────────────────
         socket.on("connect", () => {
-          console.log("[Socket] ✅ Connecté :", socket.id);
+          console.log("[Socket]  Connecté :", socket.id);
           set({ isConnected: true, error: null });
 
           // S'enregistrer auprès du serveur

@@ -1,14 +1,18 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { MapPin } from "lucide-react"
 import SlotPicker from "./localisation/SlotPicker"
 import type { DoctorUser } from "@/app/frontend/store/useAuthStore"
+import { useAppointmentStore } from "@/app/frontend/store/appoitmentStore"
+import { useAuthStore, isPatient } from "@/app/frontend/store/useAuthStore"
+import type { ConsultationType, Priority, Currency, PaymentMethod } from "@/app/frontend/types/Appointment"
 
 interface BookingCardProps {
   telemedicine: DoctorUser["telemedicine"]
   location: DoctorUser["location"]
-  doctorId: string
+  doctor: DoctorUser
 }
 
 const CONSULTATION_LABELS: Record<string, string> = {
@@ -19,25 +23,75 @@ const CONSULTATION_LABELS: Record<string, string> = {
 
 const formatFee = (amount: number) => `${amount.toLocaleString("fr-FR")} FCFA`
 
-export default function BookingCard({ telemedicine, location, doctorId }: BookingCardProps) {
+export default function BookingCard({ telemedicine, location, doctor }: BookingCardProps) {
+  const router = useRouter()
   const { consultationTypes, consultationFees, availability } = telemedicine
+  const { create, isLoading: isCreating } = useAppointmentStore()
+  const user = useAuthStore((state) => state.user)
 
-  const [selectedType, setSelectedType]   = useState<"video" | "audio" | "chat">(
+  const [selectedType, setSelectedType] = useState<"video" | "audio" | "chat">(
     consultationTypes[0] ?? "video"
   )
-  const [selectedSlot, setSelectedSlot]   = useState<string | null>(null)
+  const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  const feeMap: Record<string, number> = {
+  const feeMap = useMemo(() => ({
     video: consultationFees.video,
     audio: consultationFees.audio,
     chat:  consultationFees.chat,
-  }
+  }), [consultationFees]);
 
-  const handleConfirm = () => {
-    if (!selectedSlot) return
-    // TODO: brancher doctorService.getAvailableSlots() puis navigation vers page paiement
-    console.log({ doctorId, type: selectedType, slot: selectedSlot })
-  }
+  const handleConfirm = useCallback(async () => {
+    if (!selectedSlot) return;
+    
+    // Vérifier si l'utilisateur est connecté
+    if (!user) {
+      router.push(`/login?redirect=/doctor/${doctor._id}`);
+      return;
+    }
+    
+    if (!isPatient(user)) {
+      setError("Seuls les patients peuvent prendre rendez-vous");
+      return;
+    }
+    
+    setError(null);
+    
+    try {
+      // Convertir le slot sélectionné en Date ISO
+      const [date, time] = selectedSlot.split('T');
+      const scheduledFor = new Date(`${date}T${time}:00`);
+      
+      // Créer le rendez-vous selon le DTO attendu
+      const appointment = await create({
+        patientId: user._id.toString(),
+        doctorId: doctor._id.toString(),
+        type: selectedType as ConsultationType,
+        scheduledFor: scheduledFor.toISOString(),
+        duration: 30, // Durée par défaut en minutes, à adapter si besoin
+        reason: `Consultation ${CONSULTATION_LABELS[selectedType].toLowerCase()}`,
+        symptoms: [],
+        priority: "medium" as Priority,
+        payment: {
+          amount: feeMap[selectedType],
+          currency: "XOF" as Currency,
+          method: "mobile_money" as PaymentMethod,
+          provider: "orange_money",
+        },
+      });
+
+      // 🔍 Log complet pour voir la structure
+    console.log("✅ RDV créé - Structure complète:", JSON.stringify(appointment, null, 2));
+    console.log("📌 ID du RDV:", appointment._id);
+    console.log("📌 Type de l'ID:", typeof appointment._id);
+      
+      // Rediriger vers la page de paiement
+      router.push(`/payment?appointmentId=${appointment._id}`);
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur lors de la réservation");
+    }
+  }, [selectedSlot, doctor, selectedType, feeMap, user, router, create]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -79,23 +133,30 @@ export default function BookingCard({ telemedicine, location, doctorId }: Bookin
             onSelectSlot={setSelectedSlot}
           />
 
+          {/* Message d'erreur */}
+          {error && (
+            <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg">
+              {error}
+            </div>
+          )}
+
           {/* Bouton confirmation */}
           <div>
             <button
               onClick={handleConfirm}
-              disabled={!selectedSlot}
+              disabled={!selectedSlot || isCreating}
               className={`w-full py-3 rounded-xl text-sm font-bold transition-all duration-150
                 ${
-                  selectedSlot
+                  selectedSlot && !isCreating
                     ? "bg-blue-900 text-white hover:bg-blue-800 shadow-sm"
                     : "bg-slate-100 text-slate-400 cursor-not-allowed"
                 }`}
             >
-              Confirmer l&apos;heure
+              {isCreating ? "Création du rendez-vous..." : "Confirmer et payer"}
             </button>
-            {selectedSlot && (
+            {selectedSlot && !isCreating && (
               <p className="text-xs text-slate-400 text-center mt-2">
-                Vous pourrez confirmer les détails et payer à l&apos;étape suivante.
+                Vous serez redirigé vers la page de paiement sécurisé.
               </p>
             )}
           </div>

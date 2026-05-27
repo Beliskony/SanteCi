@@ -19,6 +19,7 @@ import { useAuthStore, isDoctor } from "@/app/frontend/store/useAuthStore";
 import { authService } from "@/app/frontend/services/authService";
 import DocDash from "./TableauBord/DocDash";
 import AgendaPage from "./AgendaComponents/AgendaPage"
+import COnsultationsPage from "./ConsultationComponents/ConsultationsPage";
 import PatHeader from "../patient/PatHeader";
 
 // ── Imports des pages ─────────────────────────────────────────
@@ -59,7 +60,7 @@ const renderPage = (active: ActivePage) => {
   switch (active) {
     case "dashboard":     return <DocDash />     // <DocDash />
     case "agenda":        return <AgendaPage />;                // <DocAgenda />
-    case "consultations": return <div>Consultations</div>;         // <DocConsult />
+    case "consultations": return <COnsultationsPage />;         // <DocConsult />
     case "patients":      return <div>Mes patients</div>;          // <DocPatients />
     case "messagerie":    return <div>Messagerie</div>;            // <DocMessagerie />
     case "stats":         return <div>Revenus & Stats</div>;       // <DocStats />

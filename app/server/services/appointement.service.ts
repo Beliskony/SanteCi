@@ -172,7 +172,7 @@ class AppointmentService {
       throw new Error('ID MongoDB invalide');
     }
 
-    const appointment = await Appointment.findOne({ id })
+    const appointment = await Appointment.findById(id)
       .populate('patientId', 'profile.firstName profile.lastName contact.phone profile.photo')
       .populate('doctorId', 'profile.firstName profile.lastName profile.specialty profile.title profile.photo');
 
