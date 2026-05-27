@@ -5,7 +5,7 @@ import type { ApiResponse } from '@/app/frontend/types';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type Currency      = 'XOF' | 'EUR' | 'USD';
-export type PaymentMethod = 'mobile_money' | 'card' | 'wallet' | 'Assurance';
+export type PaymentMethod = 'wave';
 export type PaymentProvider = 'orange_money' | 'mtn_money' | 'wave';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 export type SimulateOutcome = 'success' | 'failure';

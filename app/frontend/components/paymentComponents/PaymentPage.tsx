@@ -8,45 +8,54 @@ import { BookingStepper }      from "./BookingStepper";
 import { PaymentForm }         from "./PaymentForm";
 import { PaymentSummary }      from "./PaymentSummary";
 import type { BookingStep }    from "./BookingStepper";
+import type { ConsultationType, Currency, PaymentMethod, Priority } from "@/app/frontend/types/Appointment";
 import type {
   PaymentMethod as ServicePaymentMethod,
   PaymentProvider,
 } from "@/app/frontend/services/paymentService";
 
-type UIPaymentMethod = "orange_money" | "mtn_money" | "card";
+type UIPaymentMethod = "wave";
 
-// Mapper méthode UI → méthode service
 const mapMethod = (m: UIPaymentMethod): ServicePaymentMethod =>
-  m === "card" ? "card" : "mobile_money";
+  m === "wave" ? "wave" : undefined as never;
 
-// Mapper provider
 const mapProvider = (m: UIPaymentMethod): PaymentProvider | undefined =>
-  m === "orange_money" ? "orange_money"
-  : m === "mtn_money"  ? "mtn_money"
-  : undefined;
+  m === "wave" ? "wave" : undefined;
+
+interface BookingData {
+  doctorId:     string;
+  patientId:    string;
+  type:         string;
+  scheduledFor: string;
+  duration:     number;
+  reason:       string;
+  amount:       number;
+}
 
 interface PaymentPageProps {
-  appointmentId: string;
-  patientId:     string; // FIX #2 — requis par le backend
-  doctorName:    string;
-  specialty:     string;
-  scheduledFor:  Date | string;
-  consultType:   string;
-  amount:        number;
-  onBack:        () => void;
-  onSuccess:     () => void;
+  bookingData:  BookingData;
+  patientId:    string;
+  doctorName:   string;
+  specialty:    string;
+  scheduledFor: Date | string;
+  consultType:  string;
+  amount:       number;
+  onBack:       () => void;
+  onSuccess:    (appointmentId: string) => void;
 }
 
 export default function PaymentPage({
-  appointmentId, patientId,
+  bookingData,
+  patientId,
   doctorName, specialty, scheduledFor, consultType, amount,
   onBack, onSuccess,
 }: PaymentPageProps) {
-  const initiate      = usePaymentStore((s) => s.initiate);
-  const isLoading     = usePaymentStore((s) => s.isLoading);
-  const error         = usePaymentStore((s) => s.error);
-  const clearError    = usePaymentStore((s) => s.clearError);
-  const updatePayment = useAppointmentStore((s) => s.updatePayment);
+  const initiate   = usePaymentStore((s) => s.initiate);
+  const simulate   = usePaymentStore((s) => s.simulate);
+  const isLoading  = usePaymentStore((s) => s.isLoading);
+  const error      = usePaymentStore((s) => s.error);
+  const clearError = usePaymentStore((s) => s.clearError);
+  const create     = useAppointmentStore((s) => s.create);
 
   const SERVICE_FEE = 500;
   const totalAmount = amount + SERVICE_FEE;
@@ -57,50 +66,52 @@ export default function PaymentPage({
   ) => {
     clearError();
     try {
-      const result = await initiate({
-        appointmentId,
-        amount:   totalAmount,
-        currency: "XOF",
-        method:   mapMethod(uiMethod),
-        provider: mapProvider(uiMethod),
-        // FIX #2 — patientId passé au service
-        // Note : si ton InitiatePaymentDTO frontend ne l'a pas encore,
-        // ajoute patientId?: string dedans
-        ...(patientId ? { patientId } : {}),
-      } as any);
+      // 1 — Créer le RDV uniquement au moment du paiement
+      const appointment = await create({
+        patientId:    bookingData.patientId,
+        doctorId:     bookingData.doctorId,
+        type:         bookingData.type as ConsultationType,
+        scheduledFor: bookingData.scheduledFor,
+        duration:     bookingData.duration,
+        reason:       bookingData.reason,
+        symptoms:     [],
+        priority:     "medium" as Priority,
+        payment: {
+          amount:   totalAmount,
+          currency: "XOF" as Currency,
+          method:   mapMethod(uiMethod) as PaymentMethod,
+          provider: mapProvider(uiMethod),
+        },
+      });
 
-      // FIX #3 — result.status (pas paymentStatus) + simulatedAt optionnel
+      // 2 — Initier le paiement sur ce RDV
+      await initiate({
+        appointmentId: appointment._id,
+        amount:        totalAmount,
+        currency:      "XOF",
+        method:        mapMethod(uiMethod),
+        provider:      mapProvider(uiMethod),
+      });
+
+      // 3 — Simuler succès (à remplacer par webhook Wave en prod)
+      const result = await simulate(appointment._id, "success");
+
       if (result.status === "paid") {
-        await updatePayment(appointmentId, {
-          paymentStatus: "paid",
-          transactionId: result.transactionId,
-          paidAt:        result.simulatedAt
-            ? new Date(result.simulatedAt).toISOString()
-            : new Date().toISOString(),
-        });
-        onSuccess();
+        onSuccess(appointment._id);
       }
     } catch {
-      // Erreur gérée dans le store
+      // Erreur gérée dans les stores (paymentStore.error)
     }
-  }, [appointmentId, patientId, totalAmount, initiate, updatePayment, clearError, onSuccess]);
+  }, [bookingData, totalAmount, create, initiate, simulate, clearError, onSuccess]);
 
   return (
     <div className="min-h-screen bg-slate-50">
 
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#1e3a8a] flex items-center justify-center">
-            <span className="text-white text-xs font-black">S</span>
-          </div>
-          <div>
-            <p className="text-sm font-bold text-slate-900">SantéCI</p>
-            <p className="text-[10px] text-slate-400">Réservation sécurisée</p>
-          </div>
-        </div>
+      <header className="bg-white px-6 py-4 flex relative">
+
         <button onClick={onBack}
-          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-[#1e3a8a] transition-colors font-medium">
+          className=" absolute right-6 mt-3 transform -translate-y-1/2 flex items-center gap-1.5 text-sm text-slate-500 hover:text-[#1e3a8a] transition-colors font-medium">
           <ArrowLeft size={15} />
           Retour au profil
         </button>
