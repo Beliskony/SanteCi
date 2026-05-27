@@ -1,11 +1,11 @@
 'use client';
 
-import {  useCallback } from 'react';
+import { Suspense, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import PaymentPage from '@/app/frontend/components/paymentComponents/PaymentPage';
 import { useAuthStore, isPatient } from '@/app/frontend/store/useAuthStore';
 
-function Page() {
+function PaymentContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
@@ -48,6 +48,25 @@ function Page() {
       onBack={handleBack}
       onSuccess={handleSuccess}
     />
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-10 h-10 border-2 border-[#1e3a8a] border-t-transparent rounded-full animate-spin mx-auto" />
+        <p className="mt-3 text-sm text-slate-500">Chargement...</p>
+      </div>
+    </div>
+  );
+}
+ 
+function Page() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <PaymentContent />
+    </Suspense>
   );
 }
 
