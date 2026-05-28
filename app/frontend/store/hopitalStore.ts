@@ -1,6 +1,4 @@
-// ============================================================
 // store/useHospitalStore.ts — État global Hôpitaux & Cliniques
-// ============================================================
 
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
