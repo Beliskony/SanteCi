@@ -1,7 +1,8 @@
 import crypto from 'crypto';
 import { Types, QueryFilter } from 'mongoose';
 import HospitalClinic from '../models/hopitalClinic.model';
-import { IHospitalClinic } from '../interfaces/hopitalClinic.interface';
+import { IHospitalClinic} from '../interfaces/hopitalClinic.interface';
+import type { HospitalType, HospitalCategory } from '../interfaces/hopitalClinic.interface';
 import {
   TCreateHospitalClinic,
   TUpdateHospitalClinic,
@@ -13,8 +14,8 @@ import { cloudinaryService } from './cloudinary.service';
 interface HospitalFilters {
   city?: string;
   district?: string;
-  type?: string;
-  category?: string;
+  type?: HospitalType;
+  category?: HospitalCategory;
   telemedicineEnabled?: boolean;
   homeVisits?: boolean;
   emergency24h?: boolean;
@@ -56,7 +57,7 @@ class HospitalClinicService {
         rating:       0,
         totalReviews: 0,
       },
-    });
+    } as any);
 
     return facility;
   }
@@ -119,7 +120,7 @@ class HospitalClinicService {
     const total = await HospitalClinic.countDocuments(query);
 
     const facilities = await HospitalClinic.find(query)
-      .select('-staff.doctors')
+      .select('name type category location imageCover staff.doctors')
       .sort({ 'metadata.rating': -1, 'metadata.verified': -1 })
       .skip(skip)
       .limit(limit)

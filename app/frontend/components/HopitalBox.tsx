@@ -42,7 +42,7 @@ const HopitalBox = ({ hospital }: HopitalBoxProps) => {
 
         <div className="flex items-center gap-1.5 text-sm text-gray-500">
           <MapPin size={14} className="shrink-0" />
-          <span>{location.district}, {location.city}</span>
+          <span>{location?.district}, {location?.city}</span>
         </div>
 
         <hr className="border-gray-200 my-1" />

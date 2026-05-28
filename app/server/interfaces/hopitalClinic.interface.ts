@@ -1,13 +1,15 @@
 import { Document, Types } from 'mongoose';
 
+export type HospitalType = 'hospital' | 'clinic' | 'pharmacy' | 'laboratory' | 'imaging_center';
+export type HospitalCategory = 'public' | 'private' | 'community';
 export interface IHospitalClinic extends Document {
   _id: Types.ObjectId;
   facilityId: string;
   
   // Identification
   name: string;
-  type: 'hospital' | 'clinic' | 'pharmacy' | 'laboratory' | 'imaging_center';
-  category: 'public' | 'private' | 'community';
+  type: HospitalType;
+  category: HospitalCategory;
   
 
    imageCover?: {

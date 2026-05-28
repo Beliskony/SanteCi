@@ -4,7 +4,7 @@ import { Phone, Bell, Menu, X, Video, LayoutDashboard, Settings, LogOut, Chevron
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useRef, useState, useMemo } from "react";
-import { useAuthStore, isDoctor } from "@/app/frontend/store/useAuthStore";
+import { useAuthStore } from "@/app/frontend/store/useAuthStore";
 import { authService } from "@/app/frontend/services/authService";
 
 const NavItems: { name: string; href: string }[] = [
