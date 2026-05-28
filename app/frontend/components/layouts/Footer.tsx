@@ -73,11 +73,11 @@ const Footer = () => {
           <h3 className="text-sm font-semibold text-white tracking-wide">Patients</h3>
           <ul className="flex flex-col gap-3">
             {[
-              { label: "Trouver un médecin", href: "/doctors" },
+              { label: "Trouver un médecin", href: "/medecins" },
               { label: "Téléconsultation", href: "/appointments" },
               { label: "Hôpitaux & Cliniques", href: "/hospitals" },
-              { label: "Comment ça marche", href: "/how-it-works" },
-              { label: "Questions fréquentes", href: "/FAQ" },
+              { label: "Comment ça marche", href: "#" },
+              { label: "Questions fréquentes", href: "#" },
               { label: "Tarifs", href: "/pricing" },
             ].map((item) => (
               <li key={item.href}>

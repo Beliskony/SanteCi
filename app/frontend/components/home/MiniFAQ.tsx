@@ -77,7 +77,7 @@ const MiniFAQ = () => {
         {/* Lien voir toutes les FAQ */}
         <div className="flex justify-center">
           <Link
-            href="/FAQ"
+            href="#"
             className="text-sm font-semibold text-[#1e3a8a] hover:text-[#3742fa] transition-colors"
           >
             Voir toutes les FAQ

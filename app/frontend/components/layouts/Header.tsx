@@ -12,8 +12,8 @@ const NavItems: { name: string; href: string }[] = [
   { name: "Médecins",           href: "/medecins" },
   { name: "Hôpitaux",           href: "/hospitals" },
   { name: "Teleconsultation",   href: "/teleconsultation" },
-  { name: "Comment ça marche",  href: "/how-it-works" },
-  { name: "FAQ",                href: "/FAQ" },
+  { name: "Comment ça marche",  href: "#" },
+  { name: "FAQ",                href: "#" },
 ];
 
 //  FIX #3 — Statique → hors du composant, jamais recréé

@@ -31,7 +31,7 @@ const SectionSpecialite = () => {
 
           {/* Bouton — sous le texte sur mobile, à droite sur desktop */}
           <Link
-            href="/doctors"
+            href="/medecins"
             className="self-start lg:shrink-0 flex items-center gap-1.5 border border-gray-300 bg-white rounded-lg px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
           >
             Toutes les spécialités
@@ -43,7 +43,7 @@ const SectionSpecialite = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {specialites.map((specialite, index) => (
             <Link
-              href={`/doctors?specialty=${encodeURIComponent(specialite.name)}`}
+              href={`/medecins?specialty=${encodeURIComponent(specialite.name)}`}
               key={index}
               className="group flex flex-col items-center gap-3 md:gap-4 bg-white rounded-xl p-4 md:p-8 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
             >
