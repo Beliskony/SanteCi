@@ -5,7 +5,7 @@
 
 import { useAuthStore } from "../store/useAuthStore";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://sante-ci-xi.vercel.app/api/";
 
 // ── Tokens ────────────────────────────────────────────────────
 
