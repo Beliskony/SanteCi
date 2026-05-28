@@ -251,7 +251,7 @@ const Header = () => {
                 Se connecter
               </button>
               <button
-                onClick={() => router.push("/appointments")}
+                onClick={() => router.push("/medecins")}
                 className="px-4 py-2 text-sm bg-[#1e3a8a] text-white rounded-lg hover:bg-[#3742fa] transition-colors duration-200"
               >
                 Prendre RDV

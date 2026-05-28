@@ -94,12 +94,12 @@ const Footer = () => {
           <h3 className="text-sm font-semibold text-white tracking-wide">Professionnels</h3>
           <ul className="flex flex-col gap-3">
             {[
-              { label: "SanteCi pour les médecins", href: "/pro" },
-              { label: "Agenda connecté", href: "/pro/agenda" },
-              { label: "Téléconsultation Pro", href: "/pro/teleconsultation" },
-              { label: "Tarifs & Abonnements", href: "/pro/pricing" },
-              { label: "Centre d'aide Pro", href: "/pro/help" },
-              { label: "Connexion Médecin", href: "/auth/login?role=doctor" },
+              { label: "SanteCi pour les médecins", href: "#" },
+              { label: "Agenda connecté", href: "#" },
+              { label: "Téléconsultation Pro", href: "/teleconsultation" },
+              { label: "Tarifs & Abonnements", href: "#" },
+              { label: "Centre d'aide Pro", href: "#" },
+              { label: "Connexion Médecin", href: "/login?role=doctor" },
             ].map((item) => (
               <li key={item.href}>
                 <Link href={item.href} className="text-sm text-slate-400 hover:text-white transition-colors duration-200">
