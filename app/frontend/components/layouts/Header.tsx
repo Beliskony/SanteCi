@@ -12,9 +12,11 @@ const NavItems: { name: string; href: string }[] = [
   { name: "Médecins",           href: "/medecins" },
   { name: "Hôpitaux",           href: "/hospitals" },
   { name: "Teleconsultation",   href: "/teleconsultation" },
-  { name: "Comment ça marche",  href: "#" },
-  { name: "FAQ",                href: "#" },
+  { name: "Comment ça marche",  href: "/how-it-work" },
+  { name: "FAQ",                href: "/FAQ" },
 ];
+
+
 
 //  FIX #3 — Statique → hors du composant, jamais recréé
 const PLACEHOLDER_NOTIFICATIONS = [
@@ -40,7 +42,7 @@ const Header = () => {
     s.user?.role === "doctor" ? (s.user as any).profile?.specialty : undefined
   );
 
-  const [hydrated,      setHydrated]      = useState(false);
+  const hasHydrated = useAuthStore((s) => s._hasHydrated);
   const [menuOpen,      setMenuOpen]      = useState(false);
   const [userDropdown,  setUserDropdown]  = useState(false);
   const [notifDropdown, setNotifDropdown] = useState(false);
@@ -48,7 +50,8 @@ const Header = () => {
   const userRef  = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { setHydrated(true); }, []);
+//  isAuthenticated basé sur le vrai flag d'hydratation Zustand
+const isAuthenticated = hasHydrated && !!role && !!firstName;
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -58,9 +61,6 @@ const Header = () => {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
-
-  //  FIX #1 (suite) — isAuthenticated basé sur des valeurs atomiques
-  const isAuthenticated = hydrated && !!role && !!firstName;
 
   //  FIX #3 — unreadCount mémorisé (sera utile quand tu brancheras les vraies notifs)
   const unreadCount = useMemo(

@@ -11,6 +11,13 @@ interface ContactsUrgenceCardProps {
   onCall?: (phone: string) => void;
 }
 
+interface EmergencyContact {
+  _id: string;
+  name: string;
+  phone: string;
+  relationship: string;
+}
+
 function initials(name: string): string {
   return name
     .split(" ")
@@ -22,11 +29,11 @@ function initials(name: string): string {
 
 export function ContactsUrgenceCard({ onCall }: ContactsUrgenceCardProps) {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [removingContact, setRemovingContact] = useState<{ name: string; phone: string; relationship: string } | null>(null);
+  const [removingContact, setRemovingContact] = useState<EmergencyContact | null>(null);
 
   const user = useAuthStore((s) => s.user);
   const patient = user && isPatient(user) ? user : null;
-  const contacts = patient?.contact.emergencyContacts ?? [];
+  const contacts = patient?.contact?.emergencyContacts ?? [];
 
   const addEmergencyContact = usePatientStore((s) => s.addEmergencyContact);
   const removeEmergencyContact = usePatientStore((s) => s.removeEmergencyContact);
@@ -34,14 +41,22 @@ export function ContactsUrgenceCard({ onCall }: ContactsUrgenceCardProps) {
   const canAdd = contacts.length < 3;
 
   const handleAdd = async (contact: { name: string; phone: string; relationship: string }) => {
-    await addEmergencyContact(contact);
+    try {
+      await addEmergencyContact(contact);
+    } catch (err) {
+      console.log("[ContactsUrgenceCard] Erreur addEmergencyContact:", err);
+      throw err;
+    }
   };
 
   const handleRemove = async () => {
     if (!removingContact) return;
-    // Note: Il faut un contactId. À adapter selon ton backend
-    console.warn("removeEmergencyContact nécessite un contactId", removingContact);
+    try {
+    await removeEmergencyContact(removingContact._id);
     setRemovingContact(null);
+  } catch (err) {
+    console.error("[ContactsUrgenceCard] Erreur removeEmergencyContact:", err);
+  }
   };
 
   return (

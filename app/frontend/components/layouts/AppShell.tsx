@@ -8,7 +8,7 @@ const AUTH_ROUTES = ["/login", "/register","/register/patient", "/register/docto
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isAuthPage = AUTH_ROUTES.some((route) => pathname.startsWith(route));
+  const isAuthPage = AUTH_ROUTES.some((route) => pathname?.startsWith(route));
 
   return (
     <>

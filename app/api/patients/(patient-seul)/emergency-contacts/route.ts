@@ -6,8 +6,7 @@ import connectDB from '@/app/server/config/databaseConnect';
 // POST /api/patients/[id]/emergency-contacts — ajouter un contact d'urgence
 // body: { name: string, phone: string, relationship: string }
 export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  req: NextRequest
 ) {
   try {
     await connectDB();
@@ -21,14 +20,6 @@ export async function POST(
       );
     }
 
-    const { id } = await params;
-    
-    if (String(authPatient._id) !== id) {
-      return NextResponse.json(
-        { success: false, message: 'Accès non autorisé.' },
-        { status: 403 }
-      );
-    }
 
     const { name, phone, relationship } = await req.json();
     if (!name || !phone || !relationship) {
@@ -38,10 +29,10 @@ export async function POST(
       );
     }
 
-    const updated = await patientService.addEmergencyContact(id, { name, phone, relationship });
+    const updated = await patientService.addEmergencyContact(String(authPatient._id), { name, phone, relationship });
     
     return NextResponse.json(
-      { success: true, data: updated.contact.emergencyContacts },
+      { success: true, data: updated },
       { status: 201 }
     );
     

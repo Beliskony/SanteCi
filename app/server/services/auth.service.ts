@@ -220,15 +220,16 @@ class AuthService {
       return {
         ...tokens,
         user: {
-          id: doctor._id,
-          firstName: doctor.profile.firstName,
-          lastName: doctor.profile.lastName,
-          email: doctor.contact.email,
+          _id: doctor._id,
           role: 'doctor',
-          isVerified: doctor.status.isVerified,
-          accountStatus: doctor.status.accountStatus,
-          specialty: doctor.profile.specialty,
-          photo: doctor.profile.photo || null,
+          doctorId: doctor.doctorId,
+          profile: doctor.profile,
+          contact: doctor.contact,
+          location: doctor.location,
+          professional: doctor.professional,
+          telemedicine: doctor.telemedicine,
+          status: doctor.status,
+          analytics: doctor.analytics,
         },
       };
     }
@@ -281,13 +282,31 @@ class AuthService {
     return {
       ...tokens,
       user: {
-        id: patient._id,
+         _id: patient._id,
+        role: 'patient',
         firstName: patient.profile.firstName,
         lastName: patient.profile.lastName,
         email: patient.contact.email,
-        role: 'patient',
-        isVerified: patient.status.isVerified,
         photo: patient.profile.photo || null,
+        isVerified: patient.status.isVerified,
+        accountStatus: patient.status.accountStatus,
+        genre: patient.profile.gender,
+        groupSangin: patient.profile.bloodGroup,
+        health: {
+          allergies: patient.health.allergies,
+          chronicDiseases: patient.health.chronicDiseases,
+          currentMedications: patient.health.currentMedications,
+          disabilities: patient.health.disabilities,
+          height: patient.health.height,
+          weight: patient.health.weight,
+          bmi: patient.health.bmi,
+        },
+        postition: {
+          city: patient.location.city,
+          district: patient.location.district,
+          address: patient.location.address,
+          coordinates: patient.location.coordinates,
+        },
       },
     };
   }

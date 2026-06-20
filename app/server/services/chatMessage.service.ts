@@ -326,31 +326,56 @@ try {
 
   // ── Get conversation summaries enrichies ──────────────────────────────────
 
+// ── Get conversation summaries enrichies ──────────────────────────────────
+
   async getConversationSummaries(
     userId: string,
     userRole: 'doctor' | 'patient'
   ): Promise<ConversationSummaryEnriched[]> {
-    // Toutes les rooms où l'utilisateur est impliqué
-    const rooms = await ChatMessage.distinct('chatRoomId', {
+    // 1. Rooms où l'utilisateur a déjà échangé au moins un message
+    const messageRooms = await ChatMessage.distinct('chatRoomId', {
       $or: [
         { senderId:   new Types.ObjectId(userId) },
         { receiverId: new Types.ObjectId(userId) },
       ],
     });
 
+    // 2. Rooms issues des rendez-vous éligibles (même sans message encore envoyé)
+    const roleField = userRole === 'patient' ? 'patientId' : 'doctorId';
+    const appointments = await Appointment.find({
+      [roleField]: new Types.ObjectId(userId),
+      'status.current': { $in: ['confirmed', 'ongoing'] },
+    })
+      .select('communication.chatRoomId patientId doctorId')
+      .lean();
+
+    // Map chatRoomId -> interlocutorId (déduit du rdv, utile si pas de message encore)
+    const roomToInterlocutor = new Map<string, string>();
+    for (const appt of appointments) {
+      const interlocutorId = userRole === 'patient'
+        ? String(appt.doctorId)
+        : String(appt.patientId);
+      roomToInterlocutor.set(appt.communication.chatRoomId, interlocutorId);
+    }
+
+    // Fusionner les deux sources de rooms, sans doublon
+    const allRoomIds = new Set<string>([...messageRooms, ...roomToInterlocutor.keys()]);
+
     const summaries = await Promise.all(
-      rooms.map(async (chatRoomId) => {
+      Array.from(allRoomIds).map(async (chatRoomId) => {
         const [lastMessage, unreadCount] = await Promise.all([
           this.getLastMessage(chatRoomId),
           this.getUnreadCount(chatRoomId, userId),
         ]);
 
-        // Déduire l'interlocuteur depuis le lastMessage
+        // Déduire l'interlocuteur : priorité au lastMessage, sinon au rdv
         let interlocutorId: string | null = null;
         if (lastMessage) {
           const senderId   = String(lastMessage.senderId);
           const receiverId = String(lastMessage.receiverId);
           interlocutorId   = senderId === userId ? receiverId : senderId;
+        } else {
+          interlocutorId = roomToInterlocutor.get(chatRoomId) ?? null;
         }
 
         const interlocutor: Interlocutor = interlocutorId
@@ -361,7 +386,8 @@ try {
       })
     );
 
-    // Trier par date du dernier message (plus récent en premier)
+    // Trier par date du dernier message (plus récent en premier),
+    // les conversations sans message passent à la fin
     return summaries.sort((a, b) => {
       const dateA = a.lastMessage?.metadata.createdAt?.getTime() ?? 0;
       const dateB = b.lastMessage?.metadata.createdAt?.getTime() ?? 0;

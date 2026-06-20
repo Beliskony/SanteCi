@@ -118,6 +118,13 @@ export const appointmentService = {
     return res.data;
   },
 
+  async reschedule(id: string, scheduledFor: string): Promise<Appointment> {
+    const res = await api.patch<ApiResponse<Appointment>>(
+      `/appointments/${id}`, { scheduledFor }
+    );
+    return res.data;
+  },
+
   //  FIX — manquait .data
   async getStats(doctorId: string): Promise<DoctorStatsResponse> {
     const res = await api.get<ApiResponse<DoctorStatsResponse>>(

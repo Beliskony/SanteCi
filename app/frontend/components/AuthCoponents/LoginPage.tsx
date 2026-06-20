@@ -36,7 +36,7 @@ const LoginPage = () => {
 
     try {
       await authService.login({ identifiantLogin: form.identifier, password: form.password, role });
-    await authService.refreshUser(); // ← fetch le profil complet
+
     router.push(role === "doctor" ? "/doctor" : "/patient");
 
     } catch {

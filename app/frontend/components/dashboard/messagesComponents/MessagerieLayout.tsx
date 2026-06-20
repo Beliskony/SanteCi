@@ -12,26 +12,20 @@ import ConversationBody    from "./ConversationBody";
 import MessageInput        from "./MessageInput";
 import CallRoom            from "@/app/frontend/components/dashboard/callComponents/CallRoom";
 
-// ─── Layout principal ─────────────────────────────────────────────────────────
-
 export default function MessagerieLayout() {
-  const { activeChatRoomId, activeInterlocutor, closeRoom } = useChatStore();
+  const { activeChatRoomId, activeInterlocutor, closeRoom, openRoom } = useChatStore();
   const user = useAuthStore((s) => s.user);
 
-  //  Socket — connexion partagée
   const connect      = useSocketStore((s) => s.connect);
   const initiateCall = useSocketStore((s) => s.initiateCall);
   const isConnected  = useSocketStore((s) => s.isConnected);
 
-  //  Call — phase UI
   const phase = useCallStore((s) => s.phase);
 
-  // ── Connecter le socket au montage ────────────────────────────────────────
   useEffect(() => {
     connect();
   }, [connect]);
 
-  // ── Démarrer un appel ─────────────────────────────────────────────────────
   const handleStartCall = useCallback((type: "audio" | "video") => {
     if (!user || !activeInterlocutor) return;
 
@@ -43,12 +37,11 @@ export default function MessagerieLayout() {
       callerId,
       callerType:    user.role as "doctor" | "patient",
       receiverId:    activeInterlocutor._id,
-      appointmentId: activeChatRoomId ?? "", // la room = le RDV
+      appointmentId: activeChatRoomId ?? "",
       callType:      type,
     });
   }, [user, activeInterlocutor, activeChatRoomId, initiateCall]);
 
-  // ── Afficher CallRoom si appel en cours ───────────────────────────────────
   const isInCall = phase !== "idle" && phase !== "ended" &&
                    phase !== "declined" && phase !== "missed" && phase !== "failed";
 
@@ -65,16 +58,16 @@ export default function MessagerieLayout() {
   return (
     <div className="flex h-full w-full bg-[#f4f6fb] overflow-hidden">
 
-      {/* ── Liste des conversations ── */}
       <ConversationList
         onSelectRoom={(roomId) => {
-          if (roomId !== activeChatRoomId) closeRoom();
+          if (roomId !== activeChatRoomId) {
+            openRoom(roomId);
+          }
         }}
       />
 
-      {/* ── Zone de conversation ── */}
       {activeChatRoomId && activeInterlocutor ? (
-        <div className="flex flex-col flex-1 min-w-0 w-full">
+        <div className="flex flex-col flex-1 min-w-0 w-full h-screen">
           <ConversationHeader
             interlocutor={activeInterlocutor}
             onStartCall={handleStartCall}

@@ -76,9 +76,8 @@ const Footer = () => {
               { label: "Trouver un médecin", href: "/medecins" },
               { label: "Téléconsultation", href: "/appointments" },
               { label: "Hôpitaux & Cliniques", href: "/hospitals" },
-              { label: "Comment ça marche", href: "#" },
-              { label: "Questions fréquentes", href: "#" },
-              { label: "Tarifs", href: "/pricing" },
+              { label: "Comment ça marche", href: "/how-it-work" },
+              { label: "Questions fréquentes", href: "/FAQ" },
             ].map((item) => (
               <li key={item.href}>
                 <Link href={item.href} className="text-sm text-slate-400 hover:text-white transition-colors duration-200">
@@ -94,12 +93,10 @@ const Footer = () => {
           <h3 className="text-sm font-semibold text-white tracking-wide">Professionnels</h3>
           <ul className="flex flex-col gap-3">
             {[
-              { label: "SanteCi pour les médecins", href: "#" },
-              { label: "Agenda connecté", href: "#" },
+              { label: "SanteCi pour tous", href: "/how-it-work" },
               { label: "Téléconsultation Pro", href: "/teleconsultation" },
-              { label: "Tarifs & Abonnements", href: "#" },
-              { label: "Centre d'aide Pro", href: "#" },
-              { label: "Connexion Médecin", href: "/login?role=doctor" },
+              { label: "Centre d'aide Pro", href: "/FAQ" },
+              { label: "Connexion", href: "/login" },
             ].map((item) => (
               <li key={item.href}>
                 <Link href={item.href} className="text-sm text-slate-400 hover:text-white transition-colors duration-200">

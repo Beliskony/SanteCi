@@ -1,23 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { patientService } from '@/app/server/services/patient.service';
-import { getAuthPatient} from '@/app/server/middleware/auth.middleware';
+import { getAuthPatient } from '@/app/server/middleware/auth.middleware';
 import connectDB from '@/app/server/config/databaseConnect';
 
-// DELETE /api/patients/[id]/emergency-contacts/[contactId]
+// DELETE /api/patients/emergency-contacts/[contactId]
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string; contactId: string } }
+  { params }: { params: Promise<{ contactId: string }> }
 ) {
   try {
     await connectDB();
 
     const authPatient = await getAuthPatient(req);
-    if (String(authPatient._id) !== params.id) {
-      return NextResponse.json({ success: false, message: 'Accès non autorisé.' }, { status: 403 });
+    if (!authPatient || !authPatient._id) {
+      return NextResponse.json(
+        { success: false, message: 'Accès réservé aux patients.' },
+        { status: 401 }
+      );
     }
 
-    const updated = await patientService.removeEmergencyContact(params.id, params.contactId);
-    return NextResponse.json({ success: true, data: updated.contact.emergencyContacts });
+    const { contactId } = await params;
+
+    const updated = await patientService.removeEmergencyContact(
+      String(authPatient._id),
+      contactId
+    );
+
+    return NextResponse.json({ success: true, data: updated }, { status: 200 });
+
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
     const status = message === 'Unauthorized' ? 401 : message === 'Patient introuvable.' ? 404 : 500;

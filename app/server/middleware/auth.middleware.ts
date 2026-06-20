@@ -25,10 +25,17 @@ function decodeToken(req: NextRequest): TokenPayload {
   const token = req.headers.get('authorization')?.split(' ')[1];
   if (!token) throw new Error('Unauthorized');
 
-  return jwt.verify(
-    token,
-    process.env.JWT_ACCESS_SECRET || "monSuperCodeSecretAxel123456@" as string
-  ) as TokenPayload;
+  try {
+    return jwt.verify(
+      token,
+      process.env.JWT_ACCESS_SECRET || "monSuperCodeSecretAxel123456@" as string
+    ) as TokenPayload;
+    
+  } catch (error) {
+    throw new Error('Unauthorized');
+  }
+
+
 }
 
 // ─── getAuthUser : doctor ou patient selon le rôle dans le token ─────────────

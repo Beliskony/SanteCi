@@ -41,7 +41,7 @@ function getPatientId(): string {
   const user = useAuthStore.getState().user;
   if (!user) throw new Error("Utilisateur non authentifié.");
   const raw = user._id;
-  return typeof raw === "string" ? raw : raw.toString();
+  return typeof raw === "string" ? raw : raw;
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────
@@ -165,9 +165,11 @@ async uploadPhoto(file: File): Promise<{ photoUrl: string }> {
     updatePatientProfile(res.data.profile);
     // On met à jour le contact via une action dédiée si disponible,
     // sinon on force un merge partiel du user sans toucher token/auth
-    useAuthStore.setState((state) => ({
-      user: state.user ? { ...state.user, contact: res.data.contact } : state.user,
-    }));
+    if (res.data.contact) {
+      useAuthStore.setState((state) => ({
+        user: state.user ? { ...state.user, contact: res.data.contact } : state.user,
+      }));
+    }
     return res.data;
   },
 
@@ -177,10 +179,12 @@ async uploadPhoto(file: File): Promise<{ photoUrl: string }> {
     const res = await api.del<ApiResponse<PatientUser>>(
       `/patients/emergency-contacts/${contactId}`
     );
-    useAuthStore.setState((state) => ({
-      user: state.user ? { ...state.user, contact: res.data.contact } : state.user,
-    }));
-    return res.data;
+    if (res.data.contact) {
+      useAuthStore.setState((state) => ({
+        user: state.user ? { ...state.user, contact: res.data.contact } : state.user,
+        }));
+      }
+        return res.data;
   },
 
   // ── getStats ──────────────────────────────────────────────────────────────

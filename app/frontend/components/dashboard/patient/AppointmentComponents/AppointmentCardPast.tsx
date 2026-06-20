@@ -1,8 +1,10 @@
 "use client"
 
-import { Video, MapPin, FileText, RefreshCw, XCircle } from "lucide-react"
+import { useState } from "react"
+import { Video, MapPin, FileText, RefreshCw, XCircle, X } from "lucide-react"
 import type { Appointment } from "@/app/frontend/types/Appointment"
 import { isPopulatedDoctor } from "@/app/frontend/types/Appointment"
+import { useAppointmentStore } from "@/app/frontend/store/appoitmentStore"
 
 interface Props {
   appointment: Appointment
@@ -23,12 +25,45 @@ export default function AppointmentCardPast({ appointment, variant }: Props) {
   const isInPerson  = details.type === "in_person"
   const isVideo     = details.type === "video"
 
+  const reschedule = useAppointmentStore((s) => s.reschedule)
+  const isLoading  = useAppointmentStore((s) => s.isLoading)
+  const storeError = useAppointmentStore((s) => s.error)
+
+  const [showModal, setShowModal] = useState(false)
+  const [newDateTime, setNewDateTime] = useState("")
+  const [localError, setLocalError] = useState<string | null>(null)
+
   const time = new Date(details.scheduledFor).toLocaleTimeString("fr-FR", {
     hour: "2-digit", minute: "2-digit",
   })
   const dayLabel = new Date(details.scheduledFor)
     .toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })
     .toUpperCase()
+
+  const handleOpenModal = () => {
+    setLocalError(null)
+    setNewDateTime("")
+    setShowModal(true)
+  }
+
+  const handleConfirmReschedule = async () => {
+    if (!newDateTime) {
+      setLocalError("Veuillez choisir une date et une heure.")
+      return
+    }
+    const chosen = new Date(newDateTime)
+    if (chosen.getTime() <= Date.now()) {
+      setLocalError("La nouvelle date doit être dans le futur.")
+      return
+    }
+    setLocalError(null)
+    try {
+      await reschedule(appointment._id, chosen.toISOString())
+      setShowModal(false)
+    } catch {
+      // l'erreur est déjà dans storeError
+    }
+  }
 
   return (
     <div className={`bg-white border rounded-2xl overflow-hidden shadow-sm ${
@@ -123,7 +158,10 @@ export default function AppointmentCardPast({ appointment, variant }: Props) {
 
           {/* Actions */}
           <div className="flex items-center gap-2">
-            <button className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+            <button
+              onClick={handleOpenModal}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer"
+            >
               <RefreshCw size={11} />
               Reprogrammer
             </button>
@@ -136,6 +174,60 @@ export default function AppointmentCardPast({ appointment, variant }: Props) {
           </div>
         </div>
       </div>
+
+      {/* ── Modal de reprogrammation ── */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-slate-900">Reprogrammer le rendez-vous</h3>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-slate-400 hover:text-slate-700"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 mb-3">
+              Avec {doctor ? `${doctor.profile.title ?? "Dr"} ${doctor.profile.firstName} ${doctor.profile.lastName}` : "votre médecin"}
+            </p>
+
+            <label className="block text-xs font-semibold text-slate-700 mb-2">
+              Nouvelle date et heure
+            </label>
+            <input
+              type="datetime-local"
+              value={newDateTime}
+              onChange={(e) => setNewDateTime(e.target.value)}
+              min={new Date().toISOString().slice(0, 16)}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent transition mb-3"
+            />
+
+            {(localError || storeError) && (
+              <div className="bg-red-50 text-red-600 text-xs p-2.5 rounded-lg mb-3">
+                {localError ?? storeError}
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowModal(false)}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 hover:bg-slate-50 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleConfirmReschedule}
+                disabled={isLoading}
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-blue-900 hover:bg-blue-800 disabled:opacity-50 transition-colors"
+              >
+                {isLoading ? "..." : "Confirmer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

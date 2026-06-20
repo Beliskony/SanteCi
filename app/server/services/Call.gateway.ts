@@ -30,12 +30,12 @@ interface SocketUser {
 // call:ice-candidate → candidat ICE relayé à l'autre pair
 
 // ─── Durée max de sonnerie avant "manqué" ─────────────────────────────────────
-const RING_TIMEOUT_MS = 45_000; // 45 secondes
+const RING_TIMEOUT_MS = 45000; // 45 secondes
 
 // ─── Call Gateway ─────────────────────────────────────────────────────────────
 
 export class CallGateway {
-  private io:       SocketServer;
+  private io: SocketServer;
 
   // Map userId → socketId pour router les événements
   private userSockets = new Map<string, string>();
@@ -43,15 +43,8 @@ export class CallGateway {
   // Map callSessionId → timeout handle (sonnerie)
   private ringTimers  = new Map<string, ReturnType<typeof setTimeout>>();
 
-  constructor(httpServer: HttpServer) {
-    this.io = new SocketServer(httpServer, {
-      cors: {
-        origin:      process.env.FRONTEND_URL ?? '*',
-        methods:     ['GET', 'POST'],
-        credentials: true,
-      },
-      transports: ['websocket', 'polling'],
-    });
+  constructor(io: SocketServer) {
+  this.io = io
 
     this.io.on('connection', (socket: Socket) => {
       console.log(`[CallGateway] Socket connecté : ${socket.id}`);
@@ -61,6 +54,7 @@ export class CallGateway {
         this.handleDisconnect(socket);
       });
     });
+
   }
 
   // ── Enregistrement des handlers par socket ────────────────────────────────

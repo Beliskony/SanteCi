@@ -199,6 +199,8 @@ class AppointmentService {
     page: number;
     pages: number;
   }> {
+    await this.autoMarkMissedAppointments();
+    
     const { patientId, doctorId, status, type, from, to, page = 1, limit = 10 } = filters;
 
     const query: QueryFilter<IAppointment> = {};
@@ -630,6 +632,62 @@ class AppointmentService {
     }
   }
 
+// ── Reschedule appointment (patient) ───────────────────────────────────────
+
+  async reschedule(
+    appointmentId: string,
+    patientId: string,
+    newScheduledFor: Date
+  ): Promise<IAppointment> {
+    const appointment = await Appointment.findById(appointmentId);
+    if (!appointment) throw new Error('Rendez-vous introuvable.');
+    if (String(appointment.patientId) !== patientId) throw new Error('Action non autorisée.');
+
+    const reschedulableStatuses: AppointmentStatus[] = ['pending', 'confirmed', 'no_show', 'cancelled'];
+    if (!reschedulableStatuses.includes(appointment.status.current)) {
+      throw new Error(`Impossible de reprogrammer un rendez-vous en statut "${appointment.status.current}".`);
+    }
+
+    const newStart = newScheduledFor;
+    const newEnd   = new Date(newStart.getTime() + appointment.details.duration * 60000);
+
+    // Vérifier les conflits sur le créneau, en excluant le rdv courant
+    const conflict = await Appointment.findOne({
+      _id: { $ne: appointment._id },
+      doctorId: appointment.doctorId,
+      'status.current': { $in: ['pending', 'confirmed', 'ongoing'] },
+      'details.scheduledFor': { $lt: newEnd },
+      $expr: {
+        $gt: [
+          { $add: ['$details.scheduledFor', { $multiply: ['$details.duration', 60000] }] },
+          newStart,
+        ],
+      },
+    });
+    if (conflict) throw new Error('Ce créneau est déjà réservé pour ce médecin.');
+
+    appointment.details.scheduledFor = newScheduledFor;
+    appointment.status.current = 'confirmed';
+    appointment.metadata.updatedAt = new Date();
+    await appointment.save();
+
+    // ── Notifier le médecin du changement de créneau ───────────────────────
+    try {
+      await notificationService.notifySystem(
+        String(appointment.doctorId),
+        'doctor',
+        'Rendez-vous reprogrammé',
+        `Un patient a reprogrammé son rendez-vous au ${newScheduledFor.toLocaleDateString('fr-FR', {
+          weekday: 'long', day: 'numeric', month: 'long',
+        })} à ${newScheduledFor.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}.`,
+        'high'
+      );
+    } catch (err) {
+      console.error('[AppointmentService.reschedule] Notification échec :', err);
+    }
+
+    return appointment;
+  }
   // ── Get doctor agenda for a day ────────────────────────────────────────────
 
   async getDoctorAgenda(doctorId: string, date: Date): Promise<IAppointment[]> {
@@ -644,6 +702,48 @@ class AppointmentService {
     })
       .populate('patientId', 'profile.firstName profile.lastName profile.photo')
       .sort({ 'details.scheduledFor': 1 });
+  }
+
+  // ── Auto-marquer les rendez-vous manqués (cron ou appel à la volée) ───────
+
+  async autoMarkMissedAppointments(): Promise<number> {
+    const now = new Date();
+
+    // Un rdv confirmé/pending dont l'heure de fin est dépassée et qui n'a
+    // jamais démarré (pas de consultation.startedAt) est considéré manqué.
+    const missed = await Appointment.find({
+      'status.current': { $in: ['pending', 'confirmed'] },
+      $expr: {
+        $lt: [
+          { $add: ['$details.scheduledFor', { $multiply: ['$details.duration', 60000] }] },
+          now,
+        ],
+      },
+    });
+
+    if (missed.length === 0) return 0;
+
+    await Appointment.updateMany(
+      { _id: { $in: missed.map((a) => a._id) } },
+      { $set: { 'status.current': 'no_show', 'metadata.updatedAt': now } }
+    );
+
+    // Notifier chaque patient concerné
+    for (const appt of missed) {
+      try {
+        await notificationService.notifySystem(
+          String(appt.patientId),
+          'patient',
+          'Rendez-vous manqué',
+          'Votre rendez-vous est passé sans confirmation de présence. Vous pouvez le reprogrammer depuis votre espace.',
+          'high'
+        );
+      } catch (err) {
+        console.error('[AppointmentService.autoMarkMissedAppointments] Notification échec :', err);
+      }
+    }
+
+    return missed.length;
   }
 
   // ── Stats for doctor ───────────────────────────────────────────────────────

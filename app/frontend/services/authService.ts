@@ -5,21 +5,85 @@ import type { ApiResponse } from "@/app/frontend/types";
 
 // ── Types backend (ce que le serveur retourne réellement) ────
 interface BackendUser {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
+  _id: string;          // patient : id plat
   role: "doctor" | "patient";
-  isVerified: boolean;
+  isVerified?: boolean;
   accountStatus?: string;
-  photo?: string;        // ← Ajouté
-  title?: string;        // ← Ajouté pour doctor
-  specialty?: string;    // ← Ajouté pour doctor
-  profile?: {            // ← Au cas où le backend retourne aussi profile
-    photo?: string;
+
+  // ── Patient (champs plats) ──
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  photo?: string;
+  groupSangin?: string;
+  genre?: "male" | "female" | "other";
+  health?: {
+    allergies?: string[];
+    chronicDiseases?: string[];
+    currentMedications?: string[];
+    disabilities?: string[];
+    height?: number;
+    weight?: number;
+    bmi?: number;
+  };
+  postition?: {          // typo backend volontaire
+    city?: string;
+    district?: string;
+    address?: string;
+    coordinates?: { latitude: number; longitude: number };
+  };
+
+  // ── Doctor (champs imbriqués) ──
+  doctorId?: string;
+  profile?: {
+    firstName?: string;
+    lastName?: string;
     title?: string;
     specialty?: string;
-}
+    photo?: string;
+  };
+  contact?: {
+    phone?: string;
+    phoneVerified?: boolean;
+    email?: string;
+    emailVerified?: boolean;
+  };
+  location?: {
+    city?: string;
+    district?: string;
+    address?: string;
+    coordinates?: { latitude: number; longitude: number };
+  };
+  professional?: {
+    licenseNumber?: string;
+    licenseExpiry?: string;
+    university?: string;
+    graduationYear?: number;
+    certifications?: any[];
+  };
+  telemedicine?: {
+    isAvailable?: boolean;
+    consultationTypes?: Array<"video" | "audio" | "chat">;
+    consultationFees?: { video: number; audio: number; chat: number };
+    availability?: any[];
+    averageResponseTime?: number;
+    rating?: number;
+    totalConsultations?: number;
+  };
+  analytics?: {
+    totalPatients?: number;
+    totalConsultations?: number;
+    monthlyEarnings?: number;
+    patientSatisfaction?: number;
+    cancellationRate?: number;
+  };
+  status?: {
+    isVerified?: boolean;
+    accountStatus?: string;
+    isOnline?: boolean;
+    subscription?: string;
+    lastActive?: string;
+  };
 }
 
 interface BackendAuthResponse {
@@ -58,110 +122,129 @@ export interface RegisterPayload {
 // Le backend retourne un objet plat, le store attend PatientUser | DoctorUser
 function mapToAuthUser(backendUser: BackendUser): AuthUser {
 
-  const photoUrl = backendUser.photo || backendUser.profile?.photo;
+  // _id : doctor envoie _id, patient envoie id
+  const id =
+    typeof backendUser._id === "string" ? backendUser._id
+    : typeof (backendUser._id as any)?.$oid === "string" ? (backendUser._id as any).$oid
+    : backendUser._id ?? "";
 
   if (backendUser.role === "doctor") {
+    const loc = backendUser.location;
+    const pro = backendUser.professional;
+    const tel = backendUser.telemedicine;
+
     return {
-      _id: backendUser.id as unknown as any,
+      _id: id,
       role: "doctor",
-      doctorId: backendUser.id,
+      doctorId: backendUser.doctorId ?? id,
       profile: {
-        firstName: backendUser.firstName,
-        lastName: backendUser.lastName,
-        title: "Dr",
-        specialty: "",
-        bio: "",
-        languages: "fr",
+        firstName:        backendUser.profile?.firstName ?? "",
+        lastName:         backendUser.profile?.lastName  ?? "",
+        title:            (backendUser.profile?.title as any) ?? "Dr",
+        specialty:        backendUser.profile?.specialty ?? "",
+        bio:              "",
+        languages:        "fr",
         yearsOfExperience: 0,
-        photo: photoUrl,
+        photo:            backendUser.profile?.photo,
       },
       contact: {
-        phone: "",
-        phoneVerified: false,
-        email: backendUser.email,
-        emailVerified: backendUser.isVerified,
+        phone:         backendUser.contact?.phone         ?? "",
+        phoneVerified: backendUser.contact?.phoneVerified ?? false,
+        email:         backendUser.contact?.email         ?? "",
+        emailVerified: backendUser.contact?.emailVerified ?? false,
       },
-      location: { city: "" },
+      location: {
+        city:        loc?.city        ?? "",
+        district:    loc?.district,
+        address:     loc?.address,
+        coordinates: loc?.coordinates,
+      },
       professional: {
-        licenseNumber: "",
-        licenseExpiry: new Date(),
-        university: "",
-        graduationYear: 0,
-        certifications: [],
+        licenseNumber: pro?.licenseNumber ?? "",
+        licenseExpiry: pro?.licenseExpiry ? new Date(pro.licenseExpiry) : new Date(),
+        university:    pro?.university    ?? "",
+        graduationYear: pro?.graduationYear ?? 0,
+        certifications: pro?.certifications ?? [],
       },
       telemedicine: {
-        isAvailable: false,
-        consultationTypes: [],
-        consultationFees: { video: 0, audio: 0, chat: 0 },
-        availability: [],
-        averageResponseTime: 0,
-        rating: 0,
-        totalConsultations: 0,
+        isAvailable:         tel?.isAvailable         ?? false,
+        consultationTypes:   tel?.consultationTypes   ?? [],
+        consultationFees:    tel?.consultationFees    ?? { video: 0, audio: 0, chat: 0 },
+        availability:        tel?.availability        ?? [],
+        averageResponseTime: tel?.averageResponseTime ?? 0,
+        rating:              tel?.rating              ?? 0,
+        totalConsultations:  tel?.totalConsultations  ?? 0,
       },
       affiliations: { hospitals: [], clinics: [], insuranceCompanies: [] },
       security: { isMedcin: true, twoFactorEnabled: false, devices: [] },
       status: {
-        isVerified: backendUser.isVerified,
-        accountStatus: (backendUser.accountStatus as any) ?? "active",
-        subscription: "free",
-        isOnline: true,
-        lastActive: new Date(),
+        isVerified:     backendUser.status?.isVerified     ?? false,
+        accountStatus:  (backendUser.status?.accountStatus as any) ?? "active",
+        subscription:   (backendUser.status?.subscription as any)  ?? "free",
+        isOnline:       backendUser.status?.isOnline       ?? false,
+        lastActive:     backendUser.status?.lastActive ? new Date(backendUser.status.lastActive) : new Date(),
       },
       analytics: {
-        totalPatients: 0,
-        totalConsultations: 0,
-        monthlyEarnings: 0,
-        patientSatisfaction: 0,
-        cancellationRate: 0,
+        totalPatients:      backendUser.analytics?.totalPatients      ?? 0,
+        totalConsultations: backendUser.analytics?.totalConsultations ?? 0,
+        monthlyEarnings:    backendUser.analytics?.monthlyEarnings    ?? 0,
+        patientSatisfaction: backendUser.analytics?.patientSatisfaction ?? 0,
+        cancellationRate:   backendUser.analytics?.cancellationRate   ?? 0,
       },
       metadata: { createdAt: new Date(), updatedAt: new Date() },
     } satisfies DoctorUser;
   }
 
+  // ── Patient (inchangé) ──
+  const loc = backendUser.postition;
+
   return {
-    _id: backendUser.id as any,
+    _id: id,
     role: "patient",
     profile: {
-      firstName: backendUser.firstName,
-      lastName: backendUser.lastName,
+      firstName:   backendUser.firstName ?? "",
+      lastName:    backendUser.lastName  ?? "",
       dateOfBirth: new Date(),
-      gender: "other",
-      photo: photoUrl,
+      gender:      backendUser.genre     ?? "other",
+      bloodGroup:  backendUser.groupSangin as any,
+      photo:       backendUser.photo,
     },
     contact: {
-      phone: "",
-      phoneVerified: false,
-      email: backendUser.email,
-      emailVerified: backendUser.isVerified,
+      phone: "", phoneVerified: false,
+      email: backendUser.email ?? "",
+      emailVerified: backendUser.isVerified ?? false,
       emergencyContacts: [],
     },
-    location: { city: "" },
+    location: {
+      city:        loc?.city     ?? "",
+      district:    loc?.district,
+      address:     loc?.address,
+      coordinates: loc?.coordinates,
+    },
     health: {
-      allergies: [],
-      chronicDiseases: [],
-      currentMedications: [],
+      allergies:          backendUser.health?.allergies          ?? [],
+      chronicDiseases:    backendUser.health?.chronicDiseases    ?? [],
+      currentMedications: backendUser.health?.currentMedications ?? [],
+      disabilities:       backendUser.health?.disabilities       ?? [],
+      height:             backendUser.health?.height,
+      weight:             backendUser.health?.weight,
+      bmi:                backendUser.health?.bmi,
     },
-    security: {
-      isPatient: true,
-      isActive: true,
-      failedAttempts: 0,
-    },
+    security:    { isPatient: true, isActive: true, failedAttempts: 0 },
     preferences: {
       language: "fr",
       notifications: { sms: false, email: true, push: true },
       privacy: { showProfile: true, showMedicalInfo: false, shareLocation: false },
     },
     status: {
-      isVerified: backendUser.isVerified,
+      isVerified:    backendUser.isVerified ?? false,
       accountStatus: (backendUser.accountStatus as any) ?? "active",
-      subscription: "free",
+      subscription:  "free",
     },
     metadata: {
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: new Date(), updatedAt: new Date(),
       lastMedicalUpdate: new Date(),
-      totalConsultations: 0,
-      totalPrescriptions: 0,
+      totalConsultations: 0, totalPrescriptions: 0,
     },
   } satisfies PatientUser;
 }
@@ -182,6 +265,7 @@ export const authService = {
       );
 
       const { accessToken, refreshToken, user } = res.data;
+      console.log("🔍 BACKEND USER BRUT:", JSON.stringify(user, null, 2));
 
       // Adapter l'objet plat backend → structure store
       const authUser = mapToAuthUser(user);

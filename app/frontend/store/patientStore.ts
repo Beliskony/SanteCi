@@ -22,6 +22,7 @@ import type {
   PatientStats,
 } from "@/app/frontend/services/patientService";
 
+
 // ─── État ──────────────────────────────────────────────────────────────────────
 
 interface PatientState {
@@ -203,7 +204,7 @@ export const usePatientStore = create<PatientState>()(
       addEmergencyContact: async (dto) => {
         const patient = getPatient();
         if (!patient) throw new Error("Non authentifié.");
-        if (patient.contact.emergencyContacts.length >= 3) {
+        if (patient?.contact?.emergencyContacts.length >= 3) {
           throw new Error("Maximum 3 contacts d'urgence autorisés.");
         }
         set({ isSaving: true, error: null });
@@ -212,6 +213,7 @@ export const usePatientStore = create<PatientState>()(
           // patientService sync useAuthStore avec le patient retourné
         } catch (err) {
           set({ error: toMessage(err) });
+          console.log(err)
           throw err;
         } finally {
           set({ isSaving: false });
@@ -303,7 +305,7 @@ export const selectPatientLocation   = () => getPatient()?.location   ?? null;
 export const selectPatientStatus     = () => getPatient()?.status     ?? null;
 export const selectPatientMetadata   = () => getPatient()?.metadata   ?? null;
 export const selectEmergencyContacts = () =>
-  getPatient()?.contact.emergencyContacts ?? [];
+  getPatient()?.contact?.emergencyContacts ?? [];
 
 // Lire l'état UI depuis usePatientStore
 export const selectIsSaving     = (s: PatientState) => s.isSaving;

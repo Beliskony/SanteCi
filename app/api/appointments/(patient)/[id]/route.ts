@@ -53,3 +53,63 @@ export async function GET(
     return NextResponse.json({ success: false, message }, { status });
   }
 }
+
+
+// PATCH /api/appointments/[id] — Reprogrammer un rendez-vous
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    await connectDB();
+
+    const authUser = await getAuthUser(req);
+
+    if (!authUser || !authUser.data?._id) {
+      return NextResponse.json(
+        { success: false, message: 'Non authentifié.' },
+        { status: 401 }
+      );
+    }
+
+    // Seul un patient peut reprogrammer son rendez-vous
+    if (authUser.role !== 'patient') {
+      return NextResponse.json(
+        { success: false, message: 'Seuls les patients peuvent reprogrammer un rendez-vous.' },
+        { status: 403 }
+      );
+    }
+
+    const { id } = await params;
+    const body = await req.json();
+
+    if (!body.scheduledFor) {
+      return NextResponse.json(
+        { success: false, message: 'La nouvelle date est requise.' },
+        { status: 400 }
+      );
+    }
+
+    const appointment = await appointmentService.reschedule(
+      id,
+      String(authUser.data._id),
+      new Date(body.scheduledFor)
+    );
+
+    return NextResponse.json({ success: true, data: appointment });
+
+  } catch (error: unknown) {
+    console.error('Error in PATCH /api/appointments/[id]:', error);
+
+    const message = error instanceof Error ? error.message : 'Erreur serveur.';
+
+    let status = 500;
+    if (message === 'Unauthorized') status = 401;
+    else if (message === 'Rendez-vous introuvable.') status = 404;
+    else if (message === 'Action non autorisée.') status = 403;
+    else if (message.includes('Impossible de reprogrammer')) status = 409;
+    else if (message.includes('déjà réservé')) status = 409;
+
+    return NextResponse.json({ success: false, message }, { status });
+  }
+}

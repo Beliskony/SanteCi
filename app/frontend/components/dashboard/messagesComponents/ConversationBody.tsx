@@ -47,8 +47,10 @@ export default function ConversationBody({ roomId }: Props) {
 
   // Ouvrir la room et marquer comme lu
   useEffect(() => {
-    if (roomId && roomId !== activeChatRoomId) {
+    if (roomId !== activeChatRoomId) {
       openRoom(roomId).then(() => markRoomAsRead(roomId));
+    } else {
+      markRoomAsRead(roomId);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);

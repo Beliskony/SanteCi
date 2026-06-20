@@ -83,6 +83,9 @@ interface AppointmentState {
    */
   join: (id: string, role: "patient" | "doctor") => Promise<void>;
 
+  /** PATCH /api/appointments/[id] — reprogrammer un rendez-vous */
+  reschedule: (id: string, scheduledFor: string) => Promise<void>;
+
   /** PATCH /api/appointments/[id]/payment */
   updatePayment: (id: string, dto: UpdatePaymentDTO) => Promise<void>;
 
@@ -250,6 +253,7 @@ export const useAppointmentStore = create<AppointmentState>()(
         }
       },
 
+
       start: async (id) => {
         set({ isLoading: true, error: null });
         try {
@@ -309,6 +313,28 @@ export const useAppointmentStore = create<AppointmentState>()(
           set({
             error:
               err instanceof Error ? err.message : "Erreur lors du marquage absent",
+            isLoading: false,
+          });
+          throw err;
+        }
+      },
+
+      reschedule: async (id, scheduledFor) => {
+        set({ isLoading: true, error: null });
+        try {
+          const updated = await appointmentService.reschedule(id, scheduledFor);
+          set((state) => ({
+            appointments: replaceInList(state.appointments, updated),
+            currentAppointment: maybeUpdateCurrent(
+              state.currentAppointment,
+              updated
+            ),
+            isLoading: false,
+          }));
+        } catch (err) {
+          set({
+            error:
+              err instanceof Error ? err.message : "Erreur de reprogrammation",
             isLoading: false,
           });
           throw err;

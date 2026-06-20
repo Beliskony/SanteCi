@@ -12,6 +12,7 @@ export default function AppointmentPage() {
 
   //  FIX #1 — Sélecteurs atomiques
   const user         = useAuthStore((s) => s.user)
+  const hasHydrated  = useAuthStore((s) => s._hasHydrated) 
   const appointments = useAppointmentStore((s) => s.appointments)
   const isLoading    = useAppointmentStore((s) => s.isLoading)
   const error        = useAppointmentStore((s) => s.error)
@@ -19,10 +20,30 @@ export default function AppointmentPage() {
 
   //  patientId stable (string primitive)
   const patientId = useMemo(() => {
-    if (!user || !isPatient(user)) return undefined
+    if (!hasHydrated) {
+      console.log('Store not hydrated yet');
+      return undefined;
+    }
+    
+    if (!user || !isPatient(user))  {
+      console.warn('User is not a valid patient:', user);
+      return undefined;
+    }
+    
     const raw = user._id
-    return typeof raw === "string" ? raw : raw.toString()
-  }, [user])
+
+     if (!raw) {
+      console.error('user._id is undefined or null:', user);
+      return undefined;
+    }
+
+    try {
+      return typeof raw === "string" ? raw : raw;
+    } catch (error) {
+      console.error('Error converting _id to string:', error);
+      return undefined;
+    }
+  }, [user]);
 
   //  FIX #3 — fetchList ajouté dans les dépendances (ref stable Zustand → pas de boucle)
   useEffect(() => {

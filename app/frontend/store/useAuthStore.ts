@@ -52,6 +52,7 @@ export interface PatientProfile extends BaseProfile {
 
 export interface PatientContact extends BaseContact {
   emergencyContacts: Array<{
+    _id: string;
     name: string;
     phone: string;
     relationship: string;
@@ -99,7 +100,7 @@ export interface PatientMetadata {
 }
 
 export interface PatientUser {
-  _id: Types.ObjectId;
+  _id: string;
   role: "patient";
   profile: PatientProfile;
   contact: PatientContact;
@@ -162,8 +163,8 @@ export interface DoctorTelemedicine {
 }
 
 export interface DoctorAffiliations {
-  hospitals: Types.ObjectId[];
-  clinics: Types.ObjectId[];
+  hospitals: string[];
+  clinics: string[];
   insuranceCompanies: string[];
 }
 
@@ -192,7 +193,7 @@ export interface DoctorMetadata {
 }
 
 export interface DoctorUser {
-  _id: Types.ObjectId;
+  _id: string;
   role: "doctor";
   doctorId: string;
   profile: DoctorProfile;
@@ -349,15 +350,34 @@ export const useAuthStore = create<AuthState>()(
         onRehydrateStorage: () => (state) => {
           state?.setHasHydrated(true); // Indique que le store a été rechargé depuis le localStorage
         },
-        partialize: (state) => ({
-          token:           state.token,
-          refreshToken:    state.refreshToken,  // ← persisté
-          isAuthenticated: state.isAuthenticated,
-          user: state.user
-            ? { ...state.user,_id: state.user._id.toString(), security: undefined }
-            : null,
-        }),
+        partialize: (state) => {
+          if (!state.user) {
+            return {
+              token: state.token,
+              refreshToken: state.refreshToken,
+              isAuthenticated: state.isAuthenticated,
+              user: null,
+            };
+          }
+        
+          const { security, ...userWithoutSecurity } = state.user as any;
+
+          const rawId = (state.user as any)._id;
+          const id = state.user._id
+            
+            return {
+              token: state.token,
+              refreshToken: state.refreshToken,
+              isAuthenticated: state.isAuthenticated,
+                user: {
+                  ...userWithoutSecurity,
+                  _id: id,
+                },
+            };
+        },
+        
       }
+
     ),
     { name: "AuthStore" }
   )
