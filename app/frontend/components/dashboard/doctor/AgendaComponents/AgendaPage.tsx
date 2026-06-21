@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Cross } from "lucide-react";
 import { useAuthStore, isDoctor } from "@/app/frontend/store/useAuthStore";
 import { useAppointmentStore }    from "@/app/frontend/store/appoitmentStore";
 import { AgendaCalendar }         from "./AgendaCalendar";
@@ -9,6 +9,9 @@ import { AgendaLegend }           from "./AgendaLegend";
 import { AgendaTimeline }         from "./AgendaTimeline";
 import type { Appointment }  from "@/app/frontend/types/Appointment";
 import { isPopulatedPatient } from "@/app/frontend/types/Appointment";
+import { OpenSlotsModal } from "../../../modals/OpenSlotsModal";
+import { AgendaMonthView } from "./AgendaMonthView";
+import { AgendaWeekView } from "./AgendaWeekView";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -27,6 +30,7 @@ export default function AgendaPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode,     setViewMode]     = useState<ViewMode>("Jour");
   const [activeAppt,   setActiveAppt]   = useState<Appointment | null>(null);
+  const [isSlotsModalOpen, setIsSlotsModalOpen] = useState(false);
 
   // Sélecteurs atomiques
   const user         = useAuthStore((s) => s.user);
@@ -35,10 +39,11 @@ export default function AgendaPage() {
   const fetchList    = useAppointmentStore((s) => s.fetchList);
   const fetchAgenda  = useAppointmentStore((s) => s.fetchAgenda);
 
+
   const doctorId = useMemo(() => {
     if (!user || !isDoctor(user)) return null;
     const raw = user._id;
-    return typeof raw === "string" ? raw : raw.toString();
+    return typeof raw === "string" ? raw : raw;
   }, [user]);
 
   // Charger les RDV du jour sélectionné
@@ -87,8 +92,7 @@ export default function AgendaPage() {
   }, [selectedDate]);
 
   const handleAddUnavailability = () => {
-    // TODO : ouvrir modal indisponibilité
-    console.log("Ajouter indisponibilité");
+    setIsSlotsModalOpen(true);
   };
 
   return (
@@ -162,14 +166,28 @@ export default function AgendaPage() {
                 <p className="text-xs text-slate-400">Chargement de l&apos;agenda...</p>
               </div>
             </div>
-          ) : (
+          ) : viewMode === "Jour" ? (
             <AgendaTimeline
               selectedDate={selectedDate}
               appointments={appointments}
               onClickAppt={setActiveAppt}
               onClickSlot={handleAddUnavailability}
             />
-          )}
+          ) : viewMode === "Semaine" ? (
+            <AgendaWeekView
+            selectedDate={selectedDate}
+            appointments={appointments}
+            onClickAppt={setActiveAppt}
+            onSelectDay={(date) => { setSelectedDate(date); setViewMode("Jour"); }}
+            />
+          ) : (
+            <AgendaMonthView
+            selectedDate={selectedDate}
+            appointments={appointments}
+            onSelectDay={(date) => { setSelectedDate(date); setViewMode("Jour"); }}
+            />
+          )
+        }
         </div>
       </div>
 
@@ -187,7 +205,7 @@ export default function AgendaPage() {
                 onClick={() => setActiveAppt(null)}
                 className="text-slate-400 hover:text-slate-700 text-lg leading-none"
               >
-                ×
+                <Cross className="w-4 h-4" />
               </button>
             </div>
 
@@ -218,6 +236,8 @@ export default function AgendaPage() {
           </div>
         </>
       )}
+
+      <OpenSlotsModal isOpen={isSlotsModalOpen} onClose={() => setIsSlotsModalOpen(false)} />
     </div>
   );
 }

@@ -113,7 +113,7 @@ export function UploadDocumentModal({ isOpen, onClose, onUpload }: UploadDocumen
         <div className="p-4 space-y-4">
           {/* Type de document */}
           <div>
-            <label className="text-xs font-medium text-gray-500 mb-2 block">
+            <label className="text-xs font-medium text-gray-700 mb-2 block">
               Type de document <span className="text-red-500">*</span>
             </label>
             <div className="flex flex-wrap gap-2">
@@ -135,20 +135,20 @@ export function UploadDocumentModal({ isOpen, onClose, onUpload }: UploadDocumen
 
           {/* Date du document */}
           <div>
-            <label className="text-xs font-medium text-gray-500 mb-1 block">
+            <label className="text-xs font-medium text-gray-700 mb-1 block">
               Date du document <span className="text-red-500">*</span>
             </label>
             <input
               type="date"
               value={documentDate}
               onChange={(e) => setDocumentDate(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="w-full px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
 
           {/* Upload fichier */}
           <div>
-            <label className="text-xs font-medium text-gray-500 mb-1 block">
+            <label className="text-xs font-medium text-gray-700 mb-1 block">
               Fichier <span className="text-red-500">*</span>
             </label>
             <div
@@ -185,13 +185,13 @@ export function UploadDocumentModal({ isOpen, onClose, onUpload }: UploadDocumen
 
           {/* Notes */}
           <div>
-            <label className="text-xs font-medium text-gray-500 mb-1 block">Notes (optionnelles)</label>
+            <label className="text-xs font-medium text-gray-700 mb-1 block">Notes (optionnelles)</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Informations complémentaires sur ce document..."
               rows={2}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+              className="w-full px-3 py-2 text-sm text-gray-700 placeholder:text-gray-500 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
             />
           </div>
 

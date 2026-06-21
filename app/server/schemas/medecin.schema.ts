@@ -20,6 +20,7 @@ const CertificationSchema = z.object({
   name:   z.string().min(1),
   year:   z.number().int().min(1900).max(new Date().getFullYear()),
   issuer: z.string().min(1),
+  documentUrl: z.string()
 });
 
 const ProfessionalSchema = z.object({

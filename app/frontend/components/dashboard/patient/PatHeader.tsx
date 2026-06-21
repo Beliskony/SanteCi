@@ -28,7 +28,7 @@ const PatHeader = () => {
             <p className="text-sm font-semibold text-gray-900 leading-tight">
               {profile ? `${profile.firstName} ${profile.lastName}` : "—"}
             </p>
-            <p className="text-xs text-gray-400">Patient</p>
+            <p className="text-xs text-gray-400">{user?.role}</p>
           </div>
 
           <div className="w-9 h-9 rounded-full bg-gray-200 overflow-hidden shrink-0">

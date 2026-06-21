@@ -80,7 +80,7 @@ export function ConsultationCard({
   const handleStart = async () => {
     await startAppt(_id);
     if (!user || !isDoctor(user) || !patient) return;
-    const doctorId = typeof user._id === "string" ? user._id : user._id.toString();
+    const doctorId = typeof user._id === "string" ? user._id : user._id;
     if (details.type === "video" || details.type === "audio") {
       initiateCall({
         callerId:      doctorId,

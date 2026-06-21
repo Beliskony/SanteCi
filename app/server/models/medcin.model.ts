@@ -1,5 +1,6 @@
 import mongoose, { Schema } from 'mongoose';
 import { IDoctor } from '../interfaces/medecin.interface';
+import { required } from 'zod/mini';
 
 
 const DoctorSchema: Schema = new Schema({
@@ -20,6 +21,7 @@ const DoctorSchema: Schema = new Schema({
       name: { type: String, required: true },
       year: { type: Number, required: true },
       issuer: { type: String, required: true },
+      documentUrl: {type: String, required: true}
     }],
   },
   contact: {

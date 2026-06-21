@@ -137,7 +137,7 @@ export function EditAntecedentsModal({
           {/* Content */}
           <div className="p-4 overflow-y-auto flex-1">
             <div className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg p-2 mb-4">
-              ⚠️ Les antécédents familiaux et chirurgicaux sont en cours de développement.
+              Les antécédents familiaux et chirurgicaux sont en cours de développement.
               Pour l'instant, seules les maladies chroniques sont sauvegardées.
             </div>
 
@@ -246,7 +246,7 @@ function EntryForm({ entry, onSave, onCancel }: { entry: MedicalEntry; onSave: (
       </div>
       <div>
         <label className="text-xs font-medium text-gray-500 mb-1 block">Titre <span className="text-red-500">*</span></label>
-        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Diabète de type 2" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20" autoFocus />
+        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Diabète de type 2" className="w-full px-3 py-2 placeholder:text-gray-600 text-sm text-gray-950 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20" autoFocus />
       </div>
       <div>
         <label className="text-xs font-medium text-gray-500 mb-1 block">Description (optionnelle)</label>

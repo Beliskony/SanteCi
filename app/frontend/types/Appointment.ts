@@ -218,4 +218,5 @@ export interface DoctorStatsResponse {
   noShow: number;
   pending: number;
   totalEarnings: number;
+  consultationsToday: number;
 }

@@ -1,32 +1,35 @@
-// ============================================================
-// components/patients/PatientStatCards.tsx
-// ============================================================
+"use client";
 
-import React from "react";
-import type { PatientSummaryDTO } from "@/app/frontend/types/Patient";
-
-interface Props {
-  summary:   PatientSummaryDTO | null;
-  isLoading: boolean;
+interface StatCardProps {
+  label: string;
+  value: number;
 }
 
-const StatCard: React.FC<{ label: string; value: number; isLoading: boolean }> = ({
-  label, value, isLoading,
-}) => (
-  <div className="bg-gray-50 rounded-xl p-4 flex flex-col gap-1">
-    <span className="text-xs text-gray-500 font-medium">{label}</span>
-    {isLoading ? (
-      <div className="h-8 w-14 bg-gray-200 animate-pulse rounded" />
-    ) : (
-      <span className="text-3xl font-semibold text-gray-900">{value}</span>
-    )}
-  </div>
-);
+function StatCard({ label, value }: StatCardProps) {
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl p-5">
+      <p className="text-xs font-medium text-slate-400">{label}</p>
+      <p className="text-2xl font-bold text-slate-900 mt-1">{value}</p>
+    </div>
+  );
+}
 
-export const PatientStatCards: React.FC<Props> = ({ summary, isLoading }) => (
-  <div className="grid grid-cols-3 gap-3 mb-6">
-    <StatCard label="Patients actifs"     value={summary?.activeCount   ?? 0} isLoading={isLoading && !summary} />
-    <StatCard label="Nouveaux ce mois"    value={summary?.newThisMonth  ?? 0} isLoading={isLoading && !summary} />
-    <StatCard label="Suivis prioritaires" value={summary?.priorityCount ?? 0} isLoading={isLoading && !summary} />
-  </div>
-);
+interface PatientsStatsCardsProps {
+  activePatients?: number;
+  newThisMonth?: number;
+  priorityFollowUps?: number;
+}
+
+export function PatientsStatsCards({
+  activePatients = 0,
+  newThisMonth = 0,
+  priorityFollowUps = 0,
+}: PatientsStatsCardsProps) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <StatCard label="Patients actifs" value={activePatients} />
+      <StatCard label="Nouveaux ce mois" value={newThisMonth} />
+      <StatCard label="Suivis prioritaires" value={priorityFollowUps} />
+    </div>
+  );
+}

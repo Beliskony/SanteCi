@@ -135,9 +135,11 @@ export interface DoctorProfessional {
   university: string;
   graduationYear: number;
   certifications: Array<{
+    _id: string;
     name: string;
     year: number;
     issuer: string;
+    documentUrl?: string;
   }>;
 }
 
@@ -250,6 +252,7 @@ interface AuthState {
   // Doctor only
   setOnlineStatus: (isOnline: boolean) => void;
   updateTelemedicine: (data: Partial<DoctorTelemedicine>) => void;
+  updateDoctorProfessional: (data: Partial<DoctorProfessional>) => void;
 
   // Patient only
   updateHealth: (health: Partial<PatientHealth>) => void;
@@ -313,6 +316,12 @@ export const useAuthStore = create<AuthState>()(
           const { user } = get();
           if (!user || !isDoctor(user)) return;
           set({ user: { ...user, telemedicine: { ...user.telemedicine, ...data } } });
+        },
+
+        updateDoctorProfessional: (data) => {
+          const { user } = get();
+          if (!user || !isDoctor(user)) return;
+          set({ user: { ...user, professional: { ...user.professional, ...data } } });
         },
 
         updateProfilePhoto: (photoUrl: string) => {

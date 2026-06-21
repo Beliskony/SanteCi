@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { IDoctor } from '../interfaces/medecin.interface';
 import { Prescription } from '../models/prescription.model';
 import { IPrescription } from '../interfaces/prescription.interface';
+import { Appointment } from '../models/appointement.model';
 import { Patient } from '../models/patient.model';
 import { cloudinaryService } from './cloudinary.service';
 import { CreatePrescriptionDTO, UpdatePrescriptionDTO } from '../schemas/prescription.schema';
@@ -37,6 +38,7 @@ interface AddCertificationDTO {
   name: string;
   year: number;
   issuer: string;
+  documentUrl?: string;
 }
 
 interface DoctorFilters {
@@ -211,6 +213,127 @@ async updatePhoto(doctorId: string, buffer: Buffer): Promise<{ photoUrl: string 
 
     return {
       doctors,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+    };
+  }
+
+
+  // ── Get my patients — annuaire patient du médecin connecté ────────────────
+
+  async getMyPatients(
+    doctorId: string,
+    filters: { query?: string; page?: number; limit?: number } = {}
+  ): Promise<{
+    patients: Array<{
+      _id: string;
+      profile: { firstName: string; lastName: string; photo?: string; dateOfBirth: Date; bloodGroup?: string };
+      mainCondition: string;
+      followUpStatus: 'priority' | 'followed' | 'recent' | null;
+      nextAppointment: { date: Date; label: string } | null;
+      patientSince: Date;
+      totalConsultations: number;
+    }>;
+    total: number;
+    page: number;
+    pages: number;
+  }> {
+    const { page = 1, limit = 20 } = filters;
+    const skip = (page - 1) * limit;
+
+    const patientIds = await Appointment.distinct('patientId', {
+      doctorId: new Types.ObjectId(doctorId),
+    });
+
+    if (patientIds.length === 0) {
+      return { patients: [], total: 0, page, pages: 0 };
+    }
+
+    const query: Record<string, unknown> = { _id: { $in: patientIds } };
+    if (filters.query) {
+      query.$or = [
+        { 'profile.firstName': { $regex: filters.query, $options: 'i' } },
+        { 'profile.lastName':  { $regex: filters.query, $options: 'i' } },
+        { 'contact.phone':     { $regex: filters.query, $options: 'i' } },
+        { 'health.chronicDiseases': { $regex: filters.query, $options: 'i' } },
+      ];
+    }
+
+    const total = await Patient.countDocuments(query);
+
+    const patientsRaw = await Patient.find(query)
+      .select('profile contact.phone health.chronicDiseases metadata')
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    const enriched = await Promise.all(
+      patientsRaw.map(async (p) => {
+        const apptsWithDoctor = await Appointment.find({
+          doctorId: new Types.ObjectId(doctorId),
+          patientId: p._id,
+        })
+          .select('details.scheduledFor status.current')
+          .sort({ 'details.scheduledFor': -1 })
+          .lean();
+
+        const now = new Date();
+        const upcoming = apptsWithDoctor
+          .filter((a) => new Date(a.details.scheduledFor) >= now && a.status.current !== 'cancelled')
+          .sort((a, b) => new Date(a.details.scheduledFor).getTime() - new Date(b.details.scheduledFor).getTime())[0];
+
+        const completedCount = apptsWithDoctor.filter((a) => a.status.current === 'completed').length;
+
+        let followUpStatus: 'priority' | 'followed' | 'recent' | null = null;
+        if (upcoming) {
+          const hoursUntil = (new Date(upcoming.details.scheduledFor).getTime() - now.getTime()) / 3600000;
+          if (hoursUntil <= 48) followUpStatus = 'priority';
+        }
+        if (!followUpStatus) {
+          followUpStatus = completedCount >= 2 ? 'followed' : completedCount === 0 ? 'recent' : null;
+        }
+
+        const mainCondition = p.health?.chronicDiseases?.[0] ?? 'Suivi général';
+
+        let nextAppointmentLabel: string | null = null;
+        if (upcoming) {
+          const dt = new Date(upcoming.details.scheduledFor);
+          const isToday = dt.toDateString() === now.toDateString();
+          const tomorrow = new Date(now);
+          tomorrow.setDate(now.getDate() + 1);
+          const isTomorrow = dt.toDateString() === tomorrow.toDateString();
+          const time = dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+          nextAppointmentLabel = isToday
+            ? `Aujourd'hui ${time}`
+            : isTomorrow
+            ? `Demain ${time}`
+            : dt.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }) + ` ${time}`;
+        }
+
+        return {
+          _id: String(p._id),
+          profile: {
+            firstName:   p.profile.firstName,
+            lastName:    p.profile.lastName,
+            photo:       p.profile.photo,
+            dateOfBirth: p.profile.dateOfBirth,
+            bloodGroup:  p.profile.bloodGroup,
+          },
+          mainCondition,
+          followUpStatus,
+          nextAppointment: upcoming
+            ? { date: upcoming.details.scheduledFor, label: nextAppointmentLabel! }
+            : null,
+          patientSince: p.metadata?.createdAt,
+          totalConsultations: completedCount,
+        };
+      })
+    );
+
+    return {
+      patients: enriched,
       total,
       page,
       pages: Math.ceil(total / limit),

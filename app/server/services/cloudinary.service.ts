@@ -165,6 +165,34 @@ class CloudinaryService {
     return this.uploadBuffer(buffer, 'document', documentId);
   }
 
+  /** Document de certification d'un médecin (diplôme, attestation...) */
+  async uploadCertificationDocument(
+    buffer:   Buffer,
+    doctorId: string,
+    fileName: string,
+  ): Promise<CloudinaryUploadResult> {
+    // Identifiant unique par fichier — un médecin peut avoir plusieurs certifications
+    const publicId = `${doctorId}-${Date.now()}`;
+
+    const result = await new Promise<UploadApiResponse>((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder:        `certifications/doctor/${doctorId}`,
+          public_id:     publicId,
+          resource_type: 'auto', // accepte PDF, images, etc.
+          overwrite:     false,  // chaque certification garde son propre fichier
+        },
+        (error, res) => {
+          if (error || !res) return reject(error ?? new Error('Upload du document de certification échoué.'));
+          resolve(res);
+        }
+      );
+      stream.end(buffer);
+    });
+
+    return { url: result.secure_url, publicId: result.public_id };
+  }
+
   // ── Suppression ────────────────────────────────────────────────────────────
 
   /**

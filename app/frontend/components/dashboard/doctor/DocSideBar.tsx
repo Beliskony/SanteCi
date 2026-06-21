@@ -21,6 +21,7 @@ import DocDash from "./TableauBord/DocDash";
 import AgendaPage from "./AgendaComponents/AgendaPage"
 import COnsultationsPage from "./ConsultationComponents/ConsultationsPage";
 import PatHeader from "../patient/PatHeader";
+import PatientsPage from "./MesPatientsComponents/PatientsPage";
 
 // ── Imports des pages ─────────────────────────────────────────
 // (à remplacer par tes vrais composants doctor)
@@ -56,12 +57,12 @@ const NAV_ITEMS: { label: string; key: ActivePage; icon: React.ElementType }[] =
 
 // ── Rendu du contenu principal selon la page active ───────────
 
-const renderPage = (active: ActivePage) => {
+const renderPage = (active: ActivePage, setActive: (key: ActivePage) => void) => {
   switch (active) {
-    case "dashboard":     return <DocDash />     // <DocDash />
+    case "dashboard":     return <DocDash onNavigate={(page) => setActive(page as ActivePage)} />     // <DocDash />
     case "agenda":        return <AgendaPage />;                // <DocAgenda />
     case "consultations": return <COnsultationsPage />;         // <DocConsult />
-    case "patients":      return <div>Mes patients</div>;          // <DocPatients />
+    case "patients":      return <PatientsPage />;          // <DocPatients />
     case "messagerie":    return <div>Messagerie</div>;            // <DocMessagerie />
     case "stats":         return <div>Revenus & Stats</div>;       // <DocStats />
     case "parametres":    return <div>Paramètres</div>;            // <DocSettings />
@@ -214,7 +215,7 @@ export default function DocSideBar() {
       {/* Contenu principal */}
       <main className="flex-1 overflow-y-auto">
         <PatHeader />
-        {renderPage(active)}
+        {renderPage(active, setActive)}
       </main>
 
     </div>

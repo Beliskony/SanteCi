@@ -46,7 +46,7 @@ export default function ConsultationsPage() {
   const doctorId = useMemo(() => {
     if (!user || !isDoctor(user)) return null;
     const raw = user._id;
-    return typeof raw === "string" ? raw : raw.toString();
+    return typeof raw === "string" ? raw : raw;
   }, [user]);
 
   // Charger les RDV au montage

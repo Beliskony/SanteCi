@@ -23,9 +23,11 @@ export interface IDoctor extends Document {
     university: string;
     graduationYear: number;
     certifications: Array<{
+      _id: string;
       name: string;
       year: number;
       issuer: string;
+      documentUrl?: string;
     }>;
   };
   

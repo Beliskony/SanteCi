@@ -1,6 +1,7 @@
 // ============================================================
 // services/doctorService.ts — Médecins
 // Routes alignées sur app/doctor/*
+//front
 // ============================================================
 
 import * as api from "@/app/frontend/lib/apiClient";
@@ -126,6 +127,50 @@ export const doctorService = {
     return res.data;
   },
 
+  /**
+   * Mes patients — annuaire patient du médecin connecté
+   * GET /doctor/patients
+   */
+  async getMyPatients(filters?: {
+    query?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{
+    patients: Array<{
+      _id: string;
+      profile: { firstName: string; lastName: string; photo?: string; dateOfBirth: string; bloodGroup?: string };
+      mainCondition: string;
+      followUpStatus: "priority" | "followed" | "recent" | null;
+      nextAppointment: { date: string; label: string } | null;
+      patientSince: string;
+      totalConsultations: number;
+    }>;
+    total: number;
+    page: number;
+    pages: number;
+  }> {
+    const qs = new URLSearchParams();
+    if (filters?.query)  qs.append("query", filters.query);
+    if (filters?.page)   qs.append("page", String(filters.page));
+    if (filters?.limit)  qs.append("limit", String(filters.limit));
+
+    const query = qs.toString();
+    const res = await api.get<{
+      success: boolean;
+      patients: any[];
+      total: number;
+      page: number;
+      pages: number;
+    }>(`/doctor/ligne/patients${query ? `?${query}` : ""}`);
+
+    return {
+      patients: res.patients,
+      total:    res.total,
+      page:     res.page,
+      pages:    res.pages,
+    };
+  },
+
   // ── Médecin connecté (auth) ──────────────────────────────
 
   /**
@@ -133,8 +178,10 @@ export const doctorService = {
    * GET /doctor/(auth)/[id]/profile
    */
   async getMyProfile(): Promise<DoctorUser> {
+    const { user } = useAuthStore.getState();
+    if (!user) throw new Error("Non authentifié.");
     const res = await api.get<ApiResponse<DoctorUser>>(
-      "/doctor/auth/profile"
+      `/doctor/${user._id}/profile`
     );
     return res.data;
   },
@@ -144,8 +191,10 @@ export const doctorService = {
    * PATCH /doctor/(auth)/[id]/profile
    */
   async updateMyProfile(data: Partial<DoctorProfile>): Promise<DoctorUser> {
-    const res = await api.patch<ApiResponse<DoctorUser>>(
-      "/doctor/auth/profile",
+    const { user } = useAuthStore.getState();
+    if (!user) throw new Error("Non authentifié.");
+    const res = await api.put<ApiResponse<DoctorUser>>(
+      `/doctor/${user._id}/profile`,
       data
     );
     useAuthStore.getState().updateDoctorProfile(data);
@@ -157,8 +206,10 @@ export const doctorService = {
    * PATCH /doctor/(auth)/telemedicine
    */
   async updateTelemedicine(data: Partial<DoctorTelemedicine>): Promise<DoctorUser> {
-    const res = await api.patch<ApiResponse<DoctorUser>>(
-      "/doctor/auth/telemedicine",
+    const { user } = useAuthStore.getState();
+    if (!user) throw new Error("Non authentifié.");
+    const res = await api.put<ApiResponse<DoctorUser>>(
+      `/doctor/${user._id}/telemedicine`,
       data
     );
     useAuthStore.getState().updateTelemedicine(data);
@@ -168,21 +219,23 @@ export const doctorService = {
   /**
    * Passer en ligne / hors ligne
    * PATCH /doctor/(auth)/ligne
-   */
+ 
   async setOnlineStatus(isOnline: boolean): Promise<void> {
     await api.patch("/doctor/auth/ligne", { isOnline });
     useAuthStore.getState().setOnlineStatus(isOnline);
-  },
+  },  */
 
   /**
    * Upload photo de profil
    * POST /doctor/(auth)/photo
    */
   async uploadPhoto(file: File): Promise<{ photoUrl: string }> {
+    const { user } = useAuthStore.getState();
+    if (!user) throw new Error("Non authentifié.");
     const formData = new FormData();
     formData.append("photo", file);
     const res = await api.uploadFile<ApiResponse<{ photoUrl: string }>>(
-      "/doctor/auth/photo",
+      `/doctor/${user._id}/photo`,
       formData
     );
     useAuthStore.getState().updateDoctorProfile({ photo: res.data.photoUrl });
@@ -197,10 +250,17 @@ export const doctorService = {
     name: string;
     year: number;
     issuer: string;
+    document?: File;
   }): Promise<DoctorUser> {
-    const res = await api.post<ApiResponse<DoctorUser>>(
-      "/doctor/auth/ligne/certifications",
-      data
+    const formData = new FormData();
+    formData.append("name", data.name);
+    formData.append("year", String(data.year));
+    formData.append("issuer", data.issuer);
+    if (data.document) formData.append("document", data.document);
+
+    const res = await api.uploadFile<ApiResponse<DoctorUser>>(
+      "/doctor/ligne/certifications",
+      formData
     );
     return res.data;
   },
@@ -211,7 +271,7 @@ export const doctorService = {
    */
   async removeCertification(certId: string): Promise<DoctorUser> {
     const res = await api.del<ApiResponse<DoctorUser>>(
-      `/doctor/auth/ligne/certifications/${certId}`
+      `/doctor/ligne/certifications/${certId}`
     );
     return res.data;
   },
@@ -221,10 +281,10 @@ export const doctorService = {
    * DELETE /doctor/(auth)/ligne/delete
    */
   async deleteAccount(): Promise<{ message: string }> {
-    const res = await api.del<ApiResponse<{ message: string }>>(
-      "/doctor/auth/ligne/delete"
+    const res = await api.del<{ success: boolean; message: string }>(
+      "/doctor/ligne/delete"
     );
-    return res.data;
+    return { message: res.message };
   },
 
   /**

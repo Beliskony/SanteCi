@@ -8,12 +8,14 @@ import { useNotificationStore }   from "@/app/frontend/store/otherStore";
 import { DoctorStatsCards }       from "./DoctorStatsCards";
 import { NextConsultations }      from "./NextConsultations";
 import { UnreadMessages }         from "./UnreadMessages";
+import { OpenSlotsModal } from "../../../modals/OpenSlotsModal";
 
 interface DocDashProps {
   onNavigate?: (page: string) => void; // pour changer de section dans DocSideBar
 }
 
 export default function DocDash({ onNavigate }: DocDashProps) {
+  
 
   // ── Sélecteurs atomiques ──────────────────────────────────
   const user      = useAuthStore((s) => s.user);
@@ -28,7 +30,7 @@ export default function DocDash({ onNavigate }: DocDashProps) {
   const doctorId = useMemo(() => {
     if (!user || !isDoctor(user)) return null;
     const raw = user._id;
-    return typeof raw === "string" ? raw : raw.toString();
+    return typeof raw === "string" ? raw : raw;
   }, [user]);
 
   // ── Chargement initial ────────────────────────────────────

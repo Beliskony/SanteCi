@@ -29,7 +29,7 @@ export default function DossierPage() {
   const patientId = useMemo(() => {
     if (!patient) return null;
     const raw = patient._id;
-    return typeof raw === "string" ? raw : raw.toString();
+    return typeof raw === "string" ? raw : raw;
   }, [patient]);
 
   const profile = patient?.profile ?? null;

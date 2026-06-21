@@ -35,7 +35,7 @@ interface DoctorDashState {
   uploadPhoto:         (file: File)                     => Promise<void>;
   updateTelemedicine:  (data: Partial<DoctorTelemedicine>) => Promise<void>;
   setOnlineStatus:     (isOnline: boolean)              => Promise<void>;
-  addCertification:    (data: { name: string; year: number; issuer: string }) => Promise<void>;
+  addCertification:    (data: { name: string; year: number; issuer: string, document?: File  }) => Promise<void>;
   removeCertification: (certId: string)                 => Promise<void>;
   deleteAccount:       ()                               => Promise<void>;
 
@@ -68,7 +68,7 @@ function getDoctorId(): string {
   const user = useAuthStore.getState().user;
   if (!user || !isDoctor(user)) throw new Error("Non authentifié en tant que médecin.");
   const raw = user._id;
-  return typeof raw === "string" ? raw : raw.toString();
+  return typeof raw === "string" ? raw : raw;
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -136,34 +136,34 @@ export const useDoctorDashStore = create<DoctorDashState>()(
       },
 
       // ── setOnlineStatus ───────────────────────────────────────────────────
-      setOnlineStatus: async (isOnline) => {
+      //setOnlineStatus: async (isOnline) => {
         // Pas de isLoading — action rapide silencieuse
-        try {
-          await doctorService.setOnlineStatus(isOnline);
+        //try {
+          //await doctorService.setOnlineStatus(isOnline);
           // doctorService sync useAuthStore.setOnlineStatus en interne
-        } catch (err) {
-          set({ error: toMessage(err) });
-        }
-      },
+        //} catch (err) {
+          //set({ error: toMessage(err) });
+        //}
+      //},
 
-      // ── addCertification ──────────────────────────────────────────────────
-      addCertification: async (data) => {
-        set({ isSaving: true, error: null });
+    addCertification: async (data) => {
+      set({ isSaving: true, error: null });
         try {
-          await doctorService.addCertification(data);
+          const updated = await doctorService.addCertification(data);
+          useAuthStore.getState().updateDoctorProfessional({ certifications: updated.professional.certifications });
         } catch (err) {
           set({ error: toMessage(err) });
           throw err;
         } finally {
           set({ isSaving: false });
         }
-      },
+    },
 
-      // ── removeCertification ───────────────────────────────────────────────
-      removeCertification: async (certId) => {
-        set({ isSaving: true, error: null });
+    removeCertification: async (certId) => {
+      set({ isSaving: true, error: null });
         try {
-          await doctorService.removeCertification(certId);
+          const updated = await doctorService.removeCertification(certId);
+              useAuthStore.getState().updateDoctorProfessional({ certifications: updated.professional.certifications });
         } catch (err) {
           set({ error: toMessage(err) });
           throw err;
@@ -200,7 +200,7 @@ export const useDoctorDashStore = create<DoctorDashState>()(
           // Pour l'instant on expose ce qu'on a, à enrichir quand le backend le supporte
           set({
             stats: {
-              consultationsToday: raw.total,       // à affiner avec un filtre date côté backend
+              consultationsToday: raw.consultationsToday,       // à affiner avec un filtre date côté backend
               consultationsDelta: 0,               // delta hier → à implémenter côté backend
               revenueMonth:       raw.totalEarnings,
               revenueDelta:       0,               // delta mois → à implémenter côté backend

@@ -755,6 +755,7 @@ class AppointmentService {
     noShow: number;
     pending: number;
     totalEarnings: number;
+    consultationsToday: number;
   }> {
     const results = await Appointment.aggregate([
       { $match: { doctorId: new Types.ObjectId(doctorId) } },
@@ -771,7 +772,7 @@ class AppointmentService {
       },
     ]);
 
-    const stats = { total: 0, completed: 0, cancelled: 0, noShow: 0, pending: 0, totalEarnings: 0 };
+    const stats = { total: 0, completed: 0, cancelled: 0, noShow: 0, pending: 0, totalEarnings: 0, consultationsToday: 0 };
 
     for (const r of results) {
       stats.total += r.count;
@@ -781,6 +782,18 @@ class AppointmentService {
       if (r._id === 'no_show') stats.noShow = r.count;
       if (r._id === 'pending') stats.pending = r.count;
     }
+
+    // ── Consultations prévues aujourd'hui (toutes statuts actifs, hors annulé) ──
+    const TIMEZONE = 'Africa/Abidjan';
+    const now = new Date();
+    const startOfToday = toZonedTime(startOfDay(now), TIMEZONE);
+    const endOfToday   = fromZonedTime(endOfDay(now), TIMEZONE);
+
+    stats.consultationsToday = await Appointment.countDocuments({
+      doctorId: new Types.ObjectId(doctorId),
+      'details.scheduledFor': { $gte: startOfToday, $lte: endOfToday },
+      'status.current': { $ne: 'cancelled' },
+    });
 
     return stats;
   }
