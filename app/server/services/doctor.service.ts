@@ -282,8 +282,12 @@ async updatePhoto(doctorId: string, buffer: Buffer): Promise<{ photoUrl: string 
         const upcoming = apptsWithDoctor
           .filter((a) => new Date(a.details.scheduledFor) >= now && a.status.current !== 'cancelled')
           .sort((a, b) => new Date(a.details.scheduledFor).getTime() - new Date(b.details.scheduledFor).getTime())[0];
+        
+        const completedAppts = apptsWithDoctor
+          .filter((a) => a.status.current === 'completed')
+          .sort((a, b) => new Date(b.details.scheduledFor).getTime() - new Date(a.details.scheduledFor).getTime());
 
-        const completedCount = apptsWithDoctor.filter((a) => a.status.current === 'completed').length;
+        const completedCount = completedAppts.length;
 
         let followUpStatus: 'priority' | 'followed' | 'recent' | null = null;
         if (upcoming) {
@@ -312,6 +316,27 @@ async updatePhoto(doctorId: string, buffer: Buffer): Promise<{ photoUrl: string 
             : dt.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }) + ` ${time}`;
         }
 
+        // ── keyInfo : allergies + maladies chroniques + traitement actif ──
+        const keyInfo: string[] = [];
+          if (p.health?.allergies?.length) {
+            keyInfo.push(...p.health.allergies.map((a: string) => `Allergie ${a}`));
+          }
+          if (p.health?.chronicDiseases?.length) {
+            keyInfo.push(...p.health.chronicDiseases);
+          }
+          if (p.health?.currentMedications?.length) {
+            keyInfo.push('Traitement actif');
+          }
+        
+        // ── lastConsultation : dernier rdv completed avec diagnostic/notes ──
+        const lastCompleted = completedAppts[0];
+        const lastConsultation = lastCompleted?.consultation?.diagnosis || lastCompleted?.consultation?.notes
+          ? {
+              title: lastCompleted.consultation?.diagnosis ?? 'Consultation',
+              notes: lastCompleted.consultation?.notes ?? '',
+            }
+          : null;
+
         return {
           _id: String(p._id),
           profile: {
@@ -328,6 +353,8 @@ async updatePhoto(doctorId: string, buffer: Buffer): Promise<{ photoUrl: string 
             : null,
           patientSince: p.metadata?.createdAt,
           totalConsultations: completedCount,
+          keyInfo,
+          lastConsultation,
         };
       })
     );
@@ -337,6 +364,155 @@ async updatePhoto(doctorId: string, buffer: Buffer): Promise<{ photoUrl: string 
       total,
       page,
       pages: Math.ceil(total / limit),
+    };
+  }
+
+
+  // ── Get performance / stats globales pour le dashboard "Pilotage" ─────────
+
+  async getDoctorPerformance(doctorId: string): Promise<{
+    revenueMonth: number;
+    revenueDelta: number;
+    totalConsultations: number;
+    cancellationRate: number;
+    patientSatisfaction: number;
+    satisfactionCount: number;
+    monthlyEvolution: Array<{ label: string; revenue: number; consultations: number }>;
+    breakdown: { video: number; inPerson: number; chat: number; audio: number };
+  }> {
+    const doctorObjectId = new Types.ObjectId(doctorId);
+    const now = new Date();
+
+    // ── Bornes du mois courant et précédent ─────────────────────────────────
+    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfLastMonth   = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+    // ── Revenu du mois courant et précédent ─────────────────────────────────
+    const [thisMonthAgg, lastMonthAgg] = await Promise.all([
+      Appointment.aggregate([
+        {
+          $match: {
+            doctorId: doctorObjectId,
+            'status.paymentStatus': 'paid',
+            'details.scheduledFor': { $gte: startOfThisMonth },
+          },
+        },
+        { $group: { _id: null, total: { $sum: '$payment.amount' } } },
+      ]),
+      Appointment.aggregate([
+        {
+          $match: {
+            doctorId: doctorObjectId,
+            'status.paymentStatus': 'paid',
+            'details.scheduledFor': { $gte: startOfLastMonth, $lte: endOfLastMonth },
+          },
+        },
+        { $group: { _id: null, total: { $sum: '$payment.amount' } } },
+      ]),
+    ]);
+
+    const revenueMonth = thisMonthAgg[0]?.total ?? 0;
+    const revenueLastMonth = lastMonthAgg[0]?.total ?? 0;
+    const revenueDelta = revenueLastMonth > 0
+      ? Math.round(((revenueMonth - revenueLastMonth) / revenueLastMonth) * 100)
+      : 0;
+
+    // ── Stats globales (total, cancelled) ───────────────────────────────────
+    const globalStats = await Appointment.aggregate([
+      { $match: { doctorId: doctorObjectId } },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          cancelled: {
+            $sum: { $cond: [{ $eq: ['$status.current', 'cancelled'] }, 1, 0] },
+          },
+        },
+      },
+    ]);
+
+    const total = globalStats[0]?.total ?? 0;
+    const cancelled = globalStats[0]?.cancelled ?? 0;
+    const cancellationRate = total > 0 ? (cancelled / total) * 100 : 0;
+
+    // ── Satisfaction (depuis le profil médecin) ─────────────────────────────
+    const doctor = await Doctor.findById(doctorId).select('analytics.patientSatisfaction analytics.totalConsultations');
+    const patientSatisfaction = doctor?.analytics.patientSatisfaction ?? 0;
+    const satisfactionCount = doctor?.analytics.totalConsultations ?? 0;
+
+    // ── Évolution mensuelle (6 derniers mois) ───────────────────────────────
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
+    const monthlyAgg = await Appointment.aggregate([
+      {
+        $match: {
+          doctorId: doctorObjectId,
+          'details.scheduledFor': { $gte: sixMonthsAgo },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            year:  { $year: '$details.scheduledFor' },
+            month: { $month: '$details.scheduledFor' },
+          },
+          revenue: {
+            $sum: {
+              $cond: [{ $eq: ['$status.paymentStatus', 'paid'] }, '$payment.amount', 0],
+            },
+          },
+          consultations: { $sum: 1 },
+        },
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } },
+    ]);
+
+    const MONTHS_FR = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
+
+    // Générer les 6 derniers mois (même ceux sans données, avec des zéros)
+    const monthlyEvolution: Array<{ label: string; revenue: number; consultations: number }> = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const match = monthlyAgg.find(
+        (m) => m._id.year === d.getFullYear() && m._id.month === d.getMonth() + 1
+      );
+      monthlyEvolution.push({
+        label: MONTHS_FR[d.getMonth()],
+        revenue: match?.revenue ?? 0,
+        consultations: match?.consultations ?? 0,
+      });
+    }
+
+    // ── Répartition par type de consultation (sur tous les RDV) ────────────
+    const typeAgg = await Appointment.aggregate([
+      { $match: { doctorId: doctorObjectId } },
+      { $group: { _id: '$details.type', count: { $sum: 1 } } },
+    ]);
+
+    const typeCounts: Record<string, number> = { video: 0, in_person: 0, chat: 0, audio: 0 };
+    let typeTotal = 0;
+    for (const t of typeAgg) {
+      typeCounts[t._id] = t.count;
+      typeTotal += t.count;
+    }
+
+    const breakdown = {
+      video:    typeTotal > 0 ? Math.round((typeCounts.video    / typeTotal) * 100) : 0,
+      inPerson: typeTotal > 0 ? Math.round((typeCounts.in_person/ typeTotal) * 100) : 0,
+      chat:     typeTotal > 0 ? Math.round((typeCounts.chat     / typeTotal) * 100) : 0,
+      audio:    typeTotal > 0 ? Math.round((typeCounts.audio    / typeTotal) * 100) : 0,
+    };
+
+    return {
+      revenueMonth,
+      revenueDelta,
+      totalConsultations: total,
+      cancellationRate,
+      patientSatisfaction,
+      satisfactionCount,
+      monthlyEvolution,
+      breakdown,
     };
   }
 

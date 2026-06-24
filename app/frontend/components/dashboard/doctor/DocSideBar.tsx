@@ -22,6 +22,7 @@ import AgendaPage from "./AgendaComponents/AgendaPage"
 import COnsultationsPage from "./ConsultationComponents/ConsultationsPage";
 import PatHeader from "../patient/PatHeader";
 import PatientsPage from "./MesPatientsComponents/PatientsPage";
+import PerformancePage from "./RevenusEtStats/PerformancePage";
 
 // ── Imports des pages ─────────────────────────────────────────
 // (à remplacer par tes vrais composants doctor)
@@ -64,9 +65,9 @@ const renderPage = (active: ActivePage, setActive: (key: ActivePage) => void) =>
     case "consultations": return <COnsultationsPage />;         // <DocConsult />
     case "patients":      return <PatientsPage />;          // <DocPatients />
     case "messagerie":    return <div>Messagerie</div>;            // <DocMessagerie />
-    case "stats":         return <div>Revenus & Stats</div>;       // <DocStats />
+    case "stats":         return <PerformancePage />;       // <DocStats />
     case "parametres":    return <div>Paramètres</div>;            // <DocSettings />
-    default:              return <div>Dashboard médecin</div>;
+    default:              return <DocDash />;
   }
 };
 

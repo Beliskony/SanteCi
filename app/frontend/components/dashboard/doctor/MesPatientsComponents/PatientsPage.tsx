@@ -36,6 +36,8 @@ export default function PatientsPage() {
       : undefined,
     bloodGroup:   p.profile.bloodGroup,
     patientSince: p.patientSince ? new Date(p.patientSince).getFullYear().toString() : undefined,
+    keyInfo:          p.keyInfo || [],
+    lastConsultation: p.lastConsultation ?? undefined,
   }));
 
 

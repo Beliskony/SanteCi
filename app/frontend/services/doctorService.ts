@@ -144,6 +144,8 @@ export const doctorService = {
       nextAppointment: { date: string; label: string } | null;
       patientSince: string;
       totalConsultations: number;
+      keyInfo: string[];
+      lastConsultation: { title: string; notes: string } | null;
     }>;
     total: number;
     page: number;
@@ -169,6 +171,33 @@ export const doctorService = {
       page:     res.page,
       pages:    res.pages,
     };
+  },
+
+  /**
+   * Performance / pilotage de l'activité du médecin connecté
+   * GET /doctor/performance
+   */
+  async getPerformance(): Promise<{
+    revenueMonth: number;
+    revenueDelta: number;
+    totalConsultations: number;
+    cancellationRate: number;
+    patientSatisfaction: number;
+    satisfactionCount: number;
+    monthlyEvolution: Array<{ label: string; revenue: number; consultations: number }>;
+    breakdown: { video: number; inPerson: number; chat: number; audio: number };
+  }> {
+    const res = await api.get<ApiResponse<{
+      revenueMonth: number;
+      revenueDelta: number;
+      totalConsultations: number;
+      cancellationRate: number;
+      patientSatisfaction: number;
+      satisfactionCount: number;
+      monthlyEvolution: Array<{ label: string; revenue: number; consultations: number }>;
+      breakdown: { video: number; inPerson: number; chat: number; audio: number };
+    }>>("/doctor/performance");
+    return res.data;
   },
 
   // ── Médecin connecté (auth) ──────────────────────────────

@@ -14,6 +14,11 @@ export interface DoctorPatientListItem {
   nextAppointment: { date: string; label: string } | null;
   patientSince: string;
   totalConsultations: number;
+  keyInfo?: string[];
+  lastConsultation?: {
+    title: string;
+    notes: string;
+  } | null
 }
 
 interface DoctorPatientsState {
@@ -26,6 +31,26 @@ interface DoctorPatientsState {
 
   fetchPatients: (filters?: { query?: string; page?: number; limit?: number }) => Promise<void>;
   clearError:    () => void;
+}
+
+export interface DoctorPerformance {
+  revenueMonth: number;
+  revenueDelta: number;
+  totalConsultations: number;
+  cancellationRate: number;
+  patientSatisfaction: number;
+  satisfactionCount: number;
+  monthlyEvolution: Array<{ label: string; revenue: number; consultations: number }>;
+  breakdown: { video: number; inPerson: number; chat: number; audio: number };
+}
+
+interface DoctorPerformanceState {
+  performance: DoctorPerformance | null;
+  isLoading:   boolean;
+  error:       string | null;
+
+  fetchPerformance: () => Promise<void>;
+  clearError:       () => void;
 }
 
 function toMessage(err: unknown): string {
@@ -64,5 +89,30 @@ export const useDoctorPatientsStore = create<DoctorPatientsState>()(
       clearError: () => set({ error: null }),
     }),
     { name: "DoctorPatientsStore" }
+  )
+);
+
+export const useDoctorPerformanceStore = create<DoctorPerformanceState>()(
+  devtools(
+    (set) => ({
+      performance: null,
+      isLoading:   false,
+      error:       null,
+
+      fetchPerformance: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const performance = await doctorService.getPerformance();
+          set({ performance });
+        } catch (err) {
+          set({ error: toMessage(err) });
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      clearError: () => set({ error: null }),
+    }),
+    { name: "DoctorPerformanceStore" }
   )
 );
