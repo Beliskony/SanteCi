@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { PatientQuickActions } from "./PatientQuickActions";
+import { CreatePrescriptionModal } from "../../../modals/CreatePrescriptionModal";
 import type { PatientListItem } from "../../../../types/PatientList";
 
 interface PatientDetailPanelProps {
@@ -8,10 +10,11 @@ interface PatientDetailPanelProps {
   onDossier?:   (id: string) => void;
   onMessage?:   (id: string) => void;
   onRevoir?:    (id: string) => void;
-  onOrdonnance?:(id: string) => void;
 }
 
-export function PatientDetailPanel({ patient, onDossier, onMessage, onRevoir, onOrdonnance }: PatientDetailPanelProps) {
+export function PatientDetailPanel({ patient, onDossier, onMessage, onRevoir}: PatientDetailPanelProps) {
+  const [isPrescriptionOpen, setIsPrescriptionOpen] = useState(false);
+
   if (!patient) {
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-8 flex items-center justify-center">
@@ -23,6 +26,7 @@ export function PatientDetailPanel({ patient, onDossier, onMessage, onRevoir, on
   }
 
   const initials = `${patient.firstName[0] ?? ""}${patient.lastName[0] ?? ""}`;
+  const patientFullName = `${patient.firstName} ${patient.lastName}`;
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col gap-4">
@@ -87,9 +91,19 @@ export function PatientDetailPanel({ patient, onDossier, onMessage, onRevoir, on
           onDossier={() => onDossier?.(patient._id)}
           onMessage={() => onMessage?.(patient._id)}
           onRevoir={() => onRevoir?.(patient._id)}
-          onOrdonnance={() => onOrdonnance?.(patient._id)}
+          onOrdonnance={() => setIsPrescriptionOpen(true)}
         />
       </div>
+
+      <CreatePrescriptionModal
+        isOpen={isPrescriptionOpen}
+        onClose={() => setIsPrescriptionOpen(false)}
+        patientId={patient._id}
+        patientName={patientFullName}
+        onSuccess={() => {
+          // Optionnel : toast de succès, ou refresh de la liste patients
+        }}
+      />
 
     </div>
   );

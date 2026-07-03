@@ -20,6 +20,7 @@ import type {
 export interface DoctorFilters {
   specialty?: string;
   city?: string;
+  district?: string;
   isAvailable?: boolean;
   consultationType?: "video" | "audio" | "chat";
   minRating?: number;
@@ -215,24 +216,36 @@ export const doctorService = {
     return res.data;
   },
 
-  /**
-   * Mettre à jour mon profil
-   * PATCH /doctor/(auth)/[id]/profile
-   */
-  async updateMyProfile(data: Partial<DoctorProfile>): Promise<DoctorUser> {
-    const { user } = useAuthStore.getState();
-    if (!user) throw new Error("Non authentifié.");
-    const res = await api.put<ApiResponse<DoctorUser>>(
-      `/doctor/${user._id}/profile`,
-      data
-    );
-    useAuthStore.getState().updateDoctorProfile(data);
-    return res.data;
-  },
+/**
+ * Mettre à jour mon profil
+ * PUT /doctor/(auth)/[id]/profile
+ */
+async updateMyProfile(data: Partial<DoctorProfile>): Promise<DoctorUser> {
+  const { user } = useAuthStore.getState();
+  console.log("📤 Service - Envoi des données:", data);
+  if (!user) throw new Error("Non authentifié.");
+  
+  const res = await api.put<ApiResponse<DoctorUser>>(
+    `/doctor/${user._id}/profile`,
+    data
+  );
+  console.log("📥 Service - Réponse du serveur:", res.data);
+
+  const updatedDoctor = res.data;
+  
+  // ✅ Mettre à jour le store
+  useAuthStore.getState().updateDoctorProfile(updatedDoctor.profile);
+  
+  // ✅ Vérifier que le store est bien mis à jour
+  const updatedUser = useAuthStore.getState().user;
+  console.log("👤 Store après mise à jour:", updatedUser?.profile);
+  
+  return updatedDoctor;
+},
 
   /**
    * Mettre à jour les paramètres de télémédecine
-   * PATCH /doctor/(auth)/telemedicine
+   * PUT /doctor/(auth)/telemedicine
    */
   async updateTelemedicine(data: Partial<DoctorTelemedicine>): Promise<DoctorUser> {
     const { user } = useAuthStore.getState();
@@ -241,7 +254,7 @@ export const doctorService = {
       `/doctor/${user._id}/telemedicine`,
       data
     );
-    useAuthStore.getState().updateTelemedicine(data);
+    useAuthStore.getState().updateTelemedicine(res.data.telemedicine);
     return res.data;
   },
 

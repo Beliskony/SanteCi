@@ -18,6 +18,32 @@ export interface DoctorStats {
   newPatients: number;          // 7 derniers jours
 }
 
+export interface UpdateProfileDTO {
+  firstName?: string;
+  lastName?: string;
+  title?: 'Dr' | 'Pr' | 'Médecin' | 'Spécialiste';
+  specialty?: string;
+  bio?: string;
+  languages?: Array<'fr' | 'en'>;
+  yearsOfExperience?: number;
+  city?: string;
+  district?: string;
+  address?: string;
+  phone?: string;
+  emergencyContact?: string;
+}
+
+export interface UpdateSubscriptionDTO {
+  subscription: 'free' | 'premium' | 'elite';
+  expiryDate?: Date;
+}
+
+export interface UpdateCoordinatesDTO {
+  latitude: number;
+  longitude: number;
+}
+
+
 // ─── State ────────────────────────────────────────────────────────────────────
 
 interface DoctorDashState {
@@ -39,6 +65,8 @@ interface DoctorDashState {
   removeCertification: (certId: string)                 => Promise<void>;
   deleteAccount:       ()                               => Promise<void>;
 
+  updateSubscription:      (data: UpdateSubscriptionDTO)       => Promise<void>;
+  updateCoordinates:       (coordinates: UpdateCoordinatesDTO) => Promise<void>;
   // ── Actions stats ─────────────────────────────────────────
   fetchStats: (doctorId: string) => Promise<void>;
 
@@ -85,6 +113,7 @@ export const useDoctorDashStore = create<DoctorDashState>()(
         try {
           const doctor = await doctorService.getMyProfile();
           useAuthStore.getState().updateDoctorProfile(doctor.profile);
+          useAuthStore.getState().updateTelemedicine(doctor.telemedicine);
         } catch (err) {
           set({ error: toMessage(err) });
         } finally {
@@ -93,12 +122,13 @@ export const useDoctorDashStore = create<DoctorDashState>()(
       },
 
       // ── updateMyProfile ───────────────────────────────────────────────────
-      updateMyProfile: async (data) => {
+      updateMyProfile: async (data: UpdateProfileDTO) => {
         set({ isSaving: true, error: null });
         try {
           const updated = await doctorService.updateMyProfile(data);
           // doctorService sync useAuthStore.updateDoctorProfile en interne
           useAuthStore.getState().updateDoctorProfile(updated.profile);
+          
         } catch (err) {
           set({ error: toMessage(err) });
           throw err;

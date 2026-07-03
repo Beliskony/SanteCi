@@ -9,6 +9,7 @@ import { devtools }   from "zustand/middleware";
 import { io, Socket } from "socket.io-client";
 import { useCallStore }  from "@/app/frontend/store/callStore";
 import { useAuthStore }  from "@/app/frontend/store/useAuthStore";
+import { useChatStore } from "./chatStore";
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -57,7 +58,7 @@ export const useSocketStore = create<SocketState>()(
         if (!user) return;
 
         const raw      = user._id;
-        const userId   = typeof raw === "string" ? raw : raw.toString();
+        const userId   = typeof raw === "string" ? raw : raw;
         const userType = user.role as "doctor" | "patient";
 
         const socket = io({
@@ -135,6 +136,36 @@ export const useSocketStore = create<SocketState>()(
         socket.on("call:tokens", (payload: any) => {
           console.log("[Socket] call:tokens rafraîchis");
           callStore.onTokensRefreshed(payload);
+        });
+
+        // ── Nouveaux messages en temps réel ─────────────
+        socket.on("new_message", (message: any) => {
+          console.log("[Socket] new_message reçu :", message);
+          useChatStore.getState().receiveMessage(message);
+        });
+
+        // ── Statuts de lecture/livraison en temps réel ──────
+        socket.on("message:delivered", (payload: { messageId: string; chatRoomId: string }) => {
+          console.log("[Socket] message:delivered", payload);
+          useChatStore.getState().markMessageDeliveredLocally(payload.messageId);
+        });
+
+        socket.on("message:read", (payload: { messageId: string; chatRoomId: string }) => {
+          console.log("[Socket] message:read", payload);
+          useChatStore.getState().markMessageReadLocally(payload.messageId);
+        });
+
+        socket.on("messages:read", (payload: { chatRoomId: string; readBy: string }) => {
+          console.log("[Socket] messages:read", payload);
+          useChatStore.getState().markRoomMessagesReadLocally(payload.chatRoomId);
+        });
+ 
+        // ── Présence en ligne ──────────────────────────────
+        socket.on("user:online",  ({ userId: uid }: any) => {
+          useChatStore.getState().setInterlocutorOnline(uid, true);
+        });
+        socket.on("user:offline", ({ userId: uid }: any) => {
+          useChatStore.getState().setInterlocutorOnline(uid, false);
         });
 
         set({ socket });

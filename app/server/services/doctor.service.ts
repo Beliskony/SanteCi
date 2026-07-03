@@ -16,8 +16,14 @@ interface UpdateProfileDTO {
   lastName?: string;
   title?: 'Dr' | 'Pr' | 'Médecin' | 'Spécialiste';
   specialty?: string;
+  bio?: string;
+  languages?: Array<'fr' | 'en'>;
+  yearsOfExperience?: number;
   city?: string;
+  district?: string;
+  address?: string;
   phone?: string;
+  emergencyContact?: string;
 }
 
 interface UpdateTelemedicineDTO {
@@ -44,12 +50,82 @@ interface AddCertificationDTO {
 interface DoctorFilters {
   specialty?: string;
   city?: string;
+  district?: string;
   isAvailable?: boolean;
   consultationType?: 'video' | 'audio' | 'chat';
   minRating?: number;
   page?: number;
   limit?: number;
 }
+
+// ─── Types pour les clés de mise à jour ────────────────────────────────────
+
+type ProfileUpdateKey = 
+  | 'profile.firstName'
+  | 'profile.lastName'
+  | 'profile.title'
+  | 'profile.specialty'
+  | 'profile.bio'
+  | 'profile.languages'
+  | 'profile.yearsOfExperience'
+  | 'profile.photo';
+
+type LocationUpdateKey =
+  | 'location.city'
+  | 'location.district'
+  | 'location.address'
+  | 'location.coordinates'
+  | 'location.consultationRadius';
+
+type ContactUpdateKey =
+  | 'contact.phone'
+  | 'contact.phoneVerified'
+  | 'contact.emergencyContact';
+
+type TelemedicineUpdateKey =
+  | 'telemedicine.isAvailable'
+  | 'telemedicine.consultationTypes'
+  | 'telemedicine.consultationFees.video'
+  | 'telemedicine.consultationFees.audio'
+  | 'telemedicine.consultationFees.chat'
+  | 'telemedicine.availability';
+
+type StatusUpdateKey =
+  | 'status.subscription'
+  | 'status.subscriptionExpiry'
+  | 'status.isOnline'
+  | 'status.lastActive'
+  | 'status.accountStatus';
+
+type UpdateData = {
+  [K in ProfileUpdateKey]?: K extends 'profile.languages' ? Array<'fr' | 'en'> :
+    K extends 'profile.yearsOfExperience' ? number :
+    K extends 'profile.title' ? 'Dr' | 'Pr' | 'Médecin' | 'Spécialiste' :
+    string;
+} & {
+  [K in LocationUpdateKey]?: K extends 'location.coordinates' ? { latitude: number; longitude: number } | null :
+    K extends 'location.consultationRadius' ? number :
+    string;
+} & {
+  [K in ContactUpdateKey]?: K extends 'contact.phoneVerified' ? boolean :
+    string;
+} & {
+  [K in TelemedicineUpdateKey]?: K extends 'telemedicine.consultationFees.video' ? number :
+    K extends 'telemedicine.consultationFees.audio' ? number :
+    K extends 'telemedicine.consultationFees.chat' ? number :
+    K extends 'telemedicine.consultationTypes' ? Array<'video' | 'audio' | 'chat'> :
+    K extends 'telemedicine.availability' ? Array<{
+      day: string;
+      slots: Array<{ start: string; end: string; isBooked?: boolean }>;
+    }> :
+    boolean;
+} & {
+  [K in StatusUpdateKey]?: K extends 'status.subscription' ? 'free' | 'premium' | 'elite' :
+    K extends 'status.subscriptionExpiry' ? Date | null :
+    K extends 'status.isOnline' ? boolean :
+    K extends 'status.lastActive' ? Date :
+    'active' | 'pending' | 'suspended' | 'blocked';
+};
 
 // ─── Doctor Service ──────────────────────────────────────────────────────────
 
@@ -70,7 +146,7 @@ class DoctorService {
 
   async getDoctorPublicProfile(id: string): Promise<Partial<IDoctor>> {
     const doctor = await Doctor.findById(id)
-      .select('doctorId profile professional.certifications contact.phone contact.email telemedicine location status.isVerified status.isOnline analytics.patientSatisfaction analytics.totalConsultations')
+      .select('doctorId profile professional.certifications contact.phone contact.email contact.emergencyContact telemedicine location status.isVerified status.isOnline analytics.patientSatisfaction analytics.totalConsultations')
       .lean();
 
     if (!doctor) throw new Error('Médecin introuvable.');
@@ -86,7 +162,12 @@ class DoctorService {
     if (dto.lastName) updateFields['profile.lastName'] = dto.lastName;
     if (dto.title) updateFields['profile.title'] = dto.title;
     if (dto.specialty) updateFields['profile.specialty'] = dto.specialty;
+    if (dto.bio !== undefined) updateFields['profile.bio'] = dto.bio;
+    if (dto.languages) updateFields['profile.languages'] = dto.languages;
+    if (dto.yearsOfExperience !== undefined) updateFields['profile.yearsOfExperience'] = dto.yearsOfExperience;
     if (dto.city) updateFields['location.city'] = dto.city;
+    if (dto.district !== undefined) updateFields['location.district'] = dto.district;
+    if (dto.address !== undefined) updateFields['location.address'] = dto.address;
     if (dto.phone) {
       const exists = await Doctor.findOne({ 'contact.phone': dto.phone });
       if (exists && String(exists._id) !== doctorId) {
@@ -95,6 +176,11 @@ class DoctorService {
       updateFields['contact.phone'] = dto.phone;
       updateFields['contact.phoneVerified'] = false;
     }
+
+    if (dto.emergencyContact !== undefined) {
+      updateFields['contact.emergencyContact'] = dto.emergencyContact;
+    }
+
 
     const updated = await Doctor.findByIdAndUpdate(
       doctorId,
@@ -144,11 +230,16 @@ async updatePhoto(doctorId: string, buffer: Buffer): Promise<{ photoUrl: string 
     }
     if (dto.availability) updateFields['telemedicine.availability'] = dto.availability;
 
+  console.log('DB name:', Doctor.db.name);
+  console.log('Doctor _id ciblé:', doctorId);
+  console.log('updateFields:', JSON.stringify(updateFields));
+
     const updated = await Doctor.findByIdAndUpdate(
       doctorId,
       { $set: updateFields },
       { new: true }
     ).select('-security.password');
+     console.log('Résultat après update:', JSON.stringify(updated?.telemedicine));
 
     if (!updated) throw new Error('Médecin introuvable.');
     return updated;
@@ -188,7 +279,7 @@ async updatePhoto(doctorId: string, buffer: Buffer): Promise<{ photoUrl: string 
     page: number;
     pages: number;
   }> {
-    const { specialty, city, isAvailable, consultationType, minRating, page = 1, limit = 10 } = filters;
+    const { specialty, city, district, isAvailable, consultationType, minRating, page = 1, limit = 10 } = filters;
 
     const query: QueryFilter<IDoctor> = {
       'status.accountStatus': 'active',
@@ -197,6 +288,7 @@ async updatePhoto(doctorId: string, buffer: Buffer): Promise<{ photoUrl: string 
 
     if (specialty) query['profile.specialty'] = { $regex: specialty, $options: 'i' };
     if (city) query['location.city'] = { $regex: city, $options: 'i' };
+    if (district) query['location.district'] = { $regex: district, $options: 'i' };
     if (isAvailable !== undefined) query['telemedicine.isAvailable'] = isAvailable;
     if (consultationType) query['telemedicine.consultationTypes'] = consultationType;
     if (minRating) query['telemedicine.rating'] = { $gte: minRating };
@@ -218,6 +310,28 @@ async updatePhoto(doctorId: string, buffer: Buffer): Promise<{ photoUrl: string 
       pages: Math.ceil(total / limit),
     };
   }
+
+  // ── Update subscription ──────────────────────────────────────────────────────
+
+async updateSubscription(
+  doctorId: string,
+  subscription: 'free' | 'premium' | 'elite',
+  expiryDate?: Date
+  ): Promise<{ message: string }> {
+  const updateData: Record<string, unknown> = {
+    'status.subscription': subscription
+  };
+
+  if (expiryDate) {
+    updateData['status.subscriptionExpiry'] = expiryDate;
+  }
+
+  await Doctor.findByIdAndUpdate(doctorId, {
+    $set: updateData
+  });
+
+  return { message: `Abonnement mis à jour : ${subscription}` };
+}
 
 
   // ── Get my patients — annuaire patient du médecin connecté ────────────────

@@ -1,107 +1,150 @@
 "use client";
 
 import { useState } from "react";
-import { Lock, Loader2 } from "lucide-react";
-
-type PaymentMethod = "wave";
+import { Lock, Loader2, CreditCard } from "lucide-react";
+import type { PaymentProvider } from "@/app/frontend/services/paymentService";
 
 interface PaymentFormProps {
-  totalAmount: number;
-  onSubmit:    (method: PaymentMethod, phone?: string) => Promise<void>;
-  isLoading:   boolean;
-  error?:      string | null;
+  amount:    number;
+  onSubmit:  (provider: PaymentProvider, contact: string) => Promise<void>;
+  isLoading: boolean;
+  error?:    string | null;
 }
 
-function WaveLogo() {
+const fmt = (n: number) => {
+  if (n === undefined || n === null || typeof n !== 'number' || isNaN(n)) {
+    return "0 FCFA";
+  }
+  return n.toLocaleString("fr-FR") + " FCFA";
+};
+const PLATFORM_RATE = 0.30;
+
+export function PaymentForm({ amount, onSubmit, isLoading, error }: PaymentFormProps) {
+  const [provider, setProvider] = useState<PaymentProvider>("wave");
+  const [contact,  setContact]  = useState("");
+
+  const platformFee = Math.round(amount * PLATFORM_RATE);
+
+  const isValid = provider === "wave"
+    ? contact.replace(/\s/g, "").length >= 8
+    : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact);
+
   return (
-    <div className="w-7 h-7 rounded-full bg-[#00b9f1] flex items-center justify-center shrink-0">
-      <img src="/wavelogo.png" alt="Wave" className="w-4 h-4 rounded-full" />
-    </div>
-  );
-}
-
-export function PaymentForm({ totalAmount, onSubmit, isLoading, error }: PaymentFormProps) {
-  const [phone, setPhone] = useState("");
-
-  const isPhoneValid = phone.replace(/\s/g, "").length >= 8;
-
-  const handleSubmit = async () => {
-    if (!isPhoneValid || isLoading) return;
-    await onSubmit("wave", phone);
-  };
-
-  return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col gap-6">
+    <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col gap-5">
       <div>
         <h2 className="text-base font-bold text-slate-900">Paiement de la consultation</h2>
-        <p className="text-xs text-slate-400 mt-0.5">Réservation sécurisée via Wave</p>
+        <p className="text-xs text-slate-400 mt-0.5">Paiement sécurisé · Côte d'Ivoire</p>
       </div>
 
-      {/* Récapitulatif montant */}
+      {/* Récap montant */}
       <div className="bg-slate-50 rounded-xl p-4 flex flex-col gap-2 text-sm">
         <div className="flex justify-between text-slate-600">
           <span>Consultation</span>
-          <span className="font-medium">{(totalAmount - 500).toLocaleString("fr-FR")} FCFA</span>
+          <span className="font-medium text-slate-800">{fmt(amount)}</span>
         </div>
-        <div className="flex justify-between text-slate-600">
-          <span>Frais de service SantéCI</span>
-          <span className="font-medium">500 FCFA</span>
-        </div>
-        <div className="flex justify-between font-bold text-slate-900 pt-2 border-t border-slate-200 mt-1">
+        <div className="flex justify-between font-bold text-slate-900 pt-2 border-t border-slate-200 mt-1 text-base">
           <span>Total à payer</span>
-          <span className="text-[#1e3a8a] text-base">{totalAmount.toLocaleString("fr-FR")} FCFA</span>
+          <span className="text-[#1e3a8a]">{fmt(amount)}</span>
         </div>
       </div>
 
-      {/* Wave — moyen de paiement unique */}
-      <div className="flex items-center gap-3 p-4 rounded-xl border-2 border-[#00b9f1] bg-cyan-50/40">
-        <WaveLogo />
-        <div>
-          <p className="text-sm font-semibold text-slate-900">Wave</p>
-          <p className="text-xs text-slate-400">Paiement mobile instantané</p>
-        </div>
-      </div>
-
-      {/* Numéro de téléphone */}
+      {/* Sélection provider */}
       <div className="flex flex-col gap-2">
-        <label className="text-sm font-semibold text-slate-700">
-          Numéro Wave de facturation
-        </label>
-        <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden focus-within:border-[#00b9f1] focus-within:ring-1 focus-within:ring-[#00b9f1]/20 transition-all">
-          <span className="px-3 py-3 text-sm text-slate-500 bg-slate-50 border-r border-slate-200 font-medium shrink-0">
-            +225
-          </span>
-          <input
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="07 45 12 89 33"
-            className="flex-1 px-3 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none bg-white"
-          />
+        <p className="text-sm font-semibold text-slate-700">Moyen de paiement</p>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => { setProvider("wave"); setContact(""); }}
+            className={`flex items-center gap-2.5 p-3.5 rounded-xl border-2 transition-all ${
+              provider === "wave"
+                ? "border-[#00b9f1] bg-cyan-50/40"
+                : "border-slate-200 hover:border-slate-300"
+            }`}
+          >
+            <div className="w-7 h-7 rounded-full bg-[#00b9f1] flex items-center justify-center shrink-0">
+              <img src="/wavelogo.png" alt="Wave" className="w-4 h-4 rounded-full" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-slate-900">Wave</p>
+              <p className="text-[10px] text-slate-400">Mobile Money</p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => { setProvider("stripe"); setContact(""); }}
+            className={`flex items-center gap-2.5 p-3.5 rounded-xl border-2 transition-all ${
+              provider === "stripe"
+                ? "border-[#635bff] bg-indigo-50/40"
+                : "border-slate-200 hover:border-slate-300"
+            }`}
+          >
+            <div className="w-7 h-7 rounded-full bg-[#635bff] flex items-center justify-center shrink-0">
+              <CreditCard size={14} className="text-white" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-slate-900">Stripe</p>
+              <p className="text-[10px] text-slate-400">Carte bancaire</p>
+            </div>
+          </button>
         </div>
-        <p className="text-xs text-slate-400">
-          Vous recevrez un prompt Wave sur ce numéro pour valider le paiement.
-        </p>
       </div>
 
-      {/* Erreur */}
+      {/* Champ adaptatif */}
+      <div className="flex flex-col gap-2">
+        {provider === "wave" ? (
+          <>
+            <label className="text-sm font-semibold text-slate-700">Numéro Wave</label>
+            <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden focus-within:border-[#00b9f1] focus-within:ring-1 focus-within:ring-[#00b9f1]/20 transition-all">
+              <span className="px-3 py-3 text-sm text-slate-500 bg-slate-50 border-r border-slate-200 font-medium shrink-0">
+                +225
+              </span>
+              <input
+                type="tel"
+                value={contact}
+                onChange={(e) => setContact(e.target.value)}
+                placeholder="07 45 12 89 33"
+                className="flex-1 px-3 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none bg-white"
+              />
+            </div>
+            <p className="text-xs text-slate-400">
+              Vous recevrez un prompt Wave sur ce numéro pour valider le paiement.
+            </p>
+          </>
+        ) : (
+          <>
+            <label className="text-sm font-semibold text-slate-700">Adresse e-mail</label>
+            <input
+              type="email"
+              value={contact}
+              onChange={(e) => setContact(e.target.value)}
+              placeholder="vous@example.com"
+              className="w-full px-3 py-3 text-sm text-slate-800 placeholder:text-slate-400 border border-slate-200 rounded-xl focus:outline-none focus:border-[#635bff] focus:ring-1 focus:ring-[#635bff]/20 transition-all"
+            />
+            <p className="text-xs text-slate-400">
+              Vous serez redirigé vers la page de paiement Stripe sécurisée.
+            </p>
+          </>
+        )}
+      </div>
+
       {error && (
         <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-xs text-red-600 font-medium">
           {error}
         </div>
       )}
 
-      {/* Bouton paiement */}
       <button
-        onClick={handleSubmit}
-        disabled={!isPhoneValid || isLoading}
-        className="w-full py-3.5 bg-[#00b9f1] text-white text-sm font-bold rounded-xl hover:bg-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 shadow-sm"
+        onClick={() => isValid && !isLoading && onSubmit(provider, contact)}
+        disabled={!isValid || isLoading}
+        className={`w-full py-3.5 text-white text-sm font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 shadow-sm ${
+          provider === "wave"
+            ? "bg-[#00b9f1] hover:bg-cyan-500"
+            : "bg-[#635bff] hover:bg-indigo-500"
+        }`}
       >
-        {isLoading ? (
-          <><Loader2 size={16} className="animate-spin" /> Traitement en cours...</>
-        ) : (
-          <><Lock size={14} /> Payer {totalAmount.toLocaleString("fr-FR")} FCFA via Wave</>
-        )}
+        {isLoading
+          ? <><Loader2 size={16} className="animate-spin" /> Traitement en cours...</>
+          : <><Lock size={14} /> Payer {fmt(amount)} via {provider === "wave" ? "Wave" : "Stripe"}</>
+        }
       </button>
     </div>
   );

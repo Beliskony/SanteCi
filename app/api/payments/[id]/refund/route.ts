@@ -1,5 +1,5 @@
-// app/api/payments/[appointmentId]/refund/route.ts
-// POST /api/payments/[appointmentId]/refund — rembourser
+// app/api/payments/[id]/refund/route.ts
+// POST /api/payments/[id]/refund — rembourser
 import { NextRequest, NextResponse } from 'next/server';
 import { paymentService } from '@/app/server/services/payment.service';
 import { getAuthUser } from '@/app/server/middleware/auth.middleware';

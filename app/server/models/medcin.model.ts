@@ -11,6 +11,13 @@ const DoctorSchema: Schema = new Schema({
     title: { type: String, enum: ['Dr', 'Pr', 'Médecin', 'Spécialiste'], required: true },
     specialty: { type: String, enum: ['Cardiologie', 'Pédiatrie', 'Généraliste', 'Dermatologie', 'Psychiatrie', 'Gynécologie', 'autres...'], required: true },
     photo:     { type: String, default: null },
+    bio: { type: String, default: '' },
+    languages: { 
+      type: [String], 
+      enum: ['fr', 'en'], 
+      default: ['fr'] 
+    },
+    yearsOfExperience: { type: Number, default: 0, min: 0 },
   },
   professional: {
     licenseNumber: { type: String, required: true },
@@ -29,6 +36,7 @@ const DoctorSchema: Schema = new Schema({
     phoneVerified: { type: Boolean, default: false },
     email: { type: String, required: true, unique:true},
     emailVerified:{type:Boolean,default:false},
+    emergencyContact: { type: String, default: '' },
   },
   telemedicine: {
     isAvailable: { type: Boolean, default: false },
@@ -52,6 +60,13 @@ const DoctorSchema: Schema = new Schema({
   },
   location: {
     city: { type: String, required: true },
+    district: { type: String, default: '' },
+    address: { type: String, default: '' },
+    coordinates: {
+      latitude: { type: Number },
+      longitude: { type: Number },
+    },
+    consultationRadius: { type: Number, default: 0, min: 0 },
   },
   affiliations: {
     hospitals: [{ type: Schema.Types.ObjectId, ref: 'Hospital' }],
@@ -64,6 +79,7 @@ const DoctorSchema: Schema = new Schema({
     lastActive: { type: Date },
     accountStatus: { type: String, enum: ['active', 'pending', 'suspended', 'blocked'], default: 'pending' },
     subscription: { type: String, enum: ['free', 'premium', 'elite'], default: 'free' },
+    subscriptionExpiry: { type: Date, default: null },
   },
   analytics: {
     totalPatients: { type: Number, default: 0 },

@@ -13,7 +13,10 @@ export default function DoctorProfileHeader({ doctor }: DoctorProfileHeaderProps
   const rating = telemedicine?.rating ?? 0
   const totalConsultations = analytics?.totalConsultations ?? 0
   const isVerified = status?.isVerified ?? false
-  const languages = profile?.languages === "fr" ? "Français" : profile?.languages === "en" ? "Anglais" : "Français, Anglais"
+  const languages = profile?.languages?.includes('fr') && profile?.languages?.includes('en') 
+    ? "Français, Anglais" : profile?.languages?.includes('fr') ? "Français" 
+    : profile?.languages?.includes('en') ? "Anglais" : "Non spécifié";
+    
   const experience = profile?.yearsOfExperience ?? 0
 
   return (
@@ -62,7 +65,7 @@ export default function DoctorProfileHeader({ doctor }: DoctorProfileHeaderProps
             </span>
             <span className="flex items-center gap-1.5 text-xs text-slate-500">
               <Briefcase size={14} className="text-slate-400" />
-              {experience} ans d&apos;expérience
+              {experience} &nbsp;ans d&apos;expérience
             </span>
           </div>
 

@@ -41,12 +41,16 @@ interface BackendUser {
     title?: string;
     specialty?: string;
     photo?: string;
+    bio?: string;
+    languages?: string[] | string;
+    yearsOfExperience?: number;
   };
   contact?: {
     phone?: string;
     phoneVerified?: boolean;
     email?: string;
     emailVerified?: boolean;
+    emergencyContact?: string;
   };
   location?: {
     city?: string;
@@ -82,6 +86,7 @@ interface BackendUser {
     accountStatus?: string;
     isOnline?: boolean;
     subscription?: string;
+    subscriptionExpiry?: string;
     lastActive?: string;
   };
 }
@@ -128,10 +133,22 @@ function mapToAuthUser(backendUser: BackendUser): AuthUser {
     : typeof (backendUser._id as any)?.$oid === "string" ? (backendUser._id as any).$oid
     : backendUser._id ?? "";
 
+
   if (backendUser.role === "doctor") {
     const loc = backendUser.location;
     const pro = backendUser.professional;
     const tel = backendUser.telemedicine;
+    const prof = backendUser.profile;
+    const status = backendUser.status;
+
+  let languages: Array<'fr' | 'en'> = ['fr'];
+    if (prof?.languages) {
+      if (Array.isArray(prof.languages)) {
+        languages = prof.languages as Array<'fr' | 'en'>;
+      } else if (typeof prof.languages === 'string') {
+        languages = prof.languages.split(',').map(l => l.trim() as 'fr' | 'en');
+      }
+    }
 
     return {
       _id: id,
@@ -142,9 +159,9 @@ function mapToAuthUser(backendUser: BackendUser): AuthUser {
         lastName:         backendUser.profile?.lastName  ?? "",
         title:            (backendUser.profile?.title as any) ?? "Dr",
         specialty:        backendUser.profile?.specialty ?? "",
-        bio:              "",
-        languages:        "fr",
-        yearsOfExperience: 0,
+        bio:              prof?.bio ?? "",
+        languages:        languages,
+        yearsOfExperience: prof?.yearsOfExperience ?? 0,
         photo:            backendUser.profile?.photo,
       },
       contact: {
@@ -152,6 +169,7 @@ function mapToAuthUser(backendUser: BackendUser): AuthUser {
         phoneVerified: backendUser.contact?.phoneVerified ?? false,
         email:         backendUser.contact?.email         ?? "",
         emailVerified: backendUser.contact?.emailVerified ?? false,
+        emergencyContact: backendUser.contact?.emergencyContact ?? "",
       },
       location: {
         city:        loc?.city        ?? "",
@@ -181,6 +199,7 @@ function mapToAuthUser(backendUser: BackendUser): AuthUser {
         isVerified:     backendUser.status?.isVerified     ?? false,
         accountStatus:  (backendUser.status?.accountStatus as any) ?? "active",
         subscription:   (backendUser.status?.subscription as any)  ?? "free",
+        subscriptionExpiry: status?.subscriptionExpiry ? new Date(status.subscriptionExpiry): new Date,
         isOnline:       backendUser.status?.isOnline       ?? false,
         lastActive:     backendUser.status?.lastActive ? new Date(backendUser.status.lastActive) : new Date(),
       },

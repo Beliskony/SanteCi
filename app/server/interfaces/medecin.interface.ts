@@ -104,7 +104,6 @@ export interface IDoctor extends Document {
   security: {
     password: string;
     isMedcin: boolean;
-    username?: string; // Optionnel
     twoFactorEnabled: boolean;
     devices: Array<{
       deviceId: string;

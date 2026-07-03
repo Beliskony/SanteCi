@@ -19,6 +19,7 @@ const FOLDERS = {
   hospitalCovers:  'hospitals/covers',
   profilePhotos:   'profile_photos',
   documents:       'documents',
+  audioMessages:   'audio_messages'
 } as const;
 
 type CloudinaryFolder = typeof FOLDERS[keyof typeof FOLDERS];
@@ -61,6 +62,9 @@ function resolveTransformation(target: UploadTarget): object | undefined {
       return undefined;
   }
 }
+
+
+
 
 // ─── Service ───────────────────────────────────────────────────────────────────
 
@@ -208,6 +212,26 @@ class CloudinaryService {
     if (result.result !== 'ok' && result.result !== 'not found') {
       throw new Error(`Échec de la suppression Cloudinary : ${result.result}`);
     }
+  }
+
+    // ── ✅ NOUVEAU : Upload message vocal ──────────────────────────────────────
+  async uploadAudio(buffer: Buffer, publicId?: string): Promise<CloudinaryUploadResult> {
+    const result = await new Promise<UploadApiResponse>((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder:        FOLDERS.audioMessages,
+          public_id:     publicId,
+          resource_type: 'video',   // Cloudinary classe audio sous "video"
+          overwrite:     false,
+        },
+        (error, res) => {
+          if (error || !res) return reject(error ?? new Error('Upload audio échoué.'));
+          resolve(res);
+        }
+      );
+      stream.end(buffer);
+    });
+    return { url: result.secure_url, publicId: result.public_id };
   }
 
   /**

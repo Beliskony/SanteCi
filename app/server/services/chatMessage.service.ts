@@ -5,6 +5,7 @@ import { notificationService } from './notification.service';
 import { Doctor } from '../models/medcin.model';
 import { Patient } from '../models/patient.model';
 import { IChatMessage } from '../interfaces/chatMessage.interface';
+import { emitToUser } from './socketRegistry';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -65,11 +66,6 @@ class ChatMessageService {
       if (appointment.communication.chatRoomId !== dto.chatRoomId) {
         throw new Error('Room de chat invalide pour ce rendez-vous.');
       }
-
-      const allowedStatuses = ['confirmed', 'ongoing'];
-      if (!allowedStatuses.includes(appointment.status.current)) {
-        throw new Error('Les messages ne sont autorisés que pour les rendez-vous confirmés ou en cours.');
-      }
     }
 
     if (['image', 'file', 'audio', 'video'].includes(dto.messageType) && !dto.file) {
@@ -94,6 +90,9 @@ class ChatMessageService {
         deletedFor: [],
       },
     });
+
+    //Emission en temps reel vers destinataire
+    emitToUser(dto.receiverId, 'new_message', message)
 
     // ── Notification au destinataire ──────────────────────────────────────────
 try {
@@ -177,6 +176,12 @@ try {
     );
 
     if (!message) throw new Error('Message introuvable.');
+
+    // ── Notifier l'expéditeur : son message a été livré ───────────────────
+    emitToUser(String(message.senderId), 'message:delivered', {
+      messageId:  String(message._id),
+      chatRoomId: message.chatRoomId,
+    });
     return message;
   }
 
@@ -195,12 +200,24 @@ try {
     message.metadata.updatedAt = new Date();
     await message.save();
 
+    // ── Notifier l'expéditeur : son message a été lu ──────────────────────
+    emitToUser(String(message.senderId), 'message:read', {
+      messageId:  String(message._id),
+      chatRoomId: message.chatRoomId,
+    });
+
     return message;
   }
 
   // ── Mark all messages in a room as read ────────────────────────────────────
 
   async markAllRead(chatRoomId: string, receiverId: string): Promise<{ updated: number }> {
+    const unreadMessages = await ChatMessage.find({
+      chatRoomId,
+      receiverId:    new Types.ObjectId(receiverId),
+      'status.read': false,
+    }).select('senderId');
+
     const result = await ChatMessage.updateMany(
       {
         chatRoomId,
@@ -217,6 +234,12 @@ try {
         },
       }
     );
+
+    // ── Notifier chaque expéditeur concerné (déduplication via Set) ───────
+    const senderIds = new Set(unreadMessages.map((m) => String(m.senderId)));
+    senderIds.forEach((senderId) => {
+      emitToUser(senderId, 'messages:read', { chatRoomId, readBy: receiverId });
+    });
 
     return { updated: result.modifiedCount };
   }

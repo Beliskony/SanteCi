@@ -14,6 +14,9 @@ const ProfileSchema = z.object({
     'Dermatologie', 'Psychiatrie', 'Gynécologie', 'autres...',
   ]),
   photo:     z.string().nullable().optional(), 
+  bio:       z.string().default(''),
+  languages: z.array(z.enum(['fr', 'en'])).default(['fr']),
+  yearsOfExperience: z.number().int().min(0).default(0),
 });
 
 const CertificationSchema = z.object({
@@ -36,6 +39,7 @@ const ContactSchema = z.object({
   phoneVerified: z.boolean().default(false),
   email:         z.string().email(),
   emailVerified: z.boolean().default(false),
+  emergencyContact: z.string().optional().default(''),
 });
 
 const ConsultationFeesSchema = z.object({
@@ -72,6 +76,13 @@ const TelemedicineSchema = z.object({
 
 const LocationSchema = z.object({
   city: z.string().min(1),
+  district: z.string().optional().default(''),
+  address: z.string().optional().default(''),
+  coordinates: z.object({
+    latitude: z.number(),
+    longitude: z.number(),
+  }).nullable().optional().default(null),
+  consultationRadius: z.number().min(0).default(0),
 });
 
 const AffiliationsSchema = z.object({
@@ -86,6 +97,7 @@ const StatusSchema = z.object({
   lastActive:     z.date().optional(),
   accountStatus:  z.enum(['active', 'pending', 'suspended', 'blocked']).default('pending'),
   subscription:   z.enum(['free', 'premium', 'elite']).default('free'),
+  subscriptionExpiry: z.date().nullable().optional().default(null),
 });
 
 const AnalyticsSchema = z.object({
@@ -139,6 +151,7 @@ export const DoctorSchema = z.object({
     isOnline:      false,
     accountStatus: 'pending' as const,
     subscription:  'free'    as const,
+    subscriptionExpiry: null, 
   })),
   analytics:    AnalyticsSchema.default(() => ({
     totalPatients:       0,

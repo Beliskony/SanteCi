@@ -15,7 +15,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import { useAuthStore, isDoctor } from "@/app/frontend/store/useAuthStore";
+import MessagerieLayoutDoc from "../messagesComponents/MessagerieLayoutDoc";
 import { authService } from "@/app/frontend/services/authService";
 import DocDash from "./TableauBord/DocDash";
 import AgendaPage from "./AgendaComponents/AgendaPage"
@@ -23,6 +23,7 @@ import COnsultationsPage from "./ConsultationComponents/ConsultationsPage";
 import PatHeader from "../patient/PatHeader";
 import PatientsPage from "./MesPatientsComponents/PatientsPage";
 import PerformancePage from "./RevenusEtStats/PerformancePage";
+import SettingsPage from "./parametres/SettingsPage";
 
 // ── Imports des pages ─────────────────────────────────────────
 // (à remplacer par tes vrais composants doctor)
@@ -64,9 +65,9 @@ const renderPage = (active: ActivePage, setActive: (key: ActivePage) => void) =>
     case "agenda":        return <AgendaPage />;                // <DocAgenda />
     case "consultations": return <COnsultationsPage />;         // <DocConsult />
     case "patients":      return <PatientsPage />;          // <DocPatients />
-    case "messagerie":    return <div>Messagerie</div>;            // <DocMessagerie />
+    case "messagerie":    return <MessagerieLayoutDoc />;            // <DocMessagerie />
     case "stats":         return <PerformancePage />;       // <DocStats />
-    case "parametres":    return <div>Paramètres</div>;            // <DocSettings />
+    case "parametres":    return <SettingsPage />;            // <DocSettings />
     default:              return <DocDash />;
   }
 };

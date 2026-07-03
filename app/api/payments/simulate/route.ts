@@ -1,12 +1,17 @@
 // app/api/payments/simulate/route.ts
-// POST /api/payments/simulate — simuler succès ou échec
+// DEV ONLY — à supprimer en prod
 import { NextRequest, NextResponse } from 'next/server';
-import { paymentService } from '@/app/server/services/payment.service';
-import { getAuthUser } from '@/app/server/middleware/auth.middleware';
-import { SimulatePaymentSchema } from '@/app/server/schemas/payment.schema';
 import connectDB from '@/app/server/config/databaseConnect';
+import { getAuthUser } from '@/app/server/middleware/auth.middleware';
+import { Appointment } from '@/app/server/models/appointement.model';
+import { SimulatePaymentSchema } from '@/app/server/schemas/payment.schema';
 
 export async function POST(req: NextRequest) {
+  // Bloquer en production
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ success: false, message: 'Non disponible en production.' }, { status: 403 });
+  }
+
   try {
     await connectDB();
 
@@ -15,39 +20,41 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: 'Non authentifié.' }, { status: 401 });
     }
 
-    if (authUser.role !== 'patient') {
-      return NextResponse.json(
-        { success: false, message: 'Accès non autorisé.' },
-        { status: 403 }
-      );
-    }
-
-    const body = await req.json();
+    const body   = await req.json();
     const parsed = SimulatePaymentSchema.safeParse(body);
-
     if (!parsed.success) {
-      return NextResponse.json(
-        { success: false, message: 'Données invalides.', errors: parsed.error.flatten().fieldErrors },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, errors: parsed.error.flatten().fieldErrors }, { status: 400 });
     }
 
     const { appointmentId, outcome } = parsed.data;
-    const patientId = String(authUser.data._id);
 
-    const result = outcome === 'success'
-      ? await paymentService.simulateSuccess(appointmentId, patientId)
-      : await paymentService.simulateFailure(appointmentId, patientId);
+    const appointment = await Appointment.findById(appointmentId);
+    if (!appointment) return NextResponse.json({ success: false, message: 'Rendez-vous introuvable.' }, { status: 404 });
 
-    return NextResponse.json({ success: true, data: result });
+    if (String(appointment.patientId) !== String(authUser.data._id)) {
+      return NextResponse.json({ success: false, message: 'Action non autorisée.' }, { status: 403 });
+    }
+
+    const newStatus = outcome === 'success' ? 'paid' : 'failed';
+    await Appointment.findByIdAndUpdate(appointmentId, {
+      $set: {
+        'status.paymentStatus': newStatus,
+        ...(outcome === 'success' ? { 'payment.paidAt': new Date() } : {}),
+        'metadata.updatedAt': new Date(),
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        appointmentId,
+        status: newStatus,
+        simulatedAt: new Date(),
+      },
+    });
 
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
-    let status = 500;
-    if (message === 'Rendez-vous introuvable.')   status = 404;
-    if (message === 'Action non autorisée.')      status = 403;
-    if (message.includes('déjà payé'))            status = 409;
-    if (message.includes('pas été initié'))       status = 422;
-    return NextResponse.json({ success: false, message }, { status });
+    return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }

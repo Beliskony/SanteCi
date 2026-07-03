@@ -161,13 +161,13 @@ export default function SlotPicker({ availability, selectedSlot, onSelectSlot }:
         </p>
       ) : (
         <div className="grid grid-cols-3 gap-2">
-          {freeSlots.map((slot) => {
+          {freeSlots.map((slot, slotIdx) => {
             const slotDateTime = `${realDate.toISOString().split('T')[0]}T${slot.start}`
             const isSelected = selectedSlot === slotDateTime
             
             return (
               <button
-                key={slot.start}
+                key={`${currentDay.day}-${slot.start}-${slotIdx}`}
                 onClick={() => onSelectSlot(slotDateTime)}
                 className={`py-2.5 rounded-lg text-sm font-medium transition-all duration-150 border
                   ${

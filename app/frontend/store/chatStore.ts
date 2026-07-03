@@ -110,6 +110,9 @@ interface ChatState {
   // ── WebSocket ─────────────────────────────────────────────
   receiveMessage:       (message: IChatMessage) => void;
   setInterlocutorOnline:(interlocutorId: string, isOnline: boolean) => void;
+  markMessageDeliveredLocally:  (messageId: string) => void;
+markMessageReadLocally:       (messageId: string) => void;
+markRoomMessagesReadLocally:  (chatRoomId: string) => void;
 
   // ── Utilitaires ───────────────────────────────────────────
   clearError: () => void;
@@ -352,6 +355,8 @@ export const useChatStore = create<ChatState>()(
           };
         });
       },
+
+      
 
       // ── setInterlocutorOnline (WebSocket presence) ────────
       // Appel : socket.on("user_online", ({ userId, isOnline }) => store.setInterlocutorOnline(userId, isOnline))

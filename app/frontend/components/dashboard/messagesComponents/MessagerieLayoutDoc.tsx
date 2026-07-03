@@ -2,25 +2,23 @@
 
 import { useEffect, useCallback } from "react";
 import { Phone } from "lucide-react";
-import { useChatStore }    from "@/app/frontend/store/chatStore";
-import { useAuthStore }    from "@/app/frontend/store/useAuthStore";
-import { useCallStore }    from "@/app/frontend/store/callStore";
-import { useSocketStore }  from "@/app/frontend/store/soketStore";
-import ConversationList    from "./ConversationList";
-import ConversationHeader  from "./ConversationHeader";
-import ConversationBody    from "./ConversationBody";
-import MessageInput        from "./MessageInput";
-import CallRoom            from "@/app/frontend/components/dashboard/callComponents/CallRoom";
+import { useChatStore }   from "@/app/frontend/store/chatStore";
+import { useAuthStore }   from "@/app/frontend/store/useAuthStore";
+import { useCallStore }   from "@/app/frontend/store/callStore";
+import { useSocketStore } from "@/app/frontend/store/soketStore";
+import ConversationList   from "@/app/frontend/components/dashboard/messagesComponents/ConversationList";
+import ConversationHeader from "@/app/frontend/components/dashboard/messagesComponents/ConversationHeader";
+import ConversationBody   from "@/app/frontend/components/dashboard/messagesComponents/ConversationBody";
+import MessageInput       from "@/app/frontend/components/dashboard/messagesComponents/MessageInput";
+import CallRoom           from "@/app/frontend/components/dashboard/callComponents/CallRoom";
 
-export default function MessagerieLayout() {
-  const { activeChatRoomId, activeInterlocutor, closeRoom, openRoom } = useChatStore();
+export default function MessagerieLayoutDoc() {
+  const { activeChatRoomId, activeInterlocutor, openRoom } = useChatStore();
   const user = useAuthStore((s) => s.user);
 
   const connect      = useSocketStore((s) => s.connect);
   const initiateCall = useSocketStore((s) => s.initiateCall);
-  const isConnected  = useSocketStore((s) => s.isConnected);
-
-  const phase = useCallStore((s) => s.phase);
+  const phase        = useCallStore((s) => s.phase);
 
   useEffect(() => {
     connect();
@@ -28,14 +26,9 @@ export default function MessagerieLayout() {
 
   const handleStartCall = useCallback((type: "audio" | "video") => {
     if (!user || !activeInterlocutor) return;
-
-    const callerId = typeof user._id === "string"
-      ? user._id
-      : user._id;
-
     initiateCall({
-      callerId,
-      callerType:    user.role as "doctor" | "patient",
+      callerId:      String(user._id),
+      callerType:    "doctor",           // ← doctor ici, patient dans l'autre layout
       receiverId:    activeInterlocutor._id,
       appointmentId: activeChatRoomId ?? "",
       callType:      type,
@@ -46,13 +39,7 @@ export default function MessagerieLayout() {
                    phase !== "declined" && phase !== "missed" && phase !== "failed";
 
   if (isInCall) {
-    return (
-      <CallRoom
-        onEnd={() => {
-          // Le store repasse en idle automatiquement via onCallEnded/socket
-        }}
-      />
-    );
+    return <CallRoom onEnd={() => {}} />;
   }
 
   return (
@@ -60,14 +47,12 @@ export default function MessagerieLayout() {
 
       <ConversationList
         onSelectRoom={(roomId) => {
-          if (roomId !== activeChatRoomId) {
-            openRoom(roomId);
-          }
+          if (roomId !== activeChatRoomId) openRoom(roomId);
         }}
       />
 
       {activeChatRoomId && activeInterlocutor ? (
-        <div className="flex flex-col flex-1 min-w-0 w-full h-screen">
+        <div className="flex flex-col flex-1 min-w-0 w-full h-full">
           <ConversationHeader
             interlocutor={activeInterlocutor}
             onStartCall={handleStartCall}

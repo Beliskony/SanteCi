@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import { persist, devtools } from "zustand/middleware";
-import { Types } from "mongoose";
 
 // ─────────────────────────────────────────────
 // Shared types
@@ -120,9 +119,9 @@ export interface DoctorProfile extends BaseProfile {
   title: "Dr" | "Pr" | "Médecin" | "Spécialiste";
   photo?: string;
   specialty: string;
-  bio: string;
-  languages: "fr" | "en";
-  yearsOfExperience: number;
+  bio?: string;
+  languages?: Array<'fr' | 'en'>;
+  yearsOfExperience?: number;
 }
 
 export interface DoctorContact extends BaseContact {
@@ -248,6 +247,7 @@ interface AuthState {
   updatePatientProfile: (profile: Partial<PatientProfile>) => void;
   updateDoctorProfile: (profile: Partial<DoctorProfile>) => void;
   updateLocation: (location: Partial<BaseLocation>) => void;
+  
 
   // Doctor only
   setOnlineStatus: (isOnline: boolean) => void;
