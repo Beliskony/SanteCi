@@ -1,26 +1,42 @@
 "use client";
 
-import { useCallback } from "react";
-import { ArrowLeft } from "lucide-react";
+import { useCallback, useEffect } from "react";
+import { ArrowLeft }           from "lucide-react";
 import { usePaymentStore }     from "@/app/frontend/store/paymentStore";
 import { useAppointmentStore } from "@/app/frontend/store/appoitmentStore";
+import { useAuthStore }        from "@/app/frontend/store/useAuthStore";
 import { BookingStepper }      from "./BookingStepper";
 import { PaymentForm }         from "./PaymentForm";
 import { PaymentSummary }      from "./PaymentSummary";
 import type { BookingStep }    from "./BookingStepper";
-import type { ConsultationType, Currency, PaymentMethod, Priority } from "@/app/frontend/types/Appointment";
-import type {
-  PaymentMethod as ServicePaymentMethod,
-  PaymentProvider,
-} from "@/app/frontend/services/paymentService";
+import type { ConsultationType, Currency, PaymentMethod, Priority, PaymentProvider } from "@/app/frontend/types/Appointment";
+import type { PaymentChannel } from "@/app/frontend/services/paymentService";
+import { loadPaiementProSDK } from "@/app/frontend/lib/paiementPro";
 
-type UIPaymentMethod = "wave";
+// ─── SDK PaiementPro (chargé dynamiquement) ───────────────────────────────────
+declare global {
+  interface Window {
+    PaiementPro: new (merchantId: string) => {
+      amount:              number;
+      description:         string;
+      channel:             string;
+      countryCurrencyCode: string;
+      referenceNumber:     string;
+      customerEmail:       string;
+      customerFirstName:   string;
+      customerLastname:    string;
+      customerPhoneNumber: string;
+      notificationURL:     string;
+      returnURL:           string;
+      returnContext:       string;
+      url:                 string;
+      success:             boolean;
+      getUrlPayment:       () => Promise<void>;
+    };
+  }
+}
 
-const mapMethod = (m: UIPaymentMethod): ServicePaymentMethod =>
-  m === "wave" ? "wave" : undefined as never;
-
-const mapProvider = (m: UIPaymentMethod): PaymentProvider | undefined =>
-  m === "wave" ? "wave" : undefined;
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface BookingData {
   doctorId:     string;
@@ -44,77 +60,108 @@ interface PaymentPageProps {
   onSuccess:    (appointmentId: string) => void;
 }
 
+const MERCHANT_ID = process.env.NEXT_PUBLIC_PAIEMENTPRO_MERCHANT_ID!;
+const APP_URL     = process.env.NEXT_PUBLIC_APP_URL!;
+const isDev       = process.env.NODE_ENV === 'development';
+
+
+// ─── Composant ────────────────────────────────────────────────────────────────
+
 export default function PaymentPage({
-  bookingData,
-  patientId,
-  doctorName, specialty, scheduledFor, consultType, amount,
-  onBack, onSuccess,
+  bookingData, patientId,
+  doctorName, specialty, scheduledFor, consultType,
+  amount, onBack, onSuccess,
 }: PaymentPageProps) {
   const initiate   = usePaymentStore((s) => s.initiate);
-  const simulate   = usePaymentStore((s) => s.simulate);
   const isLoading  = usePaymentStore((s) => s.isLoading);
   const error      = usePaymentStore((s) => s.error);
   const clearError = usePaymentStore((s) => s.clearError);
   const create     = useAppointmentStore((s) => s.create);
+  const user       = useAuthStore((s) => s.user);
 
-  const SERVICE_FEE = 500;
-  const totalAmount = amount + SERVICE_FEE;
+  // Précharger le SDK au montage
+  useEffect(() => { loadPaiementProSDK().catch(console.error); }, []);
 
-  const handleSubmit = useCallback(async (
-    uiMethod: UIPaymentMethod,
-    _phone?: string
-  ) => {
-    clearError();
-    try {
-      // 1 — Créer le RDV uniquement au moment du paiement
-      const appointment = await create({
-        patientId:    bookingData.patientId,
-        doctorId:     bookingData.doctorId,
-        type:         bookingData.type as ConsultationType,
-        scheduledFor: bookingData.scheduledFor,
-        duration:     bookingData.duration,
-        reason:       bookingData.reason,
-        symptoms:     [],
-        priority:     "medium" as Priority,
-        payment: {
-          amount:   totalAmount,
-          currency: "XOF" as Currency,
-          method:   mapMethod(uiMethod) as PaymentMethod,
-          provider: mapProvider(uiMethod),
-        },
-      });
+// PaymentPage.tsx — handleSubmit sans isDev, flow PaiementPro uniquement
+const handleSubmit = useCallback(async (
+  channel: PaymentChannel,
+  phone:   string,
+) => {
+  clearError();
+  try {
+    // 1 — Créer le rendez-vous
+    const appointment = await create({
+      patientId:    bookingData.patientId,
+      doctorId:     bookingData.doctorId,
+      type:         bookingData.type as ConsultationType,
+      scheduledFor: bookingData.scheduledFor,
+      duration:     bookingData.duration,
+      reason:       bookingData.reason,
+      symptoms:     [],
+      priority:     'medium' as Priority,
+      payment: {
+        amount,
+        currency: 'XOF' as Currency,
+        method:   (channel === 'CARD' ? 'card' : 'mobile_money') as PaymentMethod,
+        provider: channel.toLowerCase() as PaymentProvider,
+      },
+    });
 
-      // 2 — Initier le paiement sur ce RDV
-      await initiate({
-        appointmentId: appointment._id,
-        amount:        totalAmount,
-        currency:      "XOF",
-        method:        mapMethod(uiMethod),
-        provider:      mapProvider(uiMethod),
-      });
+    const referenceNumber = `SANTE-${appointment._id}-${Date.now()}`;
 
-      // 3 — Simuler succès (à remplacer par webhook Wave en prod)
-      const result = await simulate(appointment._id, "success");
+    // 2 — Enregistrer en base
+    await initiate({
+      appointmentId: appointment._id,
+      amount,
+      currency:      'XOF',
+      channel,
+      referenceNumber,
+    });
 
-      if (result.status === "paid") {
-        onSuccess(appointment._id);
-      }
-    } catch {
-      // Erreur gérée dans les stores (paymentStore.error)
+    // 3 — Charger SDK et obtenir l'URL
+    await loadPaiementProSDK();
+
+    const pp = new window.PaiementPro(MERCHANT_ID);
+
+    pp.amount              = amount;
+    pp.description         = `Consultation médicale SantéCI — ${doctorName}`;
+    pp.channel             = channel;
+    pp.countryCurrencyCode = '952';
+    pp.referenceNumber     = referenceNumber;
+    pp.customerEmail       = (user as any)?.email ?? '';
+    pp.customerFirstName   = (user as any)?.profile?.firstName ?? '';
+    pp.customerLastname    = (user as any)?.profile?.lastName  ?? '';
+    pp.customerPhoneNumber = phone || ((user as any)?.profile?.phone ?? '');
+    pp.notificationURL     = `${APP_URL}/api/webhooks/paiementpro`;
+    pp.returnURL           = `${APP_URL}/patient/rdv/pay/${appointment._id}?ref=${referenceNumber}`;
+    pp.returnContext       = JSON.stringify({ appointmentId: appointment._id, referenceNumber });
+
+    await pp.getUrlPayment();
+
+    if (pp.success && pp.url) {
+      window.location.href = pp.url;
+    } else {
+      throw new Error("Impossible d'obtenir l'URL de paiement PaiementPro.");
     }
-  }, [bookingData, totalAmount, create, initiate, simulate, clearError, onSuccess]);
+
+  } catch (err: any) {
+    console.error('[PaymentPage]', err?.message);
+  }
+}, [bookingData, amount, user, doctorName, create, initiate, clearError]);
 
   return (
     <div className="min-h-screen bg-slate-50">
 
       {/* Header */}
-      <header className="bg-white px-6 py-4 flex relative">
-
-        <button onClick={onBack}
-          className=" absolute right-6 mt-3 transform -translate-y-1/2 flex items-center gap-1.5 text-sm text-slate-500 hover:text-[#1e3a8a] transition-colors font-medium">
-          <ArrowLeft size={15} />
-          Retour au profil
+      <header className="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-[#1e3a8a] transition-colors font-medium"
+        >
+          <ArrowLeft size={15} /> Retour
         </button>
+        <span className="text-sm font-semibold text-slate-700">Paiement de la consultation</span>
+        <div className="w-16" />
       </header>
 
       {/* Stepper */}
@@ -123,9 +170,9 @@ export default function PaymentPage({
       </div>
 
       {/* Corps */}
-      <div className="max-w-4xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
+      <div className="max-w-3xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6 items-start">
         <PaymentForm
-          totalAmount={totalAmount}
+          amount={amount}
           onSubmit={handleSubmit}
           isLoading={isLoading}
           error={error}
@@ -136,9 +183,9 @@ export default function PaymentPage({
           scheduledFor={scheduledFor}
           consultType={consultType}
           amount={amount}
-          serviceFee={SERVICE_FEE}
         />
       </div>
+
     </div>
   );
 }

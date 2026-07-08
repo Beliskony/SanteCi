@@ -6,6 +6,7 @@ import type {
   PaymentResult,
   PaymentStatusResult,
   InitiatePaymentDTO,
+  InitiateSubscriptionDTO,
   SimulateOutcome,
 } from '../services/paymentService';
 
@@ -22,29 +23,23 @@ interface PaymentState {
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
-  /** POST /api/payments — crée la session Wave/Stripe et redirige */
+  /** POST /api/payments — enregistre la consultation en pending */
   initiate: (dto: InitiatePaymentDTO) => Promise<PaymentResult>;
 
-  /**
-   * POST /api/payments/verify
-   * Appelé au retour sur success_url — confirme le paiement auprès du backend
-   */
-  verify: (appointmentId: string) => Promise<PaymentResult>;
+  /** POST /api/subscriptions — enregistre l'abonnement médecin en pending */
+  initiateSubscription: (dto: InitiateSubscriptionDTO) => Promise<PaymentResult>;
 
-  /**
-   * POST /api/payments/simulate — dev uniquement
-   * Simule un succès ou échec sans passer par Wave/Stripe
-   */
-  simulate: (
-    appointmentId: string,
-    outcome: SimulateOutcome
-  ) => Promise<{ appointmentId: string; status: string; simulatedAt: string }>;
-
-  /** GET /api/payments/[id] — statut */
+  /** GET /api/payments/[id] — statut consultation */
   fetchStatus: (id: string) => Promise<void>;
 
   /** POST /api/payments/[id]/refund */
   refund: (id: string, reason?: string) => Promise<PaymentResult>;
+
+  /** POST /api/payments/simulate — dev uniquement */
+  simulate: (
+    appointmentId: string,
+    outcome: SimulateOutcome
+  ) => Promise<{ appointmentId: string; status: string; simulatedAt: string }>;
 
   // ── Utils ─────────────────────────────────────────────────────────────────
   clearPayment: () => void;
@@ -62,21 +57,15 @@ export const usePaymentStore = create<PaymentState>()(
       isLoading:      false,
       error:          null,
 
-      // ── Initier ───────────────────────────────────────────────────────────
-      // Crée la session côté backend puis redirige vers Wave ou Stripe.
-      // La page ne reprend pas après cette action — le patient reviendra
-      // sur success_url où verify() sera appelé.
+      // ── initiate ──────────────────────────────────────────────────────────
+      // Enregistre le paiement en base (pending).
+      // La redirection vers PaiementPro se fait dans PaymentPage
+      // après l'appel SDK pp.getUrlPayment() → window.location.href = pp.url
       initiate: async (dto) => {
         set({ isLoading: true, error: null });
         try {
           const result = await paymentService.initiate(dto);
           set({ currentPayment: result, isLoading: false });
-
-          // Rediriger vers Wave ou Stripe (même onglet, obligatoire pour Wave)
-          if (result.checkoutUrl) {
-            window.location.href = result.checkoutUrl;
-          }
-
           return result;
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Erreur de paiement.';
@@ -85,37 +74,24 @@ export const usePaymentStore = create<PaymentState>()(
         }
       },
 
-      // ── Vérifier ──────────────────────────────────────────────────────────
-      // Appelé depuis la page success_url après redirect Wave/Stripe.
-      // Interroge le backend qui vérifie auprès de Wave/Stripe et confirme.
-      verify: async (appointmentId) => {
+      // ── initiateSubscription ──────────────────────────────────────────────
+      // Enregistre l'abonnement en base (pending).
+      // La redirection vers PaiementPro se fait dans SubscriptionSection
+      // après l'appel SDK pp.getUrlPayment() → window.location.href = pp.url
+      initiateSubscription: async (dto) => {
         set({ isLoading: true, error: null });
         try {
-          const result = await paymentService.verify(appointmentId);
+          const result = await paymentService.initiateSubscription(dto);
           set({ currentPayment: result, isLoading: false });
           return result;
         } catch (err) {
-          const message = err instanceof Error ? err.message : 'Erreur de vérification.';
+          const message = err instanceof Error ? err.message : 'Erreur d\'abonnement.';
           set({ error: message, isLoading: false });
           throw err;
         }
       },
 
-      // ── Simuler (dev uniquement) ──────────────────────────────────────────
-      simulate: async (appointmentId, outcome) => {
-        set({ isLoading: true, error: null });
-        try {
-          const result = await paymentService.simulate(appointmentId, outcome);
-          set({ isLoading: false });
-          return result;
-        } catch (err) {
-          const message = err instanceof Error ? err.message : 'Erreur de simulation.';
-          set({ error: message, isLoading: false });
-          throw err;
-        }
-      },
-
-      // ── Statut ────────────────────────────────────────────────────────────
+      // ── fetchStatus ───────────────────────────────────────────────────────
       fetchStatus: async (id) => {
         set({ isLoading: true, error: null });
         try {
@@ -127,7 +103,7 @@ export const usePaymentStore = create<PaymentState>()(
         }
       },
 
-      // ── Rembourser ────────────────────────────────────────────────────────
+      // ── refund ────────────────────────────────────────────────────────────
       refund: async (id, reason) => {
         set({ isLoading: true, error: null });
         try {
@@ -136,6 +112,20 @@ export const usePaymentStore = create<PaymentState>()(
           return result;
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Erreur de remboursement.';
+          set({ error: message, isLoading: false });
+          throw err;
+        }
+      },
+
+      // ── simulate (dev uniquement) ─────────────────────────────────────────
+      simulate: async (appointmentId, outcome) => {
+        set({ isLoading: true, error: null });
+        try {
+          const result = await paymentService.simulate(appointmentId, outcome);
+          set({ isLoading: false });
+          return result;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Erreur de simulation.';
           set({ error: message, isLoading: false });
           throw err;
         }

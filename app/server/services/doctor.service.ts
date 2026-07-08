@@ -279,6 +279,8 @@ async updatePhoto(doctorId: string, buffer: Buffer): Promise<{ photoUrl: string 
     page: number;
     pages: number;
   }> {
+    const now = new Date();
+
     const { specialty, city, district, isAvailable, consultationType, minRating, page = 1, limit = 10 } = filters;
 
     const query: QueryFilter<IDoctor> = {
@@ -297,14 +299,35 @@ async updatePhoto(doctorId: string, buffer: Buffer): Promise<{ photoUrl: string 
     const total = await Doctor.countDocuments(query);
 
     const doctors = await Doctor.find(query)
-      .select('doctorId profile telemedicine location status.isOnline status.isVerified analytics.patientSatisfaction analytics.totalConsultations')
+      .select('doctorId profile telemedicine location status.isOnline status.isVerified status.subscription status.subscriptionExpiry analytics.patientSatisfaction analytics.totalConsultations')
       .sort({ 'telemedicine.rating': -1 })
       .skip(skip)
       .limit(limit)
       .lean();
 
+    // ── Calculer le poids d'abonnement en mémoire + trier ─────────────────
+    const weighted = doctors.map(doc => {
+    const sub    = (doc.status as any)?.subscription ?? 'free';
+    const expiry = (doc.status as any)?.subscriptionExpiry;
+    const isActive = expiry ? new Date(expiry) > now : false;
+
+    const weight =
+      sub === 'elite'   && isActive ? 3 :
+      sub === 'premium' && isActive ? 2 : 1;
+
+      return { ...doc, _subscriptionWeight: weight };
+    });
+
+      weighted.sort((a, b) =>
+    b._subscriptionWeight - a._subscriptionWeight ||
+    (b.telemedicine?.rating ?? 0) - (a.telemedicine?.rating ?? 0)
+  );
+
+  // Nettoyer le champ interne avant de renvoyer
+  const result = weighted.map(({ _subscriptionWeight, ...doc }) => doc);
+
     return {
-      doctors,
+      doctors: result,
       total,
       page,
       pages: Math.ceil(total / limit),

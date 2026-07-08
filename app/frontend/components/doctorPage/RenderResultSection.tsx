@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
-import { MapPin, Building2, Video, MessageSquare, Star, ChevronDown } from "lucide-react";
+import { MapPin, Building2, Video, MessageSquare, Star, ChevronDown, BadgeCheck } from "lucide-react";
 import { useDoctorStore } from "@/app/frontend/store/otherStore";
 import CheckBoxSectionSide from "./CheckBoxSectionSide";
 import type { DoctorUser } from "@/app/frontend/types";
+import { getDoctorTier } from "@/app/frontend/lib/doctorBadge";
 
 // ── Créneaux fictifs pour la démo (à remplacer par les vraies dispo) ──
 const MOCK_SLOTS = [
@@ -101,6 +102,7 @@ const RenderResultSection = () => {
 const DoctorCard = ({ doctor }: { doctor: Partial<DoctorUser> }) => {
   const fees = doctor.telemedicine?.consultationFees;
   const types = doctor.telemedicine?.consultationTypes ?? [];
+  const tier  = getDoctorTier(doctor.status);
 
   return (
     <Link
@@ -123,7 +125,20 @@ const DoctorCard = ({ doctor }: { doctor: Partial<DoctorUser> }) => {
               {doctor.profile?.firstName?.[0]}{doctor.profile?.lastName?.[0]}
             </div>
           )}
-        </div>
+
+          {/* Badge tier sur la photo */}
+            {tier === 'elite' && (
+              <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center border-2 border-white">
+                <BadgeCheck size={11} className="text-white" />
+              </div>
+            )}
+            {tier === 'premium' && (
+              <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-slate-400 rounded-full flex items-center justify-center border-2 border-white">
+                <BadgeCheck size={10} className="text-white" />
+              </div>
+            )}
+          </div>
+
 
         {/* Infos */}
         <div className="flex flex-col gap-1 flex-1 min-w-0">

@@ -4,13 +4,12 @@ import type { DoctorUser } from "@/app/frontend/store/useAuthStore"
 interface ConsultationTarifsProps {
   telemedicine: DoctorUser["telemedicine"]
   location: DoctorUser["location"]
-  profile: DoctorUser["profile"]
 }
 
 const formatFee = (amount: number) =>
   `${amount.toLocaleString("fr-FR")} FCFA`
 
-export default function ConsultationTarifs({ telemedicine, location, profile }: ConsultationTarifsProps) {
+export default function ConsultationTarifs({ telemedicine, location }: ConsultationTarifsProps) {
   const { consultationFees, consultationTypes } = telemedicine
 
   const hasVideo = consultationTypes.includes("video")

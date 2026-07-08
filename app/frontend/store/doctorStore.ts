@@ -55,6 +55,15 @@ interface DoctorDashState {
   // ── Données dashboard ─────────────────────────────────────
   stats:      DoctorStats | null;
 
+  // ── Abonnement ────────────────────────────────────────────
+  subscriptionStatus: {
+    subscription:       'free' | 'premium' | 'elite';
+    subscriptionExpiry: string | null;
+    subscriptionStatus: 'active' | 'pending' | 'failed' | 'expired' | null;
+    isActive:           boolean;
+  } | null;
+
+
   // ── Actions profil ────────────────────────────────────────
   fetchMyProfile:      ()                               => Promise<void>;
   updateMyProfile:     (data: Partial<DoctorProfile>)  => Promise<void>;
@@ -67,6 +76,8 @@ interface DoctorDashState {
 
   updateSubscription:      (data: UpdateSubscriptionDTO)       => Promise<void>;
   updateCoordinates:       (coordinates: UpdateCoordinatesDTO) => Promise<void>;
+  fetchSubscriptionStatus: () => Promise<void>;
+
   // ── Actions stats ─────────────────────────────────────────
   fetchStats: (doctorId: string) => Promise<void>;
 
@@ -82,6 +93,7 @@ const initialState = {
   isSaving:  false,
   error:     null,
   stats:     null,
+  subscriptionStatus: null,
 };
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
@@ -216,6 +228,55 @@ export const useDoctorDashStore = create<DoctorDashState>()(
           set({ isSaving: false });
         }
       },
+
+      // ── fetchSubscriptionStatus ───────────────────────────────────────────
+      fetchSubscriptionStatus: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const status = await doctorService.getSubscriptionStatus();
+          set({ subscriptionStatus: status });
+
+          // Sync useAuthStore pour que SubscriptionSection soit réactif
+          if (status.subscription) {
+            useAuthStore.getState().updateDoctorStatus({
+              subscription:       status.subscription,
+              subscriptionExpiry: status.subscriptionExpiry
+                ? new Date(status.subscriptionExpiry)
+                : undefined,
+            });
+          }
+        } catch (err) {
+          set({ error: toMessage(err) });
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      // ── updateSubscription ────────────────────────────────────────────────
+      // Appelé après confirmation de paiement PaiementPro (returnURL)
+      updateSubscription: async (data) => {
+        set({ isSaving: true, error: null });
+        try {
+          // Rafraîchir le statut depuis le backend (webhook a déjà mis à jour)
+          const status = await doctorService.getSubscriptionStatus();
+          set({ subscriptionStatus: status });
+
+          // Sync useAuthStore
+          useAuthStore.getState().updateDoctorStatus?.({
+            subscription:       status.subscription,
+            subscriptionExpiry: status.subscriptionExpiry
+              ? new Date(status.subscriptionExpiry)
+              : undefined,
+          });
+        } catch (err) {
+          set({ error: toMessage(err) });
+          throw err;
+        } finally {
+          set({ isSaving: false });
+        }
+      },
+
+      // setOnlineStatus reste commenté comme avant
 
       // ── fetchStats ────────────────────────────────────────────────────────
       // Utilise les stats appointments du backend + les enrichit

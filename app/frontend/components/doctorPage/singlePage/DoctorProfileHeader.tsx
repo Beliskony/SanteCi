@@ -1,6 +1,7 @@
 import Image from "next/image"
 import { BadgeCheck, Star, Languages, Briefcase } from "lucide-react"
 import type { DoctorUser } from "@/app/frontend/store/useAuthStore"
+import { getDoctorTier } from "@/app/frontend/lib/doctorBadge"
 
 interface DoctorProfileHeaderProps {
   doctor: Partial<DoctorUser>
@@ -12,7 +13,7 @@ export default function DoctorProfileHeader({ doctor }: DoctorProfileHeaderProps
   const fullName = `${profile?.title ?? "Dr"} ${profile?.firstName ?? ""} ${profile?.lastName ?? ""}`
   const rating = telemedicine?.rating ?? 0
   const totalConsultations = analytics?.totalConsultations ?? 0
-  const isVerified = status?.isVerified ?? false
+ const tier = getDoctorTier(status);
   const languages = profile?.languages?.includes('fr') && profile?.languages?.includes('en') 
     ? "Français, Anglais" : profile?.languages?.includes('fr') ? "Français" 
     : profile?.languages?.includes('en') ? "Anglais" : "Non spécifié";
@@ -70,12 +71,16 @@ export default function DoctorProfileHeader({ doctor }: DoctorProfileHeaderProps
           </div>
 
           {/* Badge vérifié */}
-          {isVerified && (
-            <div className="flex items-center gap-1.5 mt-3">
-              <BadgeCheck size={16} className="text-emerald-500" />
-              <span className="text-xs font-medium text-emerald-600">Médecin vérifié</span>
-            </div>
-          )}
+            {tier === 'elite' && (
+              <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center border-2 border-white">
+                <BadgeCheck size={11} className="text-white" />
+              </div>
+            )}
+            {tier === 'premium' && (
+              <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-slate-400 rounded-full flex items-center justify-center border-2 border-white">
+                <BadgeCheck size={10} className="text-white" />
+              </div>
+            )}
         </div>
       </div>
 

@@ -346,6 +346,42 @@ async updateMyProfile(data: Partial<DoctorProfile>): Promise<DoctorUser> {
     return res.data;
   },
 
+  // ── Abonnement ───────────────────────────────────────────
+
+  /**
+   * Statut de l'abonnement du médecin connecté
+   * GET /api/subscriptions/status
+   */
+  async getSubscriptionStatus(): Promise<{
+    subscription:          'free' | 'premium' | 'elite';
+    subscriptionExpiry:    string | null;
+    subscriptionStatus:    'active' | 'pending' | 'failed' | 'expired' | null;
+    isActive:              boolean;
+  }> {
+    const res = await api.get<ApiResponse<{
+      subscription:       'free' | 'premium' | 'elite';
+      subscriptionExpiry: string | null;
+      subscriptionStatus: 'active' | 'pending' | 'failed' | 'expired' | null;
+      isActive:           boolean;
+    }>>('/subscriptions/status');
+    return res.data;
+  },
+
+  /**
+   * Utilitaire — tier actif selon expiry
+   */
+  getActiveTier(status: {
+    subscription?:       string;
+    subscriptionExpiry?: string | Date | null;
+  }): 'free' | 'premium' | 'elite' {
+    const sub    = status?.subscription ?? 'free';
+    const expiry = status?.subscriptionExpiry;
+    if (!expiry || sub === 'free') return 'free';
+    return new Date(expiry) > new Date()
+      ? sub as 'premium' | 'elite'
+      : 'free';
+  },
+
   // ── Helper ───────────────────────────────────────────────
 
   isCurrentUserDoctor(): boolean {

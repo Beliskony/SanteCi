@@ -253,6 +253,7 @@ interface AuthState {
   setOnlineStatus: (isOnline: boolean) => void;
   updateTelemedicine: (data: Partial<DoctorTelemedicine>) => void;
   updateDoctorProfessional: (data: Partial<DoctorProfessional>) => void;
+  updateDoctorStatus: (data: Partial<BaseStatus & { isOnline: boolean }>) => void;
 
   // Patient only
   updateHealth: (health: Partial<PatientHealth>) => void;
@@ -322,6 +323,12 @@ export const useAuthStore = create<AuthState>()(
           const { user } = get();
           if (!user || !isDoctor(user)) return;
           set({ user: { ...user, professional: { ...user.professional, ...data } } });
+        },
+
+        updateDoctorStatus: (data) => {
+          const { user } = get();
+          if (!user || !isDoctor(user)) return;
+          set({ user: { ...user, status: { ...user.status, ...data } } });
         },
 
         updateProfilePhoto: (photoUrl: string) => {

@@ -89,6 +89,7 @@ export interface IDoctor extends Document {
     accountStatus: 'active' | 'pending' | 'suspended' | 'blocked';
     subscription: 'free' | 'premium' | 'elite';
     subscriptionExpiry?: Date;
+    subscriptionReference?: string;
   };
   
   // Analytics
