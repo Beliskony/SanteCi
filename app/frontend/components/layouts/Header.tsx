@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useAuthStore } from "@/app/frontend/store/useAuthStore";
+import { useNotificationStore } from "@/app/frontend/store/notificationStore";
 import { authService } from "@/app/frontend/services/authService";
 
 const NavItems: { name: string; href: string }[] = [
@@ -16,14 +17,34 @@ const NavItems: { name: string; href: string }[] = [
   { name: "FAQ",                href: "/FAQ" },
 ];
 
+function formatTimeAgo(dateStr: string): string {
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "À l'instant";
+  if (diffMin < 60) return `Il y a ${diffMin} min`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `Il y a ${diffH}h`;
+  const diffJ = Math.floor(diffH / 24);
+  if (diffJ === 1) return "Hier";
+  return `Il y a ${diffJ}j`;
+};
+
+const NOTIFICATION_SECTION_MAP: Record<string, string> = {
+  appointment: "agenda",
+  reminder:    "agenda",
+  message:     "messagerie",
+  prescription: "patients",
+  payment:     "stats",
+  emergency:   "consultations",
+  system:      "dashboard",
+};
+
+function getNotificationTarget(n: { type: string; role?: string }): string {
+  // Le patient n'a pas forcément les mêmes sections — à ajuster si besoin
+  return NOTIFICATION_SECTION_MAP[n.type] ?? "dashboard";
+}
 
 
-//  FIX #3 — Statique → hors du composant, jamais recréé
-const PLACEHOLDER_NOTIFICATIONS = [
-  { id: 1, text: "Votre RDV du 15 mai est confirmé.",   time: "Il y a 5 min", read: false },
-  { id: 2, text: "Dr. Kouamé a accepté votre demande.", time: "Il y a 1h",    read: false },
-  { id: 3, text: "Votre ordonnance est disponible.",    time: "Hier",         read: true  },
-];
 
 const Header = () => {
   const pathname = usePathname();
@@ -41,6 +62,14 @@ const Header = () => {
   const specialty = useAuthStore((s) =>
     s.user?.role === "doctor" ? (s.user as any).profile?.specialty : undefined
   );
+
+    // ── Notifications réelles ──────────────────────────────────────────────
+  const notifications  = useNotificationStore((s) => s.notifications);
+  const unreadCount     = useNotificationStore((s) => s.unreadCount);
+  const fetchNotifications = useNotificationStore((s) => s.fetchNotifications);
+  const markAsRead         = useNotificationStore((s) => s.markAsRead);
+  const markAllAsRead      = useNotificationStore((s) => s.markAllAsRead);
+  const resetNotifications = useNotificationStore((s) => s.reset);
 
   const hasHydrated = useAuthStore((s) => s._hasHydrated);
   const [menuOpen,      setMenuOpen]      = useState(false);
@@ -62,11 +91,11 @@ const isAuthenticated = hasHydrated && !!role && !!firstName;
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  //  FIX #3 — unreadCount mémorisé (sera utile quand tu brancheras les vraies notifs)
-  const unreadCount = useMemo(
-    () => PLACEHOLDER_NOTIFICATIONS.filter((n) => !n.read).length,
-    [] // statique pour l'instant
-  );
+    useEffect(() => {
+    if (isAuthenticated) {
+      fetchNotifications({ limit: 5 }); // les 5 plus récentes pour le dropdown
+    }
+  }, [isAuthenticated, fetchNotifications]);
 
   const roleLabel = useMemo(() => {
     if (!isAuthenticated) return "";
@@ -143,7 +172,7 @@ const isAuthenticated = hasHydrated && !!role && !!firstName;
               <div className="relative" ref={notifRef}>
                 <button
                   onClick={() => { setNotifDropdown(!notifDropdown); setUserDropdown(false); }}
-                  className="relative p-1.5 text-[#1e3a8a] hover:bg-gray-100 rounded-lg transition-colors"
+                  className="relative p-1.5 text-[#1e3a8a] hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
                 >
                   <Bell size={18} />
                   {unreadCount > 0 && (
@@ -157,23 +186,44 @@ const isAuthenticated = hasHydrated && !!role && !!firstName;
                   <div className="absolute right-0 top-10 w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
                     <div className="flex justify-between items-center px-4 py-3 border-b border-gray-100">
                       <span className="text-sm font-semibold text-gray-900">Notifications</span>
-                      <button className="text-xs text-[#1e3a8a] hover:underline">Tout marquer lu</button>
+                      <button
+                        onClick={() => markAllAsRead()}
+                        className="text-xs text-[#1e3a8a] hover:underline cursor-pointer"
+                      >
+                        Tout marquer lu
+                      </button>
                     </div>
                     <div className="flex flex-col max-h-72 overflow-y-auto">
-                      {PLACEHOLDER_NOTIFICATIONS.map((n) => (
-                        <div
-                          key={n.id}
-                          className={`flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-none ${
-                            !n.read ? "bg-[#1e3a8a]/5" : ""
-                          }`}
-                        >
-                          <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${!n.read ? "bg-[#1e3a8a]" : "bg-gray-300"}`} />
-                          <div className="flex flex-col gap-0.5 flex-1">
-                            <p className="text-xs text-gray-700 leading-relaxed">{n.text}</p>
-                            <span className="text-[10px] text-gray-400">{n.time}</span>
-                          </div>
+                      <div className="flex flex-col max-h-72 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="px-4 py-6 text-center text-xs text-gray-400">
+                          Aucune notification pour le moment.
                         </div>
-                      ))}
+                      ) : (
+                        notifications.map((n) => (
+                          <div
+                            key={n._id}
+                            onClick={() =>  {
+                                if (!n.statut.read) markAsRead(n._id);
+                                setNotifDropdown(false);
+                                const section = getNotificationTarget(n);
+                                router.push(`${dashboardHref}?section=${section}`);
+                              }}
+                              
+                            className={`flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-none cursor-pointer ${
+                              !n.statut.read ? "bg-[#1e3a8a]/5" : ""
+                            }`}
+                          >
+                            <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${!n.statut.read ? "bg-[#1e3a8a]" : "bg-gray-300"}`} />
+                            <div className="flex flex-col gap-0.5 flex-1">
+                              <p className="text-xs font-medium text-gray-800 leading-relaxed">{n.title}</p>
+                              <p className="text-xs text-gray-600 leading-relaxed">{n.body}</p>
+                              <span className="text-[10px] text-gray-400">{formatTimeAgo(n.metadata.createdAt)}</span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
                     </div>
                     <div className="px-4 py-2.5 border-t border-gray-100">
                       <Link
@@ -325,7 +375,7 @@ const isAuthenticated = hasHydrated && !!role && !!firstName;
                 <Link
                   href="/notifications"
                   onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50 border border-gray-100 transition-colors"
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50 border border-gray-100 transition-colors cursor-pointer"
                 >
                   <Bell size={16} className="text-[#1e3a8a]" />
                   Notifications

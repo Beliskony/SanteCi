@@ -38,40 +38,6 @@ const HeroSection = () => {
           rapide et fiable.
         </p>
 
-        {/* Barre de recherche */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center border border-gray-200 rounded-xl shadow-sm overflow-hidden bg-white">
-          {/* Champ spécialité */}
-          <div className="flex items-center gap-2 px-4 py-3 flex-1 min-w-0">
-            <Search size={18} className="text-gray-400 shrink-0" />
-            <input
-              type="text"
-              placeholder="Spécialité, médecin..."
-              className="text-sm text-gray-500 placeholder-gray-400 outline-none w-full bg-transparent"
-            />
-          </div>
-
-          {/* Séparateur vertical */}
-          <div className="hidden sm:block w-px bg-gray-200 self-stretch my-2.5" />
-          {/* Séparateur horizontal mobile */}
-          <div className="block sm:hidden h-px bg-gray-200 mx-4" />
-
-          {/* Champ ville */}
-          <div className="flex items-center gap-2 px-4 py-3 flex-1 min-w-0">
-            <MapPin size={18} className="text-gray-400 shrink-0" />
-            <input
-              type="text"
-              placeholder="Ville, quartier"
-              className="text-sm text-gray-500 placeholder-gray-400 outline-none w-full bg-transparent"
-            />
-          </div>
-
-          {/* Bouton rechercher */}
-          <div className="p-2">
-            <button className="w-full sm:w-auto bg-[#1e3a8a] hover:bg-[#3742fa] transition-colors text-white text-sm font-semibold px-6 py-3 rounded-lg">
-              Rechercher
-            </button>
-          </div>
-        </div>
 
         {/* Checklist */}
         <div className="flex flex-wrap gap-x-6 gap-y-2">

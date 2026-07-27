@@ -42,7 +42,7 @@ const PatDash = () => {
     if (!raw) return undefined;
     // Après rehydration, _id est une string ; en runtime c'est un ObjectId
     if (typeof raw === "string") return raw;
-    if (typeof raw === "object" && "toString" in raw) return raw.toString();
+    if (typeof raw === "object" && "toString" in raw) return raw;
     return undefined;
   }, [user]);
 

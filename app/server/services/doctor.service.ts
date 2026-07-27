@@ -868,6 +868,132 @@ async updatePrescription(
   return updated!;
 }
 
+// ── Get patient dossier — dossier médical complet vu par le médecin ───────
+
+  async getPatientDossier(
+    doctorId: string,
+    patientId: string
+  ): Promise<{
+    profile: {
+      firstName: string;
+      lastName: string;
+      photo?: string;
+      dateOfBirth: Date;
+      gender: string;
+      bloodGroup?: string;
+    };
+    contact: {
+      phone: string;
+      email?: string;
+      emergencyContacts: Array<{ name: string; phone: string; relationship: string }>;
+    };
+    health: {
+      allergies: string[];
+      chronicDiseases: string[];
+      currentMedications: string[];
+      disabilities: string[];
+      height?: number;
+      weight?: number;
+      bmi?: number;
+    };
+    patientSince: Date;
+    consultations: Array<{
+      _id: string;
+      date: Date;
+      type: string;
+      reason: string;
+      status: string;
+      diagnosis?: string;
+      notes?: string;
+      recommendations: string[];
+    }>;
+    prescriptions: Array<{
+      _id: string;
+      prescriptionId: string;
+      date: Date;
+      status: string;
+      diagnosis: string;
+      validityDays: number;
+    }>;
+  }> {
+    // Vérifier que ce médecin a bien une relation avec ce patient
+    // (au moins un rendez-vous ensemble) avant de livrer le dossier
+
+    const patient = await Patient.findById(patientId)
+      .select('profile contact.phone contact.email contact.emergencyContacts health metadata')
+      .lean();
+
+    if (!patient) throw new Error(
+       `Patient introuvable. [debug] db=${Patient.db.name} patientId=${patientId} doctorId=${doctorId}`
+    );
+
+    const appointments = await Appointment.find({
+      doctorId: new Types.ObjectId(doctorId),
+      patientId: new Types.ObjectId(patientId),
+    })
+      .select('details.type details.scheduledFor details.reason status.current consultation')
+      .sort({ 'details.scheduledFor': -1 })
+      .lean();
+
+    const consultations = appointments.map((a) => ({
+      _id: String(a._id),
+      date: a.details.scheduledFor,
+      type: a.details.type,
+      reason: a.details.reason,
+      status: a.status.current,
+      diagnosis: a.consultation?.diagnosis,
+      notes: a.consultation?.notes,
+      recommendations: a.consultation?.recommendations ?? [],
+    }));
+
+    const prescriptionsRaw = await Prescription.find({
+      doctorId: new Types.ObjectId(doctorId),
+      patientId: new Types.ObjectId(patientId),
+    })
+      .select('prescriptionId date status diagnosis validityDays')
+      .sort({ date: -1 })
+      .lean();
+
+    const prescriptions = prescriptionsRaw.map((p) => ({
+      _id: String(p._id),
+      prescriptionId: p.prescriptionId,
+      date: p.date,
+      status: p.status,
+      diagnosis: p.diagnosis,
+      validityDays: p.validityDays,
+    }));
+
+    return {
+      profile: {
+        firstName:   patient.profile.firstName,
+        lastName:    patient.profile.lastName,
+        photo:       patient.profile.photo,
+        dateOfBirth: patient.profile.dateOfBirth,
+        gender:      patient.profile.gender,
+        bloodGroup:  patient.profile.bloodGroup,
+      },
+      contact: {
+        phone: patient.contact.phone,
+        email: patient.contact.email,
+        emergencyContacts: patient.contact.emergencyContacts ?? [],
+      },
+      health: {
+        allergies:          patient.health?.allergies ?? [],
+        chronicDiseases:    patient.health?.chronicDiseases ?? [],
+        currentMedications: patient.health?.currentMedications ?? [],
+        disabilities:       patient.health?.disabilities ?? [],
+        height:             patient.health?.height,
+        weight:             patient.health?.weight,
+        bmi:                patient.health?.bmi,
+      },
+      patientSince: patient.metadata?.createdAt,
+      consultations,
+      prescriptions,
+    };
+
+
+  }
+
 // ── Delete prescription ────────────────────────────────────────────────────────
 
 async deletePrescription(

@@ -22,8 +22,8 @@ const steps = [
   {
     number: "Étape 3",
     icon: MessageSquareIcon,
-    title: "Je parle",
-    description: "Décrivez brièvement votre problème et obtenez les horaires disponibles.",
+    title: "Je choisis",
+    description: "Sélectionnez le créneau horaire qui vous convient.",
   },
   {
     number: "Étape 4",

@@ -382,6 +382,22 @@ async updateMyProfile(data: Partial<DoctorProfile>): Promise<DoctorUser> {
       : 'free';
   },
 
+  /**
+   * Dossier médical complet d'un patient (vu par le médecin connecté)
+   * GET /doctor/ligne/patients/:patientId/dossier
+   */
+  async getPatientDossier(patientId: string): Promise<{
+    profile: { firstName: string; lastName: string; photo?: string; dateOfBirth: string; gender: string; bloodGroup?: string };
+    contact: { phone: string; email?: string; emergencyContacts: Array<{ name: string; phone: string; relationship: string }> };
+    health: { allergies: string[]; chronicDiseases: string[]; currentMedications: string[]; disabilities: string[]; height?: number; weight?: number; bmi?: number };
+    patientSince: string;
+    consultations: Array<{ _id: string; date: string; type: string; reason: string; status: string; diagnosis?: string; notes?: string; recommendations: string[] }>;
+    prescriptions: Array<{ _id: string; prescriptionId: string; date: string; status: string; diagnosis: string; validityDays: number }>;
+  }> {
+    const res = await api.get<ApiResponse<any>>(`/doctor/ligne/patients/${patientId}/dossier`);
+    return res.data;
+  },
+
   // ── Helper ───────────────────────────────────────────────
 
   isCurrentUserDoctor(): boolean {

@@ -1,5 +1,6 @@
 import * as api from "@/app/frontend/lib/apiClient";
 import { useAuthStore } from "../store/useAuthStore";
+import { useNotificationStore } from "../store/notificationStore";
 import type { AuthUser, PatientUser, DoctorUser } from "../store/useAuthStore";
 import type { ApiResponse } from "@/app/frontend/types";
 
@@ -350,6 +351,7 @@ export const authService = {
       localStorage.removeItem("refresh-token");
     }
     useAuthStore.getState().logout();
+    useNotificationStore.getState().reset();
   },
 
   // POST /api/password/send-otp

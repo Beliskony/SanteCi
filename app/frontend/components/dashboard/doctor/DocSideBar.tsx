@@ -25,15 +25,6 @@ import PatientsPage from "./MesPatientsComponents/PatientsPage";
 import PerformancePage from "./RevenusEtStats/PerformancePage";
 import SettingsPage from "./parametres/SettingsPage";
 
-// ── Imports des pages ─────────────────────────────────────────
-// (à remplacer par tes vrais composants doctor)
-// import DocDash       from "...";
-// import DocAgenda     from "...";
-// import DocConsult    from "...";
-// import DocPatients   from "...";
-// import DocMessagerie from "...";
-// import DocStats      from "...";
-// import DocSettings   from "...";
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -71,6 +62,7 @@ const renderPage = (active: ActivePage, setActive: (key: ActivePage) => void) =>
     default:              return <DocDash />;
   }
 };
+
 
 // ── SidebarContent partagé (desktop + drawer mobile) ─────────
 

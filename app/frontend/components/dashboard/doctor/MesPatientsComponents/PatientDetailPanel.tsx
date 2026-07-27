@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { PatientQuickActions } from "./PatientQuickActions";
 import { CreatePrescriptionModal } from "../../../modals/CreatePrescriptionModal";
+import { PatientDossierModal } from "../../../modals/PatientDossierModal";
 import type { PatientListItem } from "../../../../types/PatientList";
 
 interface PatientDetailPanelProps {
@@ -14,6 +15,7 @@ interface PatientDetailPanelProps {
 
 export function PatientDetailPanel({ patient, onDossier, onMessage, onRevoir}: PatientDetailPanelProps) {
   const [isPrescriptionOpen, setIsPrescriptionOpen] = useState(false);
+  const [isDossierOpen, setIsDossierOpen] = useState(false);
 
   if (!patient) {
     return (
@@ -27,6 +29,11 @@ export function PatientDetailPanel({ patient, onDossier, onMessage, onRevoir}: P
 
   const initials = `${patient.firstName[0] ?? ""}${patient.lastName[0] ?? ""}`;
   const patientFullName = `${patient.firstName} ${patient.lastName}`;
+
+  const handleDossier = () => {
+    onDossier?.(patient._id);
+    setIsDossierOpen(true);
+  }
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col gap-4">
@@ -88,9 +95,9 @@ export function PatientDetailPanel({ patient, onDossier, onMessage, onRevoir}: P
       <div className="border-t border-slate-100 pt-4">
         <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Actions rapides</p>
         <PatientQuickActions
-          onDossier={() => onDossier?.(patient._id)}
+          onDossier={handleDossier}
           onMessage={() => onMessage?.(patient._id)}
-          onRevoir={() => onRevoir?.(patient._id)}
+          //onRevoir={() => onRevoir?.(patient._id)}
           onOrdonnance={() => setIsPrescriptionOpen(true)}
         />
       </div>
@@ -105,6 +112,11 @@ export function PatientDetailPanel({ patient, onDossier, onMessage, onRevoir}: P
         }}
       />
 
+      <PatientDossierModal
+        isOpen={isDossierOpen}
+        onClose={() => setIsDossierOpen(false)}
+        patient={patient}
+      />
     </div>
   );
 }

@@ -184,3 +184,54 @@ export interface ApiError {
   message: string;
   errors?: Record<string, string[]>;
 }
+
+
+
+// ============================================================
+// types/review.types.ts
+// ============================================================
+
+export interface Review {
+  _id: string;
+  appointmentId: string;
+  doctorId: string;
+  patientId: string;
+  rating: number;
+  comment?: string;
+  isAnonymous: boolean;
+  status: 'published' | 'flagged' | 'hidden';
+  metadata: {
+    createdAt: string;
+    updatedAt: string;
+  };
+}
+
+export interface DoctorReviewSummaryItem {
+  _id: string;
+  rating: number;
+  comment?: string;
+  patientName: string;
+  createdAt: string;
+}
+
+export interface DoctorReviewsResponse {
+  reviews: DoctorReviewSummaryItem[];
+  total: number;
+  page: number;
+  pages: number;
+  averageRating: number;
+  reviewCount: number;
+}
+
+export interface CreateReviewDTO {
+  appointmentId: string;
+  rating: number;
+  comment?: string;
+  isAnonymous?: boolean;
+}
+
+export interface UpdateReviewDTO {
+  rating?: number;
+  comment?: string;
+  isAnonymous?: boolean;
+}

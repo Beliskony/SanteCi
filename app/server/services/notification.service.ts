@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
 import { Notification } from '../models/notification.model';
 import { INotification } from '../interfaces/notification.interface';
-import type { TNotification, TNotificationData } from '../schemas/notification.schema';
+import type { TNotificationData } from '../schemas/notification.schema';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -178,6 +178,37 @@ class NotificationService {
       body:     `Vous avez reçu un paiement de ${amount.toLocaleString('fr-FR')} ${currency}.`,
       data:     { appointmentId: new Types.ObjectId(appointmentId) as any },
       priority: 'normal',
+    });
+  }
+
+  async notifySubscriptionExpiringSoon(
+    doctorId: string,
+    tier: 'premium' | 'elite',
+    daysLeft: number,
+    expiresAt: Date
+  ): Promise<INotification> {
+    return this.create({
+      userId: doctorId,
+      userType: 'doctor',
+      type: 'system',
+      title: `Abonnement ${tier} bientôt expiré`,
+      body: `Votre abonnement ${tier} expire dans ${daysLeft} jour${daysLeft > 1 ? 's' : ''} (le ${expiresAt.toLocaleDateString('fr-FR')}). Renouvelez pour ne pas perdre vos avantages.`,
+      priority: 'high',
+      expiresAt,
+    });
+  }
+
+  async notifySubscriptionDowngraded(
+    doctorId: string,
+    previousTier: 'premium' | 'elite'
+  ): Promise<INotification> {
+    return this.create({
+      userId: doctorId,
+      userType: 'doctor',
+      type: 'system',
+      title: 'Abonnement expiré',
+      body: `Votre abonnement ${previousTier} a expiré et votre compte est repassé en offre gratuite. Renouvelez pour retrouver vos avantages.`,
+      priority: 'high',
     });
   }
 

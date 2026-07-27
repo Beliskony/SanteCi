@@ -122,11 +122,11 @@ try {
   const preview =
     dto.messageType === 'text'
       ? dto.content
-      : dto.messageType === 'image'       ? '📷 Image'
-      : dto.messageType === 'audio'       ? '🎙️ Message vocal'
-      : dto.messageType === 'video'       ? '🎥 Vidéo'
-      : dto.messageType === 'file'        ? '📎 Fichier'
-      : dto.messageType === 'prescription'? '💊 Ordonnance'
+      : dto.messageType === 'image'       ? 'Image'
+      : dto.messageType === 'audio'       ? 'Message vocal'
+      : dto.messageType === 'video'       ? 'Vidéo'
+      : dto.messageType === 'file'        ? 'Fichier'
+      : dto.messageType === 'prescription'? 'Ordonnance'
       : dto.content;
 
   await notificationService.notifyNewMessage(

@@ -40,6 +40,7 @@ export default function PatientsPage() {
     lastConsultation: p.lastConsultation ?? undefined,
   }));
 
+  
 
  return (
     <div className="min-h-screen bg-[#f4f6fb]">
