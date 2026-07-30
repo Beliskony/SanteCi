@@ -98,6 +98,7 @@ export interface IDoctor extends Document {
     totalConsultations: number;
     monthlyEarnings: number;
     patientSatisfaction: number;
+    reviewCount: number;
     cancellationRate: number;
   };
   

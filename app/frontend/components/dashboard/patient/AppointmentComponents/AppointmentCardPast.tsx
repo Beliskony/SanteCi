@@ -1,10 +1,14 @@
 "use client"
 
-import { useState } from "react"
-import { Video, MapPin, FileText, RefreshCw, XCircle, X } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Video, MapPin, FileText, RefreshCw, XCircle, X, Star } from "lucide-react"
 import type { Appointment } from "@/app/frontend/types/Appointment"
 import { isPopulatedDoctor } from "@/app/frontend/types/Appointment"
 import { useAppointmentStore } from "@/app/frontend/store/appoitmentStore"
+import { StarRating } from "../../../ReviewComponents/StarRating"
+import { LeaveReviewModal } from "../../../ReviewComponents/LeaveReviewModal"
+import { reviewService } from "@/app/frontend/services/reviewService"
+import type { Review } from "@/app/frontend/types"
 
 interface Props {
   appointment: Appointment
@@ -24,6 +28,13 @@ export default function AppointmentCardPast({ appointment, variant }: Props) {
   const isCancelled = variant === "cancelled"
   const isInPerson  = details.type === "in_person"
   const isVideo     = details.type === "video"
+  // Seuls les RDV réellement "completed" peuvent recevoir un avis
+  // (un "no_show" par ex. pourrait aussi apparaître dans l'onglet "past" sans avoir eu lieu)
+  const isCompleted = status.current === "completed"
+
+  const doctorName = doctor
+    ? `${doctor.profile.title ?? "Dr"} ${doctor.profile.firstName} ${doctor.profile.lastName}`
+    : "votre médecin"
 
   const reschedule = useAppointmentStore((s) => s.reschedule)
   const isLoading  = useAppointmentStore((s) => s.isLoading)
@@ -32,6 +43,20 @@ export default function AppointmentCardPast({ appointment, variant }: Props) {
   const [showModal, setShowModal] = useState(false)
   const [newDateTime, setNewDateTime] = useState("")
   const [localError, setLocalError] = useState<string | null>(null)
+
+  // ── Avis — état local à CETTE carte, pas dans le store global ──────────
+  // (évite que plusieurs cartes affichées en même temps ne se marchent dessus)
+  const [existingReview, setExistingReview] = useState<Review | null>(null)
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false)
+
+  useEffect(() => {
+    if (!isCompleted) return
+    let cancelled = false
+    reviewService.getForAppointment(appointment._id)
+      .then((review) => { if (!cancelled) setExistingReview(review) })
+      .catch(() => { /* pas grave si ça échoue, le bouton "Laisser un avis" reste proposé */ })
+    return () => { cancelled = true }
+  }, [appointment._id, isCompleted])
 
   const time = new Date(details.scheduledFor).toLocaleTimeString("fr-FR", {
     hour: "2-digit", minute: "2-digit",
@@ -103,9 +128,7 @@ export default function AppointmentCardPast({ appointment, variant }: Props) {
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-bold text-slate-700 truncate">
-                  {doctor
-                    ? `${doctor.profile.title ?? "Dr"} ${doctor.profile.firstName} ${doctor.profile.lastName}`
-                    : "Médecin"}
+                  {doctor ? doctorName : "Médecin"}
                 </p>
                 <p className="text-xs text-blue-900 font-medium">{doctor?.profile.specialty}</p>
               </div>
@@ -156,6 +179,31 @@ export default function AppointmentCardPast({ appointment, variant }: Props) {
             <p className="text-xs text-red-400 italic">{status.cancellationReason}</p>
           )}
 
+          {/* Avis — uniquement pour les RDV réellement terminés */}
+          {isCompleted && (
+            <div className="flex items-center gap-2">
+              {existingReview ? (
+                <>
+                  <StarRating value={existingReview.rating} size={14} />
+                  <button
+                    onClick={() => setIsReviewModalOpen(true)}
+                    className="text-xs text-slate-500 hover:text-blue-900 hover:underline cursor-pointer"
+                  >
+                    Modifier mon avis
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setIsReviewModalOpen(true)}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-blue-900 hover:underline cursor-pointer"
+                >
+                  <Star size={13} />
+                  Laisser un avis
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex items-center gap-2">
             <button
@@ -190,7 +238,7 @@ export default function AppointmentCardPast({ appointment, variant }: Props) {
             </div>
 
             <p className="text-xs text-slate-500 mb-3">
-              Avec {doctor ? `${doctor.profile.title ?? "Dr"} ${doctor.profile.firstName} ${doctor.profile.lastName}` : "votre médecin"}
+              Avec {doctorName}
             </p>
 
             <label className="block text-xs font-semibold text-slate-700 mb-2">
@@ -228,6 +276,18 @@ export default function AppointmentCardPast({ appointment, variant }: Props) {
           </div>
         </div>
       )}
+
+      {/* ── Modal Laisser/Modifier un avis ── */}
+      <LeaveReviewModal
+        isOpen={isReviewModalOpen}
+        onClose={() => setIsReviewModalOpen(false)}
+        appointmentId={appointment._id}
+        doctorName={doctorName}
+        onSuccess={() => {
+          // Rafraîchit l'affichage des étoiles sur CETTE carte, sans toucher aux autres
+          reviewService.getForAppointment(appointment._id).then(setExistingReview)
+        }}
+      />
     </div>
   )
 }

@@ -73,10 +73,11 @@ const isSlotStillBookable = (date: Date, slotStart: string): boolean => {
 export default function SlotPicker({ availability, selectedSlot, onSelectSlot }: SlotPickerProps) {
   const [currentDayIndex, setCurrentDayIndex] = useState(0)
 
-  // Trier les jours dans l'ordre de la semaine, en repartant du jour courant
+  // Trier par date réelle chronologique (pas par nom du jour) : si on est mardi,
+  // "lundi" doit passer APRÈS mercredi/vendredi puisqu'il tombe la semaine prochaine
   const sortedDays = useMemo(() =>
     [...availability].sort((a, b) =>
-      DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day)
+      getRealDateForDay(a.day).getTime() - getRealDateForDay(b.day).getTime()
     ),
     [availability]
   )

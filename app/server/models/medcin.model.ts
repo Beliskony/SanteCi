@@ -1,6 +1,5 @@
 import mongoose, { Schema } from 'mongoose';
 import { IDoctor } from '../interfaces/medecin.interface';
-import { required } from 'zod/mini';
 
 
 const DoctorSchema: Schema = new Schema({
@@ -87,6 +86,7 @@ const DoctorSchema: Schema = new Schema({
     totalConsultations: { type: Number, default: 0 },
     monthlyEarnings: { type: Number, default: 0 },
     patientSatisfaction: { type: Number, default: 0 },
+    reviewCount: {type: Number, default: 0},
     cancellationRate: { type: Number, default: 0 },
   },
   security: {

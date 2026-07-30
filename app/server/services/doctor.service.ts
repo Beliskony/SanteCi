@@ -228,18 +228,26 @@ async updatePhoto(doctorId: string, buffer: Buffer): Promise<{ photoUrl: string 
       if (dto.consultationFees.audio !== undefined) updateFields['telemedicine.consultationFees.audio'] = dto.consultationFees.audio;
       if (dto.consultationFees.chat !== undefined) updateFields['telemedicine.consultationFees.chat'] = dto.consultationFees.chat;
     }
-    if (dto.availability) updateFields['telemedicine.availability'] = dto.availability;
-
-  console.log('DB name:', Doctor.db.name);
-  console.log('Doctor _id ciblé:', doctorId);
-  console.log('updateFields:', JSON.stringify(updateFields));
+    if (dto.availability)  {
+      // Dédupliquer par horaire de départ ("start"), pour chaque jour,
+      // avant d'écraser en base — empêche les doublons du type
+      // "09:00" enregistré deux fois pour le même jour.
+      updateFields['telemedicine.availability'] = dto.availability.map((day) => {
+        const seen = new Set<string>();
+        const dedupedSlots = day.slots.filter((slot) => {
+          if (seen.has(slot.start)) return false;
+          seen.add(slot.start);
+          return true;
+        });
+        return { ...day, slots: dedupedSlots };
+      });
+    }
 
     const updated = await Doctor.findByIdAndUpdate(
       doctorId,
       { $set: updateFields },
       { new: true }
     ).select('-security.password');
-     console.log('Résultat après update:', JSON.stringify(updated?.telemedicine));
 
     if (!updated) throw new Error('Médecin introuvable.');
     return updated;
@@ -703,29 +711,15 @@ async updateSubscription(
 
   async incrementConsultationStats(
     doctorId: string,
-    earnings: number,
-    satisfaction?: number
+    earnings: number
   ): Promise<void> {
-    const updateData: Record<string, unknown> = {
+    await Doctor.findByIdAndUpdate(doctorId, {
       $inc: {
         'analytics.totalConsultations': 1,
         'analytics.monthlyEarnings': earnings,
         'telemedicine.totalConsultations': 1,
       },
-    };
-
-    if (satisfaction !== undefined) {
-      // Calcul moyenne glissante de satisfaction
-      const doctor = await Doctor.findById(doctorId).select('analytics.patientSatisfaction analytics.totalConsultations');
-      if (doctor) {
-        const total = doctor.analytics.totalConsultations + 1;
-        const currentAvg = doctor.analytics.patientSatisfaction || 0;
-        const newAvg = (currentAvg * (total - 1) + satisfaction) / total;
-        (updateData as { $set?: Record<string, unknown> }).$set = { 'analytics.patientSatisfaction': newAvg };
-      }
-    }
-
-    await Doctor.findByIdAndUpdate(doctorId, updateData);
+    });
   }
 
   // ── Delete account ─────────────────────────────────────────────────────────
@@ -923,9 +917,7 @@ async updatePrescription(
       .select('profile contact.phone contact.email contact.emergencyContacts health metadata')
       .lean();
 
-    if (!patient) throw new Error(
-       `Patient introuvable. [debug] db=${Patient.db.name} patientId=${patientId} doctorId=${doctorId}`
-    );
+    if (!patient) throw new Error('Patient introuvable.');
 
     const appointments = await Appointment.find({
       doctorId: new Types.ObjectId(doctorId),

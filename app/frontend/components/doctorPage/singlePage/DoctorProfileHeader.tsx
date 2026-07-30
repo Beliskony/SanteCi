@@ -2,6 +2,7 @@ import Image from "next/image"
 import { BadgeCheck, Star, Languages, Briefcase } from "lucide-react"
 import type { DoctorUser } from "@/app/frontend/store/useAuthStore"
 import { getDoctorTier } from "@/app/frontend/lib/doctorBadge"
+import { DoctorReviewsSection } from "../../ReviewComponents/DoctorReviewSection"
 
 interface DoctorProfileHeaderProps {
   doctor: Partial<DoctorUser>
@@ -12,8 +13,10 @@ export default function DoctorProfileHeader({ doctor }: DoctorProfileHeaderProps
 
   const fullName = `${profile?.title ?? "Dr"} ${profile?.firstName ?? ""} ${profile?.lastName ?? ""}`
   const rating = telemedicine?.rating ?? 0
-  const totalConsultations = analytics?.totalConsultations ?? 0
- const tier = getDoctorTier(status);
+  // ⚠️ reviewCount (nombre d'avis) ≠ totalConsultations (nombre de RDV honorés)
+  // Ajoute `reviewCount?: number` dans le type analytics de DoctorUser si pas déjà fait
+  const reviewCount = (analytics as any)?.reviewCount ?? 0
+  const tier = getDoctorTier(status);
   const languages = profile?.languages?.includes('fr') && profile?.languages?.includes('en') 
     ? "Français, Anglais" : profile?.languages?.includes('fr') ? "Français" 
     : profile?.languages?.includes('en') ? "Anglais" : "Non spécifié";
@@ -55,8 +58,10 @@ export default function DoctorProfileHeader({ doctor }: DoctorProfileHeaderProps
           {/* Spécialité */}
           <p className="text-blue-900 font-semibold text-sm mt-0.5">{profile?.specialty}</p>
 
-          {/* Patients count */}
-          <p className="text-slate-400 text-xs mt-0.5">{totalConsultations} avis patients</p>
+          {/* Nombre d'avis (pas le nombre de consultations) */}
+          <p className="text-slate-400 text-xs mt-0.5">
+            {reviewCount > 0 ? `${reviewCount} avis patients` : "Aucun avis pour le moment"}
+          </p>
 
           {/* Tags */}
           <div className="flex flex-wrap gap-3 mt-3">
@@ -89,6 +94,14 @@ export default function DoctorProfileHeader({ doctor }: DoctorProfileHeaderProps
         <div className="mt-5 pt-5 border-t border-slate-100">
           <p className="text-sm font-semibold text-slate-900 mb-2">Présentation</p>
           <p className="text-sm text-slate-500 leading-relaxed">{profile.bio}</p>
+        </div>
+      )}
+
+      {/* Avis patients */}
+      {doctor._id && (
+        <div className="mt-5 pt-5 border-t border-slate-100">
+          <p className="text-sm font-semibold text-slate-900 mb-3">Avis patients</p>
+          <DoctorReviewsSection doctorId={String(doctor._id)} />
         </div>
       )}
     </div>
