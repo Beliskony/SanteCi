@@ -1,16 +1,45 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
-import { Phone } from "lucide-react";
+import { useEffect, useCallback, useState } from "react";
+import { Phone, AlertCircle } from "lucide-react";
 import { useChatStore }   from "@/app/frontend/store/chatStore";
 import { useAuthStore }   from "@/app/frontend/store/useAuthStore";
 import { useCallStore }   from "@/app/frontend/store/callStore";
 import { useSocketStore } from "@/app/frontend/store/soketStore";
+import { appointmentService } from "@/app/frontend/services/consultationService";
 import ConversationList   from "@/app/frontend/components/dashboard/messagesComponents/ConversationList";
 import ConversationHeader from "@/app/frontend/components/dashboard/messagesComponents/ConversationHeader";
 import ConversationBody   from "@/app/frontend/components/dashboard/messagesComponents/ConversationBody";
 import MessageInput       from "@/app/frontend/components/dashboard/messagesComponents/MessageInput";
 import CallRoom           from "@/app/frontend/components/dashboard/callComponents/CallRoom";
+
+// ── Résoudre le rendez-vous appelable entre ce médecin et ce patient ─────────
+// Un appel a besoin d'un vrai Appointment "confirmed" ou "ongoing" — pas du
+// chatRoomId de la conversation. On va chercher le RDV le plus pertinent :
+// priorité à celui "ongoing", sinon le "confirmed" le plus proche de maintenant.
+async function resolveCallableAppointmentId(
+  doctorId: string,
+  patientId: string
+): Promise<string | null> {
+  const res = await appointmentService.list({ doctorId, patientId, limit: 20 });
+
+  const eligible = res.appointments.filter((a) =>
+    a.status.current === "ongoing" || a.status.current === "confirmed"
+  );
+
+  if (eligible.length === 0) return null;
+
+  const ongoing = eligible.find((a) => a.status.current === "ongoing");
+  if (ongoing) return ongoing._id;
+
+  const now = Date.now();
+  eligible.sort((a, b) =>
+    Math.abs(new Date(a.details.scheduledFor).getTime() - now) -
+    Math.abs(new Date(b.details.scheduledFor).getTime() - now)
+  );
+
+  return eligible[0]._id;
+}
 
 export default function MessagerieLayoutDoc() {
   const { activeChatRoomId, activeInterlocutor, openRoom } = useChatStore();
@@ -20,20 +49,42 @@ export default function MessagerieLayoutDoc() {
   const initiateCall = useSocketStore((s) => s.initiateCall);
   const phase        = useCallStore((s) => s.phase);
 
+  const [isResolvingCall, setIsResolvingCall] = useState(false);
+  const [callError, setCallError] = useState<string | null>(null);
+
   useEffect(() => {
     connect();
   }, [connect]);
 
-  const handleStartCall = useCallback((type: "audio" | "video") => {
+  const handleStartCall = useCallback(async (type: "audio" | "video") => {
     if (!user || !activeInterlocutor) return;
-    initiateCall({
-      callerId:      String(user._id),
-      callerType:    "doctor",           // ← doctor ici, patient dans l'autre layout
-      receiverId:    activeInterlocutor._id,
-      appointmentId: activeChatRoomId ?? "",
-      callType:      type,
-    });
-  }, [user, activeInterlocutor, activeChatRoomId, initiateCall]);
+
+    setCallError(null);
+    setIsResolvingCall(true);
+    try {
+      const appointmentId = await resolveCallableAppointmentId(
+        String(user._id),
+        activeInterlocutor._id
+      );
+
+      if (!appointmentId) {
+        setCallError("Aucun rendez-vous confirmé ou en cours avec ce patient — impossible de démarrer l'appel.");
+        return;
+      }
+
+      initiateCall({
+        callerId:      String(user._id),
+        callerType:    "doctor",
+        receiverId:    activeInterlocutor._id,
+        appointmentId,
+        callType:      type,
+      });
+    } catch (err: any) {
+      setCallError(err.message ?? "Impossible de vérifier le rendez-vous.");
+    } finally {
+      setIsResolvingCall(false);
+    }
+  }, [user, activeInterlocutor, initiateCall]);
 
   const isInCall = phase !== "idle" && phase !== "ended" &&
                    phase !== "declined" && phase !== "missed" && phase !== "failed";
@@ -53,6 +104,15 @@ export default function MessagerieLayoutDoc() {
 
       {activeChatRoomId && activeInterlocutor ? (
         <div className="flex flex-col flex-1 min-w-0 w-full h-full">
+          {callError && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border-b border-amber-100 text-xs text-amber-700">
+              <AlertCircle size={14} className="shrink-0" />
+              <span className="flex-1">{callError}</span>
+              <button onClick={() => setCallError(null)} className="font-semibold hover:underline">
+                Fermer
+              </button>
+            </div>
+          )}
           <ConversationHeader
             interlocutor={activeInterlocutor}
             onStartCall={handleStartCall}

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { format, isToday, isYesterday, isSameDay } from "date-fns";
 import { fr } from "date-fns/locale";
-import { useChatStore, type ChatMessageData } from "@/app/frontend/store/chatStore";
+import { useChatStore } from "@/app/frontend/store/chatStore";
 import { useAuthStore } from "@/app/frontend/store/useAuthStore";
 import MessageBubble from "./MessageBubble";
 

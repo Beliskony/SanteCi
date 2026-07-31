@@ -2,13 +2,6 @@ import { Server as HttpServer } from 'http';
 import { Server as SocketServer, Socket } from 'socket.io';
 import { callService } from '../services/Call.service';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface SocketUser {
-  userId:   string;
-  userType: 'doctor' | 'patient';
-  socketId: string;
-}
 
 // ─── Événements entrants (client → serveur) ───────────────────────────────────
 // call:initiate      → démarrer un appel
@@ -78,6 +71,7 @@ export class CallGateway {
       callType:      'audio' | 'video';
     }) => {
       try {
+        console.log('[CallGateway] call:initiate reçu :', data);
         const callSession = await callService.initiateCall(data);
 
         // Confirmer au caller que l'appel est initié
@@ -116,7 +110,8 @@ export class CallGateway {
         }
 
       } catch (err: any) {
-        socket.emit('call:failed', { message: err.message });
+        console.error('[CallGateway] call:initiate erreur :', err);
+        socket.emit('call:failed', { message: err?.message ?? 'Erreur inconnue côté serveur' });
       }
     });
 
@@ -146,7 +141,8 @@ export class CallGateway {
         }
 
       } catch (err: any) {
-        socket.emit('call:failed', { message: err.message });
+        console.error('[CallGateway] call:accept erreur :', err);
+        socket.emit('call:failed', { message: err?.message ?? 'Erreur inconnue côté serveur' });
       }
     });
 
@@ -178,7 +174,8 @@ export class CallGateway {
         socket.emit('call:declined', { callSessionId: data.callSessionId });
 
       } catch (err: any) {
-        socket.emit('call:failed', { message: err.message });
+        console.error('[CallGateway] call:decline erreur :', err);
+        socket.emit('call:failed', { message: err?.message ?? 'Erreur inconnue côté serveur' });
       }
     });
 
@@ -212,7 +209,8 @@ export class CallGateway {
         if (receiverSocketId) this.io.to(receiverSocketId).emit('call:ended', endPayload);
 
       } catch (err: any) {
-        socket.emit('call:failed', { message: err.message });
+        console.error('[CallGateway] call:end erreur :', err);
+        socket.emit('call:failed', { message: err?.message ?? 'Erreur inconnue côté serveur' });
       }
     });
 
@@ -236,7 +234,8 @@ export class CallGateway {
         const tokens = await callService.refreshTokens(data.callSessionId);
         socket.emit('call:tokens', tokens);
       } catch (err: any) {
-        socket.emit('call:failed', { message: err.message });
+        console.error('[CallGateway] call:token-refresh erreur :', err);
+        socket.emit('call:failed', { message: err?.message ?? 'Erreur inconnue côté serveur' });
       }
     });
   }

@@ -3,7 +3,7 @@ import connectDB  from '@/app/server/config/databaseConnect';
 import { getAuthUser } from '@/app/server/middleware/auth.middleware';
 import { callService } from '@/app/server/services/Call.service';
 
-// ─── GET /api/calls/[callSessionId] ───────────────────────────────────────
+// ─── GET /api/calls/[Id] ───────────────────────────────────────
 // Récupérer les détails d'une session d'appel
 
 export async function GET(

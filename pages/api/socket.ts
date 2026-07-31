@@ -9,6 +9,8 @@ import { Server as SocketServer }               from "socket.io";
 import type { Server as HttpServer }            from "http";
 import type { Socket as NetSocket }             from "net";
 import { CallGateway } from "@/app/server/services/Call.gateway";
+import { ChatGateway } from "@/app/server/services/Chat.gateway"; // ⚠️ adapte le chemin si différent
+import { setIO }       from "@/app/server/services/socketRegistry"; // ⚠️ adapte le chemin si différent
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,9 +52,16 @@ export default function handler(
     transports: ["websocket", "polling"],
   });
 
-  // ── Monter les gateways ───────────────────────────────────
-  // CallGateway gère les appels audio/vidéo
-  new CallGateway(res.socket.server as any);
+  // Rend l'instance io disponible à socketRegistry.emitToUser()
+  // (utilisé hors contexte socket direct, ex: notificationService)
+  setIO(io);
+
+  // ── Monter les gateways sur la MÊME instance io (pas res.socket.server !) ──
+  // C'était le bug : CallGateway recevait le serveur HTTP brut au lieu de
+  // l'instance Socket.IO, donc il écoutait des connexions TCP au lieu
+  // des connexions Socket.IO — aucun event applicatif n'était jamais reçu.
+  new ChatGateway(io);
+  new CallGateway(io);
 
   // Stocker l'instance pour le guard
   res.socket.server.io = io;

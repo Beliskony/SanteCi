@@ -98,7 +98,7 @@ function IncomingCallScreen({ onEnd }: { onEnd?: () => void }) {
   const user            = useAuthStore((s) => s.user);
 
   const userId = user
-    ? (typeof user._id === "string" ? user._id : user._id.toString())
+    ? (typeof user._id === "string" ? user._id : user._id)
     : "";
 
   const callerLabel = incomingPayload?.callType === "video"
@@ -190,7 +190,7 @@ export default function CallRoom({ onEnd }: CallRoomProps) {
   })();
 
   const userId = user
-    ? (typeof user._id === "string" ? user._id : user._id.toString())
+    ? (typeof user._id === "string" ? user._id : user._id)
     : "";
 
   // Scroll chat
