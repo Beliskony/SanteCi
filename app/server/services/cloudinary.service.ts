@@ -165,7 +165,7 @@ class CloudinaryService {
   }
 
   /** Document médical (consultation, ordonnance…) */
-  async uploadDocument(buffer: Buffer, documentId: string): Promise<CloudinaryUploadResult> {
+  async uploadDocumentOrdonance(buffer: Buffer, documentId: string): Promise<CloudinaryUploadResult> {
     return this.uploadBuffer(buffer, 'document', documentId);
   }
 
@@ -195,6 +195,32 @@ class CloudinaryService {
     });
 
     return { url: result.secure_url, publicId: result.public_id };
+  }
+
+
+  // ── Upload d'un document (PDF, etc.) — distinct de uploadProfilePhoto ──────
+  // resource_type: 'raw' est nécessaire pour les fichiers non-image (PDF, DOC...)
+  // sinon Cloudinary tente de les traiter comme des images et échoue.
+
+  async uploadDocument(
+    buffer: Buffer,
+    ownerId: string,
+    docType: string
+  ): Promise<{ url: string }> {
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder:       `verification_documents/${ownerId}`,
+          public_id:    `${docType}_${Date.now()}`,
+          resource_type: 'raw', // ← indispensable pour les PDF
+        },
+        (error, result) => {
+          if (error || !result) return reject(error ?? new Error('Échec upload document.'));
+          resolve({ url: result.secure_url });
+        }
+      );
+      uploadStream.end(buffer);
+    });
   }
 
   // ── Suppression ────────────────────────────────────────────────────────────

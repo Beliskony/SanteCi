@@ -99,6 +99,7 @@ const PreferencesSchema = z.object({
 
 const StatusSchema = z.object({
   isVerified:          z.boolean().default(false),
+  isOnline:            z.boolean().default(false),
   verificationCode:    z.string().optional(),
   verificationExpires: z.date().optional(),
   accountStatus:       z.enum(['active', 'suspended', 'blocked']).default('active'),
@@ -142,6 +143,7 @@ export const PatientSchema = z.object({
   })),
   status:      StatusSchema.default(() => ({
     isVerified:    false,
+    isOnline:      false,
     accountStatus: 'active'  as const,
     subscription:  'free'    as const,
   })),

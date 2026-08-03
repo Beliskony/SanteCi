@@ -162,6 +162,7 @@ export const useSocketStore = create<SocketState>()(
  
         // ── Présence en ligne ──────────────────────────────
         socket.on("user:online",  ({ userId: uid }: any) => {
+          console.log("[Socket] user:online reçu :", uid);
           useChatStore.getState().setInterlocutorOnline(uid, true);
         });
         socket.on("user:offline", ({ userId: uid }: any) => {

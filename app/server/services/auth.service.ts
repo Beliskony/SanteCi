@@ -29,7 +29,7 @@ interface RegisterDoctorDTO {
   phone: string;
   password: string;
   licenseNumber: string;
-  licenseExpiry: Date;
+  licenseExpiry?: Date;
   university: string;
   graduationYear: number;
   city: string;
@@ -88,7 +88,7 @@ class AuthService {
 
   // ── Register Doctor ────────────────────────────────────────────────────────
 
-  async registerDoctor(dto: RegisterDoctorDTO): Promise<{ message: string }> {
+  async registerDoctor(dto: RegisterDoctorDTO): Promise<AuthTokens & { user: object; message: string }> {
     const existing = await Doctor.findOne({ 'contact.email': dto.email });
     if (existing) throw new Error('Un compte médecin existe déjà avec cet email.');
 
@@ -96,7 +96,7 @@ class AuthService {
     const otp = generateOtp();
     const doctorId = `DOC-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 
-    await Doctor.create({
+    const doctor = await Doctor.create({
       doctorId,
       profile: {
         firstName: dto.firstName,
@@ -106,7 +106,7 @@ class AuthService {
       },
       professional: {
         licenseNumber: dto.licenseNumber,
-        licenseExpiry: dto.licenseExpiry,
+        licenseExpiry: dto.licenseExpiry ?? null,
         university: dto.university,
         graduationYear: dto.graduationYear,
         certifications: [],
@@ -132,9 +132,34 @@ class AuthService {
       },
     });
 
-    await mailService.sendOtp(dto.email, otp, 'doctor');
+    //await mailService.sendOtp(dto.email, otp, 'doctor');
 
-    return { message: 'Compte médecin créé. Vérifiez votre email pour activer votre compte.' };
+    // ── Connexion automatique : le médecin obtient une vraie session ─────
+    // dès la création du compte, exactement comme login() — nécessaire pour
+    // que l'étape 2 (upload documents) et l'étape 3 (dashboard) soient
+    // authentifiées au lieu de laisser un trou de sécurité.
+    const tokens = generateTokens({
+      id: String(doctor._id),
+      role: 'doctor',
+      email: doctor.contact.email,
+    });
+
+    return {
+      ...tokens,
+      message: 'Compte médecin créé. Vérifiez votre email pour activer votre compte.',
+      user: {
+        _id: doctor._id,
+        role: 'doctor',
+        doctorId: doctor.doctorId,
+        profile: doctor.profile,
+        contact: doctor.contact,
+        location: doctor.location,
+        professional: doctor.professional,
+        telemedicine: doctor.telemedicine,
+        status: doctor.status,
+        analytics: doctor.analytics,
+      },
+    };
   }
 
   // ── Register Patient ───────────────────────────────────────────────────────
@@ -376,18 +401,25 @@ class AuthService {
       const doctor = await Doctor.findOne({ 'contact.email': email });
       if (!doctor) throw new Error('Compte introuvable.');
 
+      // ── Vérification réelle du code OTP (manquait totalement) ──────────
+      if (!doctor.status.verificationCode || doctor.status.verificationCode !== otp) {
+        throw new Error('Code OTP invalide.');
+      }
 
+      if (!doctor.status.verificationExpires || doctor.status.verificationExpires < new Date()) {
+        throw new Error('Code OTP expiré. Demandez-en un nouveau.');
+      }
+
+      // ── L'OTP confirme seulement que l'email appartient au médecin ─────
+      // isVerified/accountStatus restent gérés par la vérification manuelle
+      // des documents professionnels (diplôme, licence) — pas par l'OTP.
       await Doctor.findByIdAndUpdate(doctor._id, {
         'contact.emailVerified': true,
-        'status.isVerified': true,
-        'status.accountStatus': 'active',
         'status.verificationCode': null,
         'status.verificationExpires': null,
       });
 
       await mailService.sendWelcome(email, doctor.profile.firstName, 'doctor');
-      console.log(otp);
-      
 
     } else {
       const patient = await Patient.findOne({ 'contact.email': email });

@@ -8,7 +8,13 @@ const DoctorSchema: Schema = new Schema({
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
     title: { type: String, enum: ['Dr', 'Pr', 'Médecin', 'Spécialiste'], required: true },
-    specialty: { type: String, enum: ['Cardiologie', 'Pédiatrie', 'Généraliste', 'Dermatologie', 'Psychiatrie', 'Gynécologie', 'autres...'], required: true },
+    specialty: { type: String, enum: [
+      'Médecine générale','Cardiologie','Dermatologie','Gynécologie',
+    'Neurologie','Ophtalmologie','Pédiatrie','Psychiatrie',
+    'Radiologie','Chirurgie générale','Orthopédie','ORL',
+    'Urologie','Endocrinologie','Gastro-entérologie','Pneumologie',
+    'Rhumatologie','Autre'
+    ], required: true },
     photo:     { type: String, default: null },
     bio: { type: String, default: '' },
     languages: { 
@@ -20,7 +26,7 @@ const DoctorSchema: Schema = new Schema({
   },
   professional: {
     licenseNumber: { type: String, required: true },
-    licenseExpiry: { type: Date, required: true },
+    licenseExpiry: { type: Date, default: null },
     university: { type: String, required: true },
     graduationYear: { type: Number, required: true },
     certifications: [{
@@ -29,6 +35,23 @@ const DoctorSchema: Schema = new Schema({
       issuer: { type: String, required: true },
       documentUrl: {type: String, required: true}
     }],
+    // ── Documents justifiant l'identité professionnelle du médecin ──
+    // Requis pour passer status.isVerified à true (vérification manuelle sous 24h)
+    verificationDocuments: [{
+      type: {
+        type: String,
+        enum: ['diploma', 'license_certificate', 'practice_attestation', 'other'],
+        required: true,
+      },
+      url:        { type: String, required: true },
+      fileName:   { type: String },
+      uploadedAt: { type: Date, default: Date.now },
+    }],
+    // ── Lieu d'exercice déclaré (hôpital, clinique, ou cabinet privé) ──
+    currentPractice: {
+      name: { type: String, default: '' },
+      type: { type: String, enum: ['hospital', 'clinic', 'private', 'other'], default: 'private' },
+    },
   },
   contact: {
     phone: { type: String, required: true, unique: true },

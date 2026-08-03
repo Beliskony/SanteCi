@@ -10,8 +10,11 @@ const ProfileSchema = z.object({
   lastName:  z.string().min(1),
   title:     z.enum(['Dr', 'Pr', 'Médecin', 'Spécialiste']),
   specialty: z.enum([
-    'Cardiologie', 'Pédiatrie', 'Généraliste',
-    'Dermatologie', 'Psychiatrie', 'Gynécologie', 'autres...',
+    'Médecine générale','Cardiologie','Dermatologie','Gynécologie',
+    'Neurologie','Ophtalmologie','Pédiatrie','Psychiatrie',
+    'Radiologie','Chirurgie générale','Orthopédie','ORL',
+    'Urologie','Endocrinologie','Gastro-entérologie','Pneumologie',
+    'Rhumatologie','Autre'
   ]),
   photo:     z.string().nullable().optional(), 
   bio:       z.string().default(''),
@@ -28,7 +31,7 @@ const CertificationSchema = z.object({
 
 const ProfessionalSchema = z.object({
   licenseNumber:  z.string().min(1),
-  licenseExpiry:  z.date(),
+  licenseExpiry:  z.date().optional().nullable(),
   university:     z.string().min(1),
   graduationYear: z.number().int().min(1900).max(new Date().getFullYear()),
   certifications: z.array(CertificationSchema).default([]),

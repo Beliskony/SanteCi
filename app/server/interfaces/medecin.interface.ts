@@ -9,7 +9,11 @@ export interface IDoctor extends Document {
     firstName: string;
     lastName: string;
     title: 'Dr' | 'Pr' | 'Médecin' | 'Spécialiste';
-    specialty: 'Cardiologie' | 'Pédiatrie' | 'Généraliste' | 'Dermatologie' | 'Psychiatrie' | 'Gynécologie' | 'autres...';
+    specialty: 'Cardiologie' |'Pédiatrie' | 'Généraliste' | 'Dermatologie' 
+    |'Psychiatrie' | 'Gynécologie' | 'Neurologie' | 'Ophtalmologie'
+    |'Radiologie' | 'Chirurgie générale' | 'Orthopédie'| 'ORL'
+    |'Urologie' | 'Endocrinologie' | 'Gastro-entérologie' | 'Pneumologie' | 'Rhumatologie' | 'Autre';
+
     photo: string;
     bio: string;
     languages: 'fr'| 'en'; 
@@ -19,7 +23,7 @@ export interface IDoctor extends Document {
   // Informations professionnelles
   professional: {
     licenseNumber: string;
-    licenseExpiry: Date;
+    licenseExpiry: Date | null;
     university: string;
     graduationYear: number;
     certifications: Array<{

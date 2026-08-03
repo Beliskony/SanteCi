@@ -1,6 +1,5 @@
 "use client";
 
-import { Bell } from "lucide-react";
 import { useAuthStore } from "@/app/frontend/store/useAuthStore";
 import { useAppointmentStore } from "@/app/frontend/store/appoitmentStore";
 
@@ -14,13 +13,6 @@ const PatHeader = () => {
       <h1 className="text-3xl font-bold text-gray-900">{user?.role}</h1>
 
       <div className="flex items-center gap-3">
-        {/* Cloche notifications */}
-        <button className="relative p-2 rounded-xl text-gray-500 hover:bg-gray-50 transition-colors">
-          <Bell size={20} />
-          {appointments.length > 0 && (
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-          )}
-        </button>
 
         {/* Profil */}
         <div className="flex items-center gap-3">

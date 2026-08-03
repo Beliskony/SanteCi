@@ -319,6 +319,32 @@ async updateMyProfile(data: Partial<DoctorProfile>): Promise<DoctorUser> {
   },
 
   /**
+   * Soumettre les documents de vérification professionnelle
+   * POST /doctor/ligne/verification-documents
+   */
+  async uploadVerificationDocuments(
+    files: {
+      diploma?:             File;
+      licenseCertificate?:  File;
+      practiceAttestation?: File;
+    },
+    practice: { name: string; type: string }
+  ): Promise<DoctorUser> {
+    const formData = new FormData();
+    if (files.diploma)             formData.append("diploma", files.diploma);
+    if (files.licenseCertificate)  formData.append("licenseCertificate", files.licenseCertificate);
+    if (files.practiceAttestation) formData.append("practiceAttestation", files.practiceAttestation);
+    formData.append("practiceName", practice.name);
+    formData.append("practiceType", practice.type);
+
+    const res = await api.uploadFile<ApiResponse<DoctorUser>>(
+      "/doctor/ligne/verification-documents",
+      formData
+    );
+    return res.data;
+  },
+
+  /**
    * Supprimer mon compte
    * DELETE /doctor/(auth)/ligne/delete
    */

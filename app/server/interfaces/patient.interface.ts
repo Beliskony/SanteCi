@@ -84,6 +84,7 @@ export interface IPatient extends Document {
   // Statut
   status: {
     isVerified: boolean;
+    isOnline: Boolean;
     verificationCode?: string;
     verificationExpires?: Date;
     accountStatus: 'active' | 'suspended' | 'blocked';

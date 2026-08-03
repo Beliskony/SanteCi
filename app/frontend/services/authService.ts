@@ -327,16 +327,33 @@ export const authService = {
   },
 
   async registerDoctor(payload: Omit<RegisterPayload, "role" | "dateOfBirth" | "gender">): Promise<{ message: string }> {
-    const { setLoading, setError } = useAuthStore.getState();
+    const { setLoading, setError, setUser } = useAuthStore.getState();
     setLoading(true);
     setError(null);
     try {
-      const res = await api.post<{ message: string }>(
+      // Route retourne { message, accessToken, refreshToken, user } — à PLAT, pas dans "data"
+      const res = await api.post<{
+        message: string;
+        accessToken: string;
+        refreshToken: string;
+        user: BackendUser;
+      }>(
         "/users/register/doctor",
         payload,
         false
       );
-      return res;
+
+      // Établir une vraie session immédiatement, comme après un login —
+      // nécessaire pour que l'étape 2 (upload documents) et le dashboard
+      // en étape 3 soient authentifiés au lieu de laisser un trou de sécurité.
+      const authUser = mapToAuthUser(res.user);
+      setUser(authUser, res.accessToken, res.refreshToken);
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("refresh-token", res.refreshToken);
+      }
+
+      return { message: res.message };
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erreur d'inscription";
       setError(message);

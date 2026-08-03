@@ -76,6 +76,7 @@ const PatientSchema: Schema = new Schema({
     },
     status: {
         isVerified: { type: Boolean, default: false },
+        isOnline: { type: Boolean, default: false },
         verificationCode: { type: String },
         verificationExpires: { type: Date },
         accountStatus: { type: String, enum: ['active', 'suspended', 'blocked'], default: 'active' },

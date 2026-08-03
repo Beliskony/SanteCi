@@ -26,8 +26,11 @@ export function DoctorCard({ doctor }: DoctorCardProps) {
   const tele    = doctor.telemedicine;
   const loc     = doctor.location;
 
-  const rating    = tele?.rating ?? 0;
-  const total     = tele?.totalConsultations ?? 0;
+  const rating  = tele?.rating ?? 0;
+  // ⚠️ reviewCount (nombre d'avis) ≠ totalConsultations (nombre de RDV honorés) —
+  // même distinction que sur DoctorProfileHeader. Ajoute `reviewCount?: number`
+  // dans analytics de DoctorUser si pas déjà fait.
+  const reviewCount = (doctor.analytics as any)?.reviewCount ?? 0;
   const types     = tele?.consultationTypes ?? [];
   const fees      = tele?.consultationFees;
   const minFee    = fees
@@ -96,9 +99,11 @@ export function DoctorCard({ doctor }: DoctorCardProps) {
                 <span className="text-xs font-semibold text-slate-700">
                   {rating.toFixed(1)}
                 </span>
-                <span className="text-xs text-slate-400">
-                  ({total} consult.)
-                </span>
+                {reviewCount > 0 && (
+                  <span className="text-xs text-slate-400">
+                    ({reviewCount} avis)
+                  </span>
+                )}
               </div>
               <div className="w-px h-3 bg-slate-200" />
               <div className="flex items-center gap-1 text-xs text-slate-500">
@@ -139,12 +144,6 @@ export function DoctorCard({ doctor }: DoctorCardProps) {
             className="flex-1 py-2 text-xs font-semibold text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
           >
             Voir le profil
-          </button>
-          <button
-            onClick={() => router.push(`/medecins/${doctor._id}?book=1`)}
-            className="flex-1 py-2 text-xs font-bold text-white bg-[#1e3a8a] rounded-xl hover:bg-blue-800 transition-colors"
-          >
-            Prendre RDV
           </button>
         </div>
       </div>

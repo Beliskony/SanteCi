@@ -734,6 +734,57 @@ async updateSubscription(
     return { message: 'Compte désactivé. Contactez le support pour une suppression définitive.' };
   }
 
+  // ── Soumettre les documents de vérification (diplôme, licence, attestation) ──
+  // Ne rend PAS le compte vérifié automatiquement — juste dispo pour revue manuelle
+  // par l'équipe SantéCI (status.isVerified reste false jusqu'à validation humaine).
+
+  async submitVerificationDocuments(
+    doctorId: string,
+    documents: Array<{ type: string; url: string; fileName: string }>,
+    practice: { name: string; type: string }
+  ): Promise<IDoctor> {
+    if (documents.length === 0) {
+      throw new Error('Aucun document fourni.');
+    }
+
+    const updated = await Doctor.findByIdAndUpdate(
+      doctorId,
+      {
+        $push: { 'professional.verificationDocuments': { $each: documents } },
+        $set: {
+          'professional.currentPractice.name': practice.name,
+          'professional.currentPractice.type': practice.type,
+        },
+      },
+      { new: true }
+    ).select('-security.password');
+
+    if (!updated) throw new Error('Médecin introuvable.');
+    return updated;
+  }
+
+  // ── Statut de vérification (pour afficher où en est le dossier) ────────────
+
+  async getVerificationStatus(doctorId: string): Promise<{
+    isVerified: boolean;
+    accountStatus: string;
+    documentsSubmitted: number;
+    currentPractice: { name: string; type: string };
+  }> {
+    const doctor = await Doctor.findById(doctorId)
+      .select('status.isVerified status.accountStatus professional.verificationDocuments professional.currentPractice')
+      .lean();
+
+    if (!doctor) throw new Error('Médecin introuvable.');
+
+    return {
+      isVerified:        doctor.status.isVerified,
+      accountStatus:     doctor.status.accountStatus,
+      documentsSubmitted: doctor.professional.verificationDocuments?.length ?? 0,
+      currentPractice:   doctor.professional.currentPractice ?? { name: '', type: 'private' },
+    };
+  }
+
 
   // ── Create prescription ────────────────────────────────────────────────────────
 

@@ -23,6 +23,13 @@ export function getSocketId(userId: string): string | undefined {
   return userSockets.get(userId);
 }
 
+// ── Liste des userId actuellement connectés en temps réel ────────────────
+// Utile pour synchroniser l'état "en ligne" d'un client qui vient tout juste
+// de se connecter, sans attendre qu'un event 'user:online' arrive plus tard.
+export function getOnlineUserIds(): string[] {
+  return Array.from(userSockets.keys());
+}
+
 export function emitToUser(userId: string, event: string, payload: any): boolean {
   if (!ioInstance) {
     console.warn('[socketRegistry] io non initialisé — emit ignoré.');

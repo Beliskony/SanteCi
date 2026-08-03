@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   LayoutDashboard,
@@ -15,6 +15,8 @@ import {
   X,
 } from "lucide-react";
 import { useAuthStore } from "@/app/frontend/store/useAuthStore";
+import { chatService } from "@/app/frontend/services/chatService";
+import { appointmentService } from "@/app/frontend/services/consultationService";
 import PatHeader from "@/app/frontend/components/dashboard/patient/PatHeader";
 import PatDash from "@/app/frontend/components/dashboard/patient/PatDash";
 import AppointmentPage from "@/app/frontend/components/dashboard/patient/AppointmentComponents/AppointmentPage";
@@ -34,6 +36,9 @@ const NAV_ITEMS: { label: string; key: ActivePage; icon: any }[] = [
   { label: "Dossier médical",    key: "dossier",    icon: FolderHeart },
 ];
 
+// Fréquence de rafraîchissement des badges (pas besoin de temps réel strict ici)
+const BADGE_REFRESH_MS = 30000;
+
 // ─── Rendu du contenu principal selon la page active ─────────
 const renderPage = (active: ActivePage) => {
   switch (active) {
@@ -47,15 +52,24 @@ const renderPage = (active: ActivePage) => {
   }
 };
 
+// ─── Petite pastille réutilisable (présence de nouveauté, pas de compteur) ────
+function NavBadge() {
+  return <span className="ml-auto w-2 h-2 rounded-full bg-[#1e3a8a] shrink-0" />;
+}
+
 // ─── Contenu partagé (desktop + drawer mobile) ────────────────
 const SidebarContent = ({
   active,
   setActive,
   onClose,
+  hasAppointmentToday,
+  hasUnreadMessages,
 }: {
   active: ActivePage;
   setActive: (key: ActivePage) => void;
   onClose?: () => void;
+  hasAppointmentToday: boolean;
+  hasUnreadMessages: boolean;
 }) => {
   const router = useAuthStore(); // garde ton import existant
 
@@ -117,6 +131,8 @@ const SidebarContent = ({
                 strokeWidth={isActive ? 2.2 : 1.8}
               />
               {label}
+              {key === "rdv" && hasAppointmentToday && <NavBadge />}
+              {key === "messages" && hasUnreadMessages && <NavBadge />}
             </button>
           );
         })}
@@ -156,6 +172,55 @@ const SidebarContent = ({
 const PatSideBar = () => {
   const [isOpen, setIsOpen]   = useState(false);
   const [active, setActive]   = useState<ActivePage>("dashboard");
+  const user = useAuthStore((s) => s.user);
+
+  const [hasAppointmentToday, setHasAppointmentToday] = useState(false);
+  const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
+
+  // ── Rafraîchir les badges ──────────────────────────────────
+  const refreshBadges = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const conversations = await chatService.getConversations();
+      const anyUnread = conversations.some((c) => (c.unreadCount ?? 0) > 0);
+      setHasUnreadMessages(anyUnread);
+    } catch (err) {
+      console.error("[PatSideBar] Erreur chargement conversations :", err);
+    }
+
+    try {
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const res = await appointmentService.list({
+        patientId: String(user._id),
+        from: startOfDay.toISOString(),
+        to:   endOfDay.toISOString(),
+        limit: 20,
+      });
+
+      const todayEligible = res.appointments.some((a) =>
+        ["confirmed", "ongoing"].includes(a.status.current)
+      );
+      setHasAppointmentToday(todayEligible);
+    } catch (err) {
+      console.error("[PatSideBar] Erreur chargement RDV du jour :", err);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    refreshBadges();
+    const interval = setInterval(refreshBadges, BADGE_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [refreshBadges]);
+
+  // En quittant la messagerie après l'avoir consultée, le compteur non-lu redevient à jour
+  useEffect(() => {
+    if (active !== "messages") refreshBadges();
+  }, [active, refreshBadges]);
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-[#f4f6fb]">
@@ -184,12 +249,23 @@ const PatSideBar = () => {
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
-        <SidebarContent active={active} setActive={setActive} onClose={() => setIsOpen(false)} />
+        <SidebarContent
+          active={active}
+          setActive={setActive}
+          onClose={() => setIsOpen(false)}
+          hasAppointmentToday={hasAppointmentToday}
+          hasUnreadMessages={hasUnreadMessages}
+        />
       </aside>
 
       {/* Sidebar fixe — desktop */}
       <aside className="hidden lg:flex flex-col h-screen w-64 bg-white border-r border-gray-100 shrink-0 sticky top-0">
-        <SidebarContent active={active} setActive={setActive} />
+        <SidebarContent
+          active={active}
+          setActive={setActive}
+          hasAppointmentToday={hasAppointmentToday}
+          hasUnreadMessages={hasUnreadMessages}
+        />
       </aside>
 
       {/* Contenu principal */}

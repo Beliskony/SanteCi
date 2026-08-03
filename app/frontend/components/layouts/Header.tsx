@@ -301,10 +301,10 @@ const isAuthenticated = hasHydrated && !!role && !!firstName;
                 Se connecter
               </button>
               <button
-                onClick={() => router.push("/medecins")}
+                onClick={() => router.push("/register")}
                 className="px-4 py-2 text-sm bg-[#1e3a8a] text-white rounded-lg hover:bg-[#3742fa] transition-colors duration-200"
               >
-                Prendre RDV
+                S'inscrire
               </button>
             </div>
           )}
@@ -402,10 +402,10 @@ const isAuthenticated = hasHydrated && !!role && !!firstName;
                   Se connecter
                 </button>
                 <button
-                  onClick={() => { setMenuOpen(false); router.push("/appointments"); }}
+                  onClick={() => { setMenuOpen(false); router.push("/register"); }}
                   className="w-full py-2.5 text-sm bg-[#1e3a8a] text-white rounded-lg hover:bg-[#3742fa] transition-colors"
                 >
-                  Prendre RDV
+                  S'inscrire
                 </button>
               </>
             )}
