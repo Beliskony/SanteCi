@@ -43,12 +43,10 @@ export function AccountSection() {
 
   const handleSave = async () => {
     clearError();
-    console.log("📤 Sauvegarde des données:", form);
     try {
       await updateMyProfile(form);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-      console.log("✅ Sauvegarde réussie !");
     } catch (e) {
       console.error("Échec updateMyProfile:", e);
     }
@@ -100,12 +98,11 @@ export function AccountSection() {
         {/* Champs éditables */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Spécialité">
-            <input
-              value={form.specialty}
-              onChange={(e) => setForm({ ...form, specialty: e.target.value })}
+            <p
               className="w-full text-sm text-slate-800 bg-transparent outline-none"
-              placeholder="Ex : Cardiologue"
-            />
+            >
+              {form.specialty}
+            </p>
           </Field>
 
           <Field label="Langue">
