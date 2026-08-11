@@ -1,13 +1,11 @@
+// app/api/patients/preferences/route.ts (sans ID dans l'URL)
 import { NextRequest, NextResponse } from 'next/server';
 import { patientService } from '@/app/server/services/patient.service';
 import { getAuthPatient } from '@/app/server/middleware/auth.middleware';
 import connectDB from '@/app/server/config/databaseConnect';
 
-// PUT /api/patients/[id]/preferences
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+// PATCH /api/patients/preferences (sans ID - on prend l'ID du token)
+export async function PATCH(req: NextRequest) {
   try {
     await connectDB();
 
@@ -20,23 +18,24 @@ export async function PUT(
       );
     }
 
-    const { id } = await params;
-    
-    if (String(authPatient._id) !== id) {
-      return NextResponse.json(
-        { success: false, message: 'Accès non autorisé.' },
-        { status: 403 }
-      );
-    }
-
     const body = await req.json();
-    const updated = await patientService.updatePreferences(id, body);
+    
+    // Utiliser l'ID du patient authentifié
+    const updatedPatient = await patientService.updatePreferences(
+      String(authPatient._id), 
+      body
+    );
 
-    return NextResponse.json({ success: true, data: updated.preferences });
+    // Retourner le patient complet (comme attendu par le frontend)
+    return NextResponse.json({ 
+      success: true, 
+      data: updatedPatient // Patient complet, pas seulement preferences
+    });
     
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
-    const status = message === 'Unauthorized' ? 401 : message === 'Patient introuvable.' ? 404 : 500;
+    const status = message === 'Unauthorized' ? 401 : 
+                   message === 'Patient introuvable.' ? 404 : 500;
     return NextResponse.json({ success: false, message }, { status });
   }
 }

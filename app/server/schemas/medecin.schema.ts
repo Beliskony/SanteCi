@@ -101,7 +101,11 @@ const StatusSchema = z.object({
   accountStatus:  z.enum(['active', 'pending', 'suspended', 'blocked']).default('pending'),
   subscription:   z.enum(['free', 'premium', 'elite']).default('free'),
   subscriptionExpiry: z.date().nullable().optional().default(null),
-  subscriptionReference: z.string().nullable().optional().default(null), 
+  subscriptionReference: z.string().nullable().optional().default(null),
+  verificationCode:    z.string().nullable().optional().default(null),
+  verificationExpires: z.date().nullable().optional().default(null),
+  subscriptionStatus:  z.string().nullable().optional().default(null),
+  expiryWarningNotifiedAt: z.string().nullable().optional().default(null),  
 });
 
 const AnalyticsSchema = z.object({
@@ -156,7 +160,11 @@ export const DoctorSchema = z.object({
     accountStatus: 'pending' as const,
     subscription:  'free'    as const,
     subscriptionExpiry: null, 
-    subscriptionReference: null, 
+    subscriptionReference: null,
+    verificationCode: null,
+    verificationExpires: null,
+    subscriptionStatus: null,
+    expiryWarningNotifiedAt: null, 
   })),
   analytics:    AnalyticsSchema.default(() => ({
     totalPatients:       0,

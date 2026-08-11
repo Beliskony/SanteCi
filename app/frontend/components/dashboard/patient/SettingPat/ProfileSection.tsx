@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Camera, Save, Loader2, User, MapPin } from "lucide-react";
+import { Camera, Save, Loader2, User } from "lucide-react";
 import { useAuthStore, isPatient, PatientProfile } from "@/app/frontend/store/useAuthStore";
 import { usePatientStore } from "@/app/frontend/store/patientStore";
 

@@ -102,7 +102,11 @@ const DoctorSchema: Schema = new Schema({
     accountStatus: { type: String, enum: ['active', 'pending', 'suspended', 'blocked'], default: 'pending' },
     subscription: { type: String, enum: ['free', 'premium', 'elite'], default: 'free' },
     subscriptionExpiry: { type: Date, default: null },
-    subscriptionReference:  { type: String, default: null }, 
+    subscriptionReference:  { type: String, default: null },
+    verificationCode:    { type: String,  default: null },
+    verificationExpires: { type: Date,    default: null },
+    subscriptionStatus:  { type: String,  default: null }, // utilisé par payment.service
+    expiryWarningNotifiedAt: { type: String, default: null }, 
   },
   analytics: {
     totalPatients: { type: Number, default: 0 },

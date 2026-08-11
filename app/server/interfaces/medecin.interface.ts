@@ -94,6 +94,10 @@ export interface IDoctor extends Document {
     subscription: 'free' | 'premium' | 'elite';
     subscriptionExpiry?: Date;
     subscriptionReference?: string;
+    verificationCode?: string;
+    verificationExpires?: Date;
+    subscriptionStatus?: string;
+    expiryWarningNotifiedAt?: string;
   };
   
   // Analytics
