@@ -1,6 +1,6 @@
 // ============================================================
 // types/index.ts — Types centralisés SanteMedCI
-// ⚠️  AuthUser / PatientUser / DoctorUser + leurs sous-types
+// AuthUser / PatientUser / DoctorUser + leurs sous-types
 //     sont importés directement depuis useAuthStore
 //     → source de vérité UNIQUE, zéro duplication, zéro conflit
 // ============================================================

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { User, Stethoscope, Check, Heart } from "lucide-react";
+import { User, Stethoscope, Check, Heart, ArrowLeft } from "lucide-react";
 
 const PATIENT_FEATURES = [
   "Recherche de spécialistes",
@@ -21,6 +21,13 @@ const RegisterChoicePage = () => {
 
   return (
     <div className="min-h-screen bg-[#f4f6fb] flex flex-col items-center justify-center px-4 py-12">
+      {/* ── Bouton acceuil ── */}
+      <div className="absolute top-4 left-4">
+        <Link href="/" className="flex items-start gap-2 text-sm text-gray-500 hover:text-[#1e3a8a]">
+          <ArrowLeft size={16} />
+          <span>Retour à l'accueil</span>
+        </Link>
+      </div>
 
       {/* ── En-tête ── */}
       <div className="flex flex-col items-center gap-3 mb-10">

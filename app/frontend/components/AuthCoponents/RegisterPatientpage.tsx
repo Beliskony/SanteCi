@@ -63,17 +63,17 @@ const RegisterPatientPage = () => {
     e.preventDefault();
     if (!acceptTerms) return;
     try {
-      await authService.register({
-        role: "patient",
-        firstName: form.firstName,
-        lastName: form.lastName,
-        email: form.email,
-        phone: `+225${form.phone.replace(/\s/g, "")}`,
-        gender: form.gender as "male" | "female" | "other",
-        dateOfBirth: form.dateOfBirth,
-        password: form.password,
+      await authService.registerPatient({
+          firstName: form.firstName,
+          lastName: form.lastName,
+          email: form.email || undefined,
+          phone: `+225${form.phone.replace(/\s/g, "")}`,
+          password: form.password,
+          city: form.city,
+          gender: form.gender as "male" | "female" | "other",
+          dateOfBirth: new Date(form.dateOfBirth),
       });
-      router.push("/dashboard/patient");
+      router.push("/patient");
     } catch {
       // erreur gérée dans le store via authService
     }

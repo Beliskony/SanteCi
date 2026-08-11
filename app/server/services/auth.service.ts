@@ -164,55 +164,92 @@ class AuthService {
 
   // ── Register Patient ───────────────────────────────────────────────────────
 
-  async registerPatient(dto: RegisterPatientDTO): Promise<{ message: string }> {
-    if (dto.email) {
-      const existing = await Patient.findOne({ 'contact.email': dto.email });
-      if (existing) throw new Error('Un compte patient existe déjà avec cet email.');
-    }
-
-    const phoneExists = await Patient.findOne({ 'contact.phone': dto.phone });
-    if (phoneExists) throw new Error('Ce numéro de téléphone est déjà utilisé.');
-
-    const hashedPassword = await bcrypt.hash(dto.password, SALT_ROUNDS);
-    const otp = generateOtp();
-    const patientId = `PAT-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
-
-    await Patient.create({
-      patientId,
-      profile: {
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        dateOfBirth: dto.dateOfBirth,
-        gender: dto.gender,
-      },
-      contact: {
-        phone: dto.phone,
-        phoneVerified: false,
-        email: dto.email,
-        emailVerified: false,
-        emergencyContacts: [],
-      },
-      location: { city: dto.city },
-      security: {
-        password: hashedPassword,
-        isPatient: true,
-        isActive: true,
-        failedAttempts: 0,
-      },
-      status: {
-        isVerified: false,
-        verificationCode: otp,
-        verificationExpires: otpExpiry(),
-        accountStatus: 'active',
-      },
-    });
-
-    if (dto.email) {
-      await mailService.sendOtp(dto.email, otp, 'patient');
-    }
-
-    return { message: 'Compte patient créé. Vérifiez votre email pour activer votre compte.' };
+  async registerPatient(dto: RegisterPatientDTO): Promise<AuthTokens & { user: object; message: string }> {
+  if (dto.email) {
+    const existing = await Patient.findOne({ 'contact.email': dto.email });
+    if (existing) throw new Error('Un compte patient existe déjà avec cet email.');
   }
+
+  const phoneExists = await Patient.findOne({ 'contact.phone': dto.phone });
+  if (phoneExists) throw new Error('Ce numéro de téléphone est déjà utilisé.');
+
+  const hashedPassword = await bcrypt.hash(dto.password, SALT_ROUNDS);
+  const otp = generateOtp();
+  const patientId = `PAT-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+
+  const patient = await Patient.create({
+    patientId,
+    profile: {
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      dateOfBirth: dto.dateOfBirth,
+      gender: dto.gender,
+    },
+    contact: {
+      phone: dto.phone,
+      phoneVerified: false,
+      email: dto.email,
+      emailVerified: false,
+      emergencyContacts: [],
+    },
+    location: { city: dto.city },
+    security: {
+      password: hashedPassword,
+      isPatient: true,
+      isActive: true,
+      failedAttempts: 0,
+    },
+    status: {
+      isVerified: false,
+      verificationCode: otp,
+      verificationExpires: otpExpiry(),
+      accountStatus: 'active',
+    },
+  });
+
+  if (dto.email) {
+    await mailService.sendOtp(dto.email, otp, 'patient');
+  }
+
+  // ── Connexion automatique — même logique que registerDoctor ──────────
+  const tokens = generateTokens({
+    id: String(patient._id),
+    role: 'patient',
+    email: patient.contact.email ?? '',
+  });
+
+  return {
+    ...tokens,
+    message: 'Compte patient créé. Vérifiez votre email pour activer votre compte.',
+    user: {
+      _id: patient._id,
+      role: 'patient',
+      firstName: patient.profile.firstName,
+      lastName: patient.profile.lastName,
+      email: patient.contact.email,
+      photo: patient.profile.photo || null,
+      isVerified: patient.status.isVerified,
+      accountStatus: patient.status.accountStatus,
+      genre: patient.profile.gender,
+      groupSangin: patient.profile.bloodGroup,
+      health: {
+        allergies: patient.health.allergies,
+        chronicDiseases: patient.health.chronicDiseases,
+        currentMedications: patient.health.currentMedications,
+        disabilities: patient.health.disabilities,
+        height: patient.health.height,
+        weight: patient.health.weight,
+        bmi: patient.health.bmi,
+      },
+      postition: {
+        city: patient.location.city,
+        district: patient.location.district,
+        address: patient.location.address,
+        coordinates: patient.location.coordinates,
+      },
+    },
+  };
+}
 
   // ── Login ──────────────────────────────────────────────────────────────────
 

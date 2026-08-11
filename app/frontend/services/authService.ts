@@ -285,7 +285,6 @@ export const authService = {
       );
 
       const { accessToken, refreshToken, user } = res.data;
-      console.log("🔍 BACKEND USER BRUT:", JSON.stringify(user, null, 2));
 
       // Adapter l'objet plat backend → structure store
       const authUser = mapToAuthUser(user);
@@ -307,24 +306,37 @@ export const authService = {
   },
 
   async registerPatient(payload: Omit<RegisterPayload, "role" | "title" | "specialty" | "licenseNumber" | "licenseExpiry" | "university" | "graduationYear">): Promise<{ message: string }> {
-    const { setLoading, setError } = useAuthStore.getState();
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.post<{ message: string }>(
-        "/users/register/patient",
-        payload,
-        false
-      );
-      return res;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur d'inscription";
-      setError(message);
-      throw err;
-    } finally {
-      setLoading(false);
+  const { setLoading, setError, setUser } = useAuthStore.getState();
+  setLoading(true);
+  setError(null);
+  try {
+    const res = await api.post<{
+      message: string;
+      accessToken: string;
+      refreshToken: string;
+      user: BackendUser;
+    }>(
+      "/users/register/patient",
+      payload,
+      false
+    );
+
+    const authUser = mapToAuthUser(res.user);
+    setUser(authUser, res.accessToken, res.refreshToken);
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem("refresh-token", res.refreshToken);
     }
-  },
+
+    return { message: res.message };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Erreur d'inscription";
+    setError(message);
+    throw err;
+  } finally {
+    setLoading(false);
+  }
+},
 
   async registerDoctor(payload: Omit<RegisterPayload, "role" | "dateOfBirth" | "gender">): Promise<{ message: string }> {
     const { setLoading, setError, setUser } = useAuthStore.getState();

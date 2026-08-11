@@ -1,5 +1,6 @@
 // app/dashboard/doctor/layout.tsx
 import DocSideBar from "@/app/frontend/components/dashboard/doctor/DocSideBar";
+import RouteGuard from "@/app/frontend/components/layouts/RouteGuard";
 
 export default function DoctorDashboardLayout({
   children,
@@ -7,10 +8,11 @@ export default function DoctorDashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-[#f4f6fb]">
-      {/* Sidebar fixe à gauche */}
-      <DocSideBar />
-
-    </div>
+    <RouteGuard role="doctor">
+      <div className="flex h-screen w-full overflow-hidden bg-[#f4f6fb]">
+        {/* Sidebar fixe à gauche */}
+        <DocSideBar />
+      </div>
+    </RouteGuard>
   );
 }

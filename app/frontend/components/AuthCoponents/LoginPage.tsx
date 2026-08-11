@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Mail, Lock, Eye, EyeOff, ArrowRight, User, Stethoscope, Heart, Shield } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, ArrowRight, User, Stethoscope, Heart, Shield, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ForgotPasswordModal from "./Forgotpasswordmodal";
@@ -51,6 +51,14 @@ const LoginPage = () => {
       {/* ── Colonne gauche — formulaire ── */}
       <div className="w-full lg:w-1/2 flex flex-col justify-center items-center px-8 py-12 bg-white">
         <div className="w-full max-w-sm flex flex-col gap-7">
+
+          {/* ── Bouton acceuil ── */}
+          <div className="absolute top-4 left-4">
+            <Link href="/" className="flex items-start gap-2 text-sm text-gray-500 hover:text-[#1e3a8a]">
+              <ArrowLeft size={16} />
+              <span>Retour à l'accueil</span>
+            </Link>
+          </div>
 
           {/* Logo */}
           <div className="flex flex-col items-center gap-3">
