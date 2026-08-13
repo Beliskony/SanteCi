@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bell, Globe, Lock, Loader2 } from "lucide-react";
 import { useAuthStore, isPatient } from "@/app/frontend/store/useAuthStore";
 import { usePatientStore } from "@/app/frontend/store/patientStore";
@@ -10,6 +10,9 @@ export function PreferencesSection() {
   const user    = useAuthStore((s) => s.user);
   const patient = user && isPatient(user) ? user : null;
   const prefs   = patient?.preferences;
+  const error      = usePatientStore((s) => s.error);
+  const clearError = usePatientStore((s) => s.clearError);
+  const fetchProfile = usePatientStore((s) => s.fetchProfile);
 
   const updatePreferences = usePatientStore((s) => s.updatePreferences);
   const isSaving          = usePatientStore((s) => s.isSaving);
@@ -25,6 +28,10 @@ export function PreferencesSection() {
     showMedicalInfo:prefs?.privacy?.showMedicalInfo?? false,
     shareLocation:  prefs?.privacy?.shareLocation  ?? false,
   });
+
+  useEffect(() => {
+    fetchProfile(); // sync les préférences depuis la DB au montage
+  }, []);
 
   const [saved, setSaved] = useState(false);
 
@@ -112,6 +119,7 @@ export function PreferencesSection() {
       </div>
 
       <SaveButton onSave={handleSave} isSaving={isSaving} saved={saved} />
+      {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
     </div>
   );
 }

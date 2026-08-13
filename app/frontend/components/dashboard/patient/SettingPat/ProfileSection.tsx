@@ -225,7 +225,7 @@ export function SaveButton({
         {isSaving ? (
           <><Loader2 size={14} className="animate-spin" /> Enregistrement...</>
         ) : saved ? (
-          "✓ Enregistré !"
+          "Enregistré !"
         ) : (
           <><Save size={14} /> Enregistrer</>
         )}

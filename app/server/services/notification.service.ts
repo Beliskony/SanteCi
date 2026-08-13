@@ -2,6 +2,7 @@ import { Types } from 'mongoose';
 import { Notification } from '../models/notification.model';
 import { INotification } from '../interfaces/notification.interface';
 import type { TNotificationData } from '../schemas/notification.schema';
+import { mailService } from '../services/mail.service';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -19,6 +20,7 @@ interface CreateNotificationDTO {
   channels?: Partial<INotification['channels']>;
   priority?: Priority;
   expiresAt?: Date;
+  recipientEmail?: string; // email réel du destinataire, pour l'envoi mail
 }
 
 interface ListFilters {
@@ -61,7 +63,44 @@ class NotificationService {
       },
     });
 
+   {/*  // ── Envoyer l'email si le canal email est activé ──────────────────────
+    if (notification.channels.email && dto.recipientEmail) {
+      try {
+        await mailService.sendAppointmentConfirmation({
+          to:      dto.recipientEmail,
+          subject: dto.title,
+          html:    `<p>${dto.body}</p>`,
+        });
+        await this.markAsSent(String(notification._id));
+      } catch (err) {
+        console.error('[NotificationService] Email échec :', err);
+        // On ne bloque pas si l'email échoue
+      }
+    } */}
+
     return notification;
+  }
+
+  // ── Lire les préférences de notification du patient ───────────────────────
+
+  private async resolveChannels(
+    userId: string,
+    userType: UserType
+  ): Promise<Partial<INotification['channels']>> {
+    // Les médecins n'ont pas de préférences de notification → défauts
+    if (userType !== 'patient') return {};
+
+    const { Patient } = await import('../models/patient.model');
+    const patient = await Patient.findById(userId)
+      .select('preferences.notifications')
+      .lean();
+
+    return {
+      push:  patient?.preferences?.notifications?.push  ?? true,
+      email: patient?.preferences?.notifications?.email ?? false,
+      sms:   patient?.preferences?.notifications?.sms   ?? false,
+      inApp: true, // toujours actif peu importe la préférence
+    };
   }
 
   // ── Helpers de création rapide ─────────────────────────────────────────────
@@ -72,22 +111,19 @@ class NotificationService {
     userType: UserType,
     appointmentId: string,
     doctorName: string,
-    scheduledFor: Date
+    scheduledFor: Date,
+    recipientEmail?: string
   ): Promise<INotification> {
-    const date = scheduledFor.toLocaleDateString('fr-FR', {
-      weekday: 'long', day: 'numeric', month: 'long',
-    });
-    const time = scheduledFor.toLocaleTimeString('fr-FR', {
-      hour: '2-digit', minute: '2-digit',
-    });
+    const channels = await this.resolveChannels(userId, userType);
     return this.create({
-      userId,
-      userType,
-      type:  'appointment',
+      userId, userType,
+      type: 'appointment',
       title: 'Rendez-vous confirmé',
-      body:  `Votre rendez-vous avec ${doctorName} est confirmé pour le ${date} à ${time}.`,
-      data:  { appointmentId: new Types.ObjectId(appointmentId) as any },
+      body: `Votre rendez-vous avec Dr ${doctorName} est confirmé pour le ${scheduledFor.toLocaleString('fr-FR')}.`,
+      data: { appointmentId: new Types.ObjectId(appointmentId) as any },
+      channels,
       priority: 'high',
+      recipientEmail,
     });
   }
 
@@ -95,18 +131,19 @@ class NotificationService {
     userId: string,
     userType: UserType,
     appointmentId: string,
-    reason?: string
+    reason?: string,
+    recipientEmail?: string
   ): Promise<INotification> {
+    const channels = await this.resolveChannels(userId, userType);
     return this.create({
-      userId,
-      userType,
-      type:  'appointment',
+      userId, userType,
+      type: 'appointment',
       title: 'Rendez-vous annulé',
-      body:  reason
-        ? `Votre rendez-vous a été annulé. Motif : ${reason}.`
-        : 'Votre rendez-vous a été annulé.',
-      data:  { appointmentId: new Types.ObjectId(appointmentId) as any },
+      body: reason ? `Votre rendez-vous a été annulé. Motif : ${reason}.` : 'Votre rendez-vous a été annulé.',
+      data: { appointmentId: new Types.ObjectId(appointmentId) as any },
+      channels,
       priority: 'high',
+      recipientEmail,
     });
   }
 
@@ -115,20 +152,20 @@ class NotificationService {
     userType: UserType,
     appointmentId: string,
     minutesBefore: number,
-    scheduledFor: Date
+    scheduledFor: Date,
+    recipientEmail?: string
   ): Promise<INotification> {
-    const time = scheduledFor.toLocaleTimeString('fr-FR', {
-      hour: '2-digit', minute: '2-digit',
-    });
+    const channels = await this.resolveChannels(userId, userType);
     return this.create({
-      userId,
-      userType,
-      type:  'reminder',
+      userId, userType,
+      type: 'reminder',
       title: `Rappel — consultation dans ${minutesBefore} min`,
-      body:  `Votre consultation commence à ${time}. Préparez-vous !`,
-      data:  { appointmentId: new Types.ObjectId(appointmentId) as any },
+      body: `Votre consultation commence dans ${minutesBefore} minutes.`,
+      data: { appointmentId: new Types.ObjectId(appointmentId) as any },
+      channels,
       priority: 'high',
       expiresAt: scheduledFor,
+      recipientEmail,
     });
   }
 

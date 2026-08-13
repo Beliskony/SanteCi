@@ -92,6 +92,8 @@ const PatientSchema: Schema = new Schema({
 });
 
 PatientSchema.index({ 'profile.firstName': 'text', 'profile.lastName': 'text' });
+//PatientSchema.index({ 'contact.phone': 1 });
+//PatientSchema.index({ 'contact.email': 1 });
 PatientSchema.index({ 'status.accountStatus': 1 });
 PatientSchema.index({ 'location.city': 1 });
 

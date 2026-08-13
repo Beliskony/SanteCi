@@ -2,10 +2,12 @@
 
 import { useAuthStore } from "@/app/frontend/store/useAuthStore";
 import { useAppointmentStore } from "@/app/frontend/store/appoitmentStore";
+import { User } from "lucide-react";
 
 const PatHeader = () => {
   const user         = useAuthStore((s) => s.user);
   const profile      = user && "profile" in user ? user.profile : null;
+  const initials = `${user?.profile?.firstName?.[0] ?? ""}${user?.profile?.lastName?.[0] ?? ""}`;
   const appointments = useAppointmentStore((s) => s.appointments);
 
   return (
@@ -23,12 +25,14 @@ const PatHeader = () => {
             <p className="text-xs text-gray-400">{user?.role}</p>
           </div>
 
-          <div className="w-9 h-9 rounded-full bg-gray-200 overflow-hidden shrink-0">
-            <img
-                    src={user?.profile?.photo || "/default_profile_photo.jpg"}
-                    alt="Avatar"
-                    className="w-9 h-9 rounded-full object-cover border-2 border-[#1e3a8a]/20"
-                  />
+          <div className="w-16 h-16 overflow-hidden shrink-0">
+            {user?.profile?.photo ? (
+            <img src={user.profile.photo} alt="Photo" className="w-20 h-20 rounded-2xl object-cover border-2 border-white shadow-md" />
+          ) : (
+            <div className="w-15 h-15 rounded-2xl bg-linear-to-br from-[#1e3a8a] to-blue-400 flex items-center justify-center text-white text-2xl font-bold shadow-md">
+              {initials || <User size={28} />}
+            </div>
+          )}
           </div>
         </div>
       </div>

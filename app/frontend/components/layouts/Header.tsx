@@ -1,6 +1,6 @@
 "use client";
 
-import { Phone, Bell, Menu, X, Video, LayoutDashboard, Settings, LogOut, ChevronDown } from "lucide-react";
+import { Phone, Bell, Menu, X, Video, LayoutDashboard, Settings, LogOut, ChevronDown, User } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useRef, useState, useMemo } from "react";
@@ -56,6 +56,7 @@ const Header = () => {
   const firstName = useAuthStore((s) => s.user?.profile?.firstName);
   const lastName  = useAuthStore((s) => s.user?.profile?.lastName);
   const photo     = useAuthStore((s) => s.user?.profile?.photo);
+  const initials = `${firstName?.[0] ?? ""}${lastName?.[0] ?? ""}`;
   const title     = useAuthStore((s) =>
     s.user?.role === "doctor" ? (s.user as any).profile?.title : undefined
   );
@@ -244,11 +245,15 @@ const isAuthenticated = hasHydrated && !!role && !!firstName;
                   onClick={() => { setUserDropdown(!userDropdown); setNotifDropdown(false); }}
                   className="flex items-center gap-2.5 hover:bg-gray-50 rounded-xl px-2 py-1 transition-colors"
                 >
-                  <img
-                    src={photo || "/default_profile_photo.jpg"}
-                    alt="Avatar"
-                    className="w-9 h-9 rounded-full object-cover border-2 border-[#1e3a8a]/20"
-                  />
+                  <div className="w-10 h-10 overflow-hidden shrink-0">
+                    {photo ? (
+                        <img src={photo} alt="Photo" className="w-20 h-20 rounded-2xl object-cover border-2 border-white shadow-md" />
+                        ) : (
+                        <div className="w-10 h-10 rounded-2xl bg-linear-to-br from-[#1e3a8a] to-blue-400 flex items-center justify-center text-white text-2xl font-bold shadow-md">
+                        {initials || <User size={28} />}
+                      </div>
+                     )}
+                  </div>
                   <div className="flex flex-col items-start leading-tight">
                     <span className="text-sm font-semibold text-[#1e3a8a]">
                       {firstName ?? "Utilisateur"} {lastName ?? ""}
@@ -342,11 +347,15 @@ const isAuthenticated = hasHydrated && !!role && !!firstName;
             {isAuthenticated ? (
               <>
                 <div className="flex items-center gap-3 px-3 py-3 rounded-xl border border-gray-200 bg-gray-50">
-                  <img
-                    src={photo || "/default_profile_photo.jpg"}
-                    alt="Avatar"
-                    className="w-9 h-9 rounded-full object-cover"
-                  />
+                  <div className="w-10 h-10 overflow-hidden shrink-0">
+                    {photo ? (
+                        <img src={photo} alt="Photo" className="w-20 h-20 rounded-2xl object-cover border-2 border-white shadow-md" />
+                        ) : (
+                        <div className="w-10 h-10 rounded-2xl bg-linear-to-br from-[#1e3a8a] to-blue-400 flex items-center justify-center text-white text-2xl font-bold shadow-md">
+                        {initials || <User size={28} />}
+                      </div>
+                     )}
+                  </div>
                   <div className="flex flex-col items-start leading-tight">
                     <span className="text-sm font-semibold text-[#1e3a8a]">
                       {firstName} {lastName}

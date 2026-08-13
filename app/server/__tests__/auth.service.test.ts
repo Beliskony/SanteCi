@@ -146,6 +146,32 @@ describe('authService.registerPatient', () => {
     city: 'Bouaké',
   };
 
+  const createdPatient = {
+    _id: 'pat123',
+    patientId: 'PAT-ABCD1234',
+    profile: {
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      dateOfBirth: dto.dateOfBirth,
+      gender: dto.gender,
+    },
+    contact: {
+      phone: dto.phone,
+      phoneVerified: false,
+      email: dto.email,
+      emailVerified: false,
+      emergencyContacts: [],
+    },
+    location: { city: dto.city },
+    health: {
+      allergies: [],
+      chronicDiseases: [],
+      currentMedications: [],
+      disabilities: [],
+    },
+    status: { isVerified: false, accountStatus: 'active' },
+  };
+
   it("rejette si l'email est déjà utilisé", async () => {
     (Patient.findOne as any).mockReturnValueOnce(mockQuery({ _id: 'x' }));
 
@@ -164,9 +190,9 @@ describe('authService.registerPatient', () => {
     );
   });
 
-  it('crée le patient et envoie un OTP si un email est fourni', async () => {
+  it('crée le patient, envoie un OTP et connecte automatiquement si un email est fourni', async () => {
     (Patient.findOne as any).mockReturnValue(mockQuery(null));
-    (Patient.create as any).mockResolvedValue({ _id: 'pat123' });
+    (Patient.create as any).mockResolvedValue(createdPatient);
 
     const result = await authService.registerPatient(dto);
 
@@ -176,15 +202,25 @@ describe('authService.registerPatient', () => {
       'patient'
     );
     expect(result.message).toMatch(/créé/);
+
+    // Connexion automatique : tokens + user retournés comme après un login
+    expect(result.accessToken).toEqual(expect.any(String));
+    expect(result.refreshToken).toEqual(expect.any(String));
+    expect(result.user).not.toHaveProperty('security');
   });
 
-  it("n'envoie pas d'OTP si aucun email n'est fourni", async () => {
+  it("n'envoie pas d'OTP si aucun email n'est fourni, mais connecte quand même le patient", async () => {
     (Patient.findOne as any).mockReturnValue(mockQuery(null));
-    (Patient.create as any).mockResolvedValue({ _id: 'pat123' });
+    (Patient.create as any).mockResolvedValue({
+      ...createdPatient,
+      contact: { ...createdPatient.contact, email: undefined },
+    });
 
-    await authService.registerPatient({ ...dto, email: undefined });
+    const result = await authService.registerPatient({ ...dto, email: undefined });
 
     expect(mailService.sendOtp).not.toHaveBeenCalled();
+    expect(result.accessToken).toEqual(expect.any(String));
+    expect(result.refreshToken).toEqual(expect.any(String));
   });
 });
 
