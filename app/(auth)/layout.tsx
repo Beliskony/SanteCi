@@ -7,7 +7,7 @@ export default function PublicLayout({
 }) {
   return (
     <div className='min-h-screen'>
-      {/* Navbar, Header communs à toutes tes pages publiques */}
+      {/* Navbar, Header communs à toutes tes pages register et login */}
       <main>{children}</main>
       {/* Footer commun */}
     </div>

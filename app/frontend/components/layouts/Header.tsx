@@ -243,13 +243,13 @@ const isAuthenticated = hasHydrated && !!role && !!firstName;
               <div className="relative" ref={userRef}>
                 <button
                   onClick={() => { setUserDropdown(!userDropdown); setNotifDropdown(false); }}
-                  className="flex items-center gap-2.5 hover:bg-gray-50 rounded-xl px-2 py-1 transition-colors"
+                  className="flex items-center gap-2.5 hover:bg-gray-50 rounded-xl px-2 py-1 transition-colors cursor-pointer"
                 >
-                  <div className="w-10 h-10 overflow-hidden shrink-0">
+                  <div className="w-13 h-13 overflow-hidden shrink-0">
                     {photo ? (
-                        <img src={photo} alt="Photo" className="w-20 h-20 rounded-2xl object-cover border-2 border-white shadow-md" />
+                        <img src={photo} alt="Photo" className="w-13 h-13 rounded-full object-cover border-2 border-white shadow-md" />
                         ) : (
-                        <div className="w-10 h-10 rounded-2xl bg-linear-to-br from-[#1e3a8a] to-blue-400 flex items-center justify-center text-white text-2xl font-bold shadow-md">
+                        <div className="w-13 h-13 rounded-full bg-linear-to-br from-[#1e3a8a] to-blue-400 flex items-center justify-center text-white text-2xl font-bold shadow-md">
                         {initials || <User size={28} />}
                       </div>
                      )}
@@ -347,11 +347,11 @@ const isAuthenticated = hasHydrated && !!role && !!firstName;
             {isAuthenticated ? (
               <>
                 <div className="flex items-center gap-3 px-3 py-3 rounded-xl border border-gray-200 bg-gray-50">
-                  <div className="w-10 h-10 overflow-hidden shrink-0">
+                  <div className="w-13 h-13 overflow-hidden shrink-0">
                     {photo ? (
-                        <img src={photo} alt="Photo" className="w-20 h-20 rounded-2xl object-cover border-2 border-white shadow-md" />
+                        <img src={photo} alt="Photo" className="w-13 h-13 rounded-full object-cover border-2 border-white shadow-md" />
                         ) : (
-                        <div className="w-10 h-10 rounded-2xl bg-linear-to-br from-[#1e3a8a] to-blue-400 flex items-center justify-center text-white text-2xl font-bold shadow-md">
+                        <div className="w-13 h-13 rounded-full bg-linear-to-br from-[#1e3a8a] to-blue-400 flex items-center justify-center text-white text-2xl font-bold shadow-md">
                         {initials || <User size={28} />}
                       </div>
                      )}

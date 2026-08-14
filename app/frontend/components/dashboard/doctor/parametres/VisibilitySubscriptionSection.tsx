@@ -208,16 +208,16 @@ export function VisibilitySection() {
 
   const [saved, setSaved] = useState(false);
   const [prefs, setPrefs] = useState({
-    showProfile:  true,
-    showLocation: true,
-    showBio:      true,
+    showProfile:  user?.preferences?.privacy?.showProfile  ?? true,
+    showLocation: user?.preferences?.privacy?.showLocation ?? true,
+    showBio:      user?.preferences?.privacy?.showBio      ?? true,
   });
 
   const togglePref = (key: keyof typeof prefs) =>
     setPrefs((p) => ({ ...p, [key]: !p[key] }));
 
   const handleSave = async () => {
-    await updateMyProfile({ bio: user?.profile?.bio } as any);
+    await updateMyProfile({ privacy: prefs });
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };

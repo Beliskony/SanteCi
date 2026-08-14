@@ -4,7 +4,7 @@ import { useState } from "react";
 import { User, Shield, Video, Eye, CreditCard } from "lucide-react";
 import { AccountSection } from "./AccountSection";
 import { TelemedicineSection } from "./Telemedicinesection";
-import { SecuritySection } from "../../patient/SettingPat/SecuritySection";
+import DoctorSecuritySection  from "@/app/frontend/components/dashboard/doctor/parametres/DoctorSecuritySection"
 import { VisibilitySection, SubscriptionSection } from "./VisibilitySubscriptionSection";
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
@@ -61,7 +61,7 @@ export default function SettingsPage() {
           {/* Contenu */}
           <div className="flex-1 min-w-0">
             {active === "compte"       && <AccountSection />}
-            {active === "securite"     && <SecuritySection />}
+            {active === "securite"     && <DoctorSecuritySection />}
             {active === "telemedecine" && <TelemedicineSection />}
             {active === "visibilite"   && <VisibilitySection />}
             {active === "abonnement"   && <SubscriptionSection />}

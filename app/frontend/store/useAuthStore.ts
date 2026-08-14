@@ -63,9 +63,18 @@ export interface PatientHealth {
   chronicDiseases: string[];
   currentMedications: string[];
   disabilities?: string[];
+  bloodPressure?: string;
   height?: number;
   weight?: number;
   bmi?: number;
+}
+
+export interface DoctorPreferences {
+  privacy: {
+    showProfile: boolean;
+    showLocation: boolean;
+    showBio: boolean;
+  };
 }
 
 export interface PatientSecurity {
@@ -203,6 +212,7 @@ export interface DoctorUser {
   professional: DoctorProfessional;
   telemedicine: DoctorTelemedicine;
   affiliations: DoctorAffiliations;
+  preferences: DoctorPreferences;
   security: DoctorSecurity;
   status: BaseStatus & { isOnline: boolean; lastActive: Date };
   analytics: DoctorAnalytics;
@@ -254,6 +264,7 @@ interface AuthState {
   updateTelemedicine: (data: Partial<DoctorTelemedicine>) => void;
   updateDoctorProfessional: (data: Partial<DoctorProfessional>) => void;
   updateDoctorStatus: (data: Partial<BaseStatus & { isOnline: boolean }>) => void;
+  updateDoctorPreferences: (prefs: Partial<DoctorPreferences>) => void;
 
   // Patient only
   updateHealth: (health: Partial<PatientHealth>) => void;
@@ -329,6 +340,12 @@ export const useAuthStore = create<AuthState>()(
           const { user } = get();
           if (!user || !isDoctor(user)) return;
           set({ user: { ...user, status: { ...user.status, ...data } } });
+        },
+
+        updateDoctorPreferences: (prefs) => {
+          const { user } = get();
+          if (!user || !isDoctor(user)) return;
+          set({ user: { ...user, preferences: { ...user.preferences, ...prefs } } });
         },
 
         updateProfilePhoto: (photoUrl: string) => {

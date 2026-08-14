@@ -24,6 +24,11 @@ interface UpdateProfileDTO {
   address?: string;
   phone?: string;
   emergencyContact?: string;
+  privacy?: {
+    showProfile?: boolean;
+    showLocation?: boolean;
+    showBio?: boolean;
+  };
 }
 
 interface UpdateTelemedicineDTO {
@@ -150,7 +155,28 @@ class DoctorService {
       .lean();
 
     if (!doctor) throw new Error('Médecin introuvable.');
-    return doctor;
+     const privacy = doctor.preferences?.privacy ?? { showProfile: true, showLocation: true, showBio: true };
+
+    // Profil masqué : le médecin a désactivé la visibilité publique
+    if (!privacy.showProfile) {
+      throw new Error('Ce profil n\'est pas accessible publiquement.');
+    }
+
+    const result: Partial<IDoctor> = { ...doctor };
+
+    if (!privacy.showBio) {
+      result.profile = { ...doctor.profile, bio: '' };
+    }
+
+    if (!privacy.showLocation) {
+      result.location = {
+        city: doctor.location.city, // ville conservée (utile pour la recherche/pertinence)
+      } as IDoctor['location'];
+    }
+
+    delete (result as any).preferences;
+
+    return result;
   }
 
   // ── Update profile ─────────────────────────────────────────────────────────
@@ -168,6 +194,11 @@ class DoctorService {
     if (dto.city) updateFields['location.city'] = dto.city;
     if (dto.district !== undefined) updateFields['location.district'] = dto.district;
     if (dto.address !== undefined) updateFields['location.address'] = dto.address;
+    if (dto.privacy) {
+      if (dto.privacy.showProfile !== undefined) updateFields['preferences.privacy.showProfile'] = dto.privacy.showProfile;
+      if (dto.privacy.showLocation !== undefined) updateFields['preferences.privacy.showLocation'] = dto.privacy.showLocation;
+      if (dto.privacy.showBio !== undefined) updateFields['preferences.privacy.showBio'] = dto.privacy.showBio;
+    }
     if (dto.phone) {
       const exists = await Doctor.findOne({ 'contact.phone': dto.phone });
       if (exists && String(exists._id) !== doctorId) {
@@ -294,6 +325,7 @@ async updatePhoto(doctorId: string, buffer: Buffer): Promise<{ photoUrl: string 
     const query: QueryFilter<IDoctor> = {
       'status.accountStatus': 'active',
       'status.isVerified': true,
+      'preferences.privacy.showProfile': { $ne: false }, // exclut les profils masqués — $ne:false inclut aussi les docs sans preferences (legacy)
     };
 
     if (specialty) query['profile.specialty'] = { $regex: specialty, $options: 'i' };
@@ -312,6 +344,20 @@ async updatePhoto(doctorId: string, buffer: Buffer): Promise<{ photoUrl: string 
       .skip(skip)
       .limit(limit)
       .lean();
+
+
+    // ── Masquer bio/location selon les préférences avant le tri par abonnement ──
+    const filtered = doctors.map((doc) => {
+    const privacy = (doc as any).preferences?.privacy ?? { showLocation: true, showBio: true };
+    const { preferences, ...rest } = doc as any;
+
+      return {
+        ...rest,
+        profile: privacy.showBio ? rest.profile : { ...rest.profile, bio: '' },
+        location: privacy.showLocation ? rest.location : { city: rest.location.city },
+      };
+    });
+    
 
     // ── Calculer le poids d'abonnement en mémoire + trier ─────────────────
     const weighted = doctors.map(doc => {

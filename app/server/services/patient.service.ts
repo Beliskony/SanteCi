@@ -26,6 +26,7 @@ interface UpdateHealthDTO {
   disabilities?: string[];
   height?: number;
   weight?: number;
+  bloodPressure?: string;
 }
 
 interface EmergencyContactDTO {
@@ -136,6 +137,7 @@ class PatientService {
     if (dto.chronicDiseases !== undefined) updateFields['health.chronicDiseases'] = dto.chronicDiseases;
     if (dto.currentMedications !== undefined) updateFields['health.currentMedications'] = dto.currentMedications;
     if (dto.disabilities !== undefined) updateFields['health.disabilities'] = dto.disabilities;
+    if (dto.bloodPressure !== undefined) updateFields['health.bloodPressure'] = dto.bloodPressure;
     if (dto.height !== undefined) {
       updateFields['health.height'] = dto.height;
     }

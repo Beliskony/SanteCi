@@ -44,6 +44,7 @@ const PatientSchema: Schema = new Schema({
     height: { type: Number },
     weight: { type: Number },
     bmi: { type: Number },
+    bloodPressure: { type: String },
     },
   prescriptions: [{
     prescriptionId: { type: mongoose.Types.ObjectId, ref: 'Prescription', required: true },

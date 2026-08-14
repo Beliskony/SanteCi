@@ -43,6 +43,14 @@ export interface IDoctor extends Document {
     emailVerified: boolean;
     emergencyContact?: string;
   };
+
+  preferences: {
+    privacy: {
+      showProfile: boolean;
+      showLocation: boolean;
+      showBio: boolean;
+    };
+  };
   
   // Télémédecine
   telemedicine: {

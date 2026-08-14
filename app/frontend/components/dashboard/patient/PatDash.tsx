@@ -218,7 +218,7 @@ const PatDash = () => {
             <div>
               <p className="text-xs text-gray-400 mb-0.5">Tension artérielle</p>
               <p className="text-base font-bold text-gray-900">
-                — <span className="text-xs font-normal text-gray-400">mmHg</span>
+                {bmi} <span className="text-xs font-normal text-gray-400">mmHg</span>
               </p>
             </div>
           </div>

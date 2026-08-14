@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { User, Bell, ShieldCheck, ChevronRight } from "lucide-react";
+import { User, Bell, ShieldCheck, ChevronRight, HeartPulse } from "lucide-react";
 import { useAuthStore, isPatient } from "@/app/frontend/store/useAuthStore";
 import { ProfileSection }     from "./ProfileSection";
 import { PreferencesSection } from "./PreferencesSection";
 import { SecuritySection }    from "./SecuritySection";
+import { VitalesSection } from "./VitalesSection";
 
 // ── Navigation ────────────────────────────────────────────────────────────────
 
-type SectionKey = "profile" | "preferences" | "security";
+type SectionKey = "profile" | "preferences" | "health" | "security";
 
 const SECTIONS: { key: SectionKey; label: string; description: string; icon: React.ReactNode }[] = [
   {
@@ -23,6 +24,12 @@ const SECTIONS: { key: SectionKey; label: string; description: string; icon: Rea
     label:       "Préférences",
     description: "Langue, notifications, confidentialité",
     icon:        <Bell size={16} />,
+  },
+  {
+    key:         "health",
+    label:       "Santé",
+    description: "Poids, taille, tension, constantes vitales",
+    icon:        <HeartPulse size={16} />,
   },
   {
     key:         "security",
@@ -124,6 +131,7 @@ export default function SettingsPage() {
 
               {/* Contenu dynamique */}
               {active === "profile"     && <ProfileSection />}
+              {active === "health"      && <VitalesSection />}
               {active === "preferences" && <PreferencesSection />}
               {active === "security"    && <SecuritySection />}
             </div>

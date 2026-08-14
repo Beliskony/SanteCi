@@ -122,6 +122,18 @@ const DeviceSchema = z.object({
   lastActive: z.date(),
 });
 
+const DoctorPrivacySchema = z.object({
+  showProfile:  z.boolean().default(true),
+  showLocation: z.boolean().default(true),
+  showBio:      z.boolean().default(true),
+});
+
+const DoctorPreferencesSchema = z.object({
+  privacy: DoctorPrivacySchema.default(() => ({
+    showProfile: true, showLocation: true, showBio: true,
+  })),
+});
+
 const SecuritySchema = z.object({
   password:         z.string().min(8),
   isMedcin:         z.boolean().default(true),
@@ -141,6 +153,9 @@ export const DoctorSchema = z.object({
   profile:      ProfileSchema,
   professional: ProfessionalSchema,
   contact:      ContactSchema,
+  preferences:  DoctorPreferencesSchema.default(() => ({
+    privacy: { showProfile: true, showLocation: true, showBio: true },
+  })),
   telemedicine: TelemedicineSchema.default(() => ({
     isAvailable:         false,
     consultationTypes:   [],

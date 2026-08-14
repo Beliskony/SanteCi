@@ -189,6 +189,7 @@ export function ProfileSection() {
         </div>
       </div>
 
+
       {/* ── Bouton save ── */}
       <SaveButton onSave={handleSave} isSaving={isSaving} saved={saved} />
     </div>

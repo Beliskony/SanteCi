@@ -45,6 +45,7 @@ export interface IPatient extends Document {
     height?: number; // en cm
     weight?: number; // en kg
     bmi?: number;
+    bloodPressure?: string,
   };
 
   prescriptions?: Array<{

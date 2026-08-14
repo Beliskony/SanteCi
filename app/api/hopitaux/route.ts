@@ -3,6 +3,18 @@ import { hospitalClinicService } from '@/app/server/services/hopital.service';
 import { getAuthDoctor } from '@/app/server/middleware/auth.middleware';
 import { CreateHospitalClinicSchema } from '@/app/server/schemas/HospitalClinic.schema';
 import connectDB from '@/app/server/config/databaseConnect';
+import type { HospitalType, HospitalCategory } from '@/app/server/interfaces/hopitalClinic.interface';
+
+const HOSPITAL_TYPES: readonly HospitalType[] = ['hospital', 'clinic', 'pharmacy', 'laboratory', 'imaging_center'] as const;
+const HOSPITAL_CATEGORIES: readonly HospitalCategory[] = ['public', 'private', 'community'] as const;
+
+function parseEnumParam<T extends string>(
+  value: string | null,
+  allowed: readonly T[]
+): T | undefined {
+  if (!value) return undefined;
+  return (allowed as readonly string[]).includes(value) ? (value as T) : undefined;
+}
 
 // GET /api/hospitals?city=&district=&type=&category=&telemedicineEnabled=&homeVisits=&emergency24h=&specialty=&page=&limit=
 export async function GET(req: NextRequest) {
@@ -14,8 +26,8 @@ export async function GET(req: NextRequest) {
     const filters = {
       city:                searchParams.get('city')     ?? undefined,
       district:            searchParams.get('district') ?? undefined,
-      type:                searchParams.get('type')     ?? undefined,
-      category:            searchParams.get('category') ?? undefined,
+      type:                parseEnumParam<HospitalType>(searchParams.get('type'), HOSPITAL_TYPES),
+      category:            parseEnumParam<HospitalCategory>(searchParams.get('category'), HOSPITAL_CATEGORIES),
       specialty:           searchParams.get('specialty') ?? undefined,
       telemedicineEnabled: searchParams.has('telemedicineEnabled') ? searchParams.get('telemedicineEnabled') === 'true' : undefined,
       homeVisits:          searchParams.has('homeVisits')          ? searchParams.get('homeVisits')          === 'true' : undefined,
@@ -25,11 +37,10 @@ export async function GET(req: NextRequest) {
     };
 
     const result = await hospitalClinicService.search(filters);
-    console.log("result:", JSON.stringify(result, null, 2));
     return NextResponse.json({ success: true, ...result });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
-     console.error("GET /api/hopitaux error:", error);
+    console.error("GET /api/hopitaux error:", error);
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }

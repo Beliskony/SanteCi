@@ -81,33 +81,30 @@ class PaymentService {
 
   // ── Initier un abonnement médecin ─────────────────────────────────────────
 
-  async initiateSubscription(dto: InitiateSubscriptionDTO): Promise<PaymentResult> {
-    const doctor = await Doctor.findById(dto.doctorId);
-    if (!doctor) throw new Error('Médecin introuvable.');
+async initiateSubscription(dto: InitiateSubscriptionDTO): Promise<PaymentResult> {
+  const doctor = await Doctor.findById(dto.doctorId);
+  if (!doctor) throw new Error('Médecin introuvable.');
 
-    const expiry = new Date();
-    expiry.setMonth(expiry.getMonth() + 1);
+  // On n'active RIEN ici — on note juste qu'un paiement est en cours.
+  // status.subscription ne change qu'à la confirmation du webhook.
+  await Doctor.findByIdAndUpdate(dto.doctorId, {
+    $set: {
+      'status.subscriptionReference': dto.referenceNumber,
+      'status.subscriptionStatus':    'pending',
+      'metadata.updatedAt':           new Date(),
+    },
+  });
 
-    await Doctor.findByIdAndUpdate(dto.doctorId, {
-      $set: {
-        'status.subscription':          dto.plan,
-        'status.subscriptionExpiry':    expiry,
-        'status.subscriptionReference': dto.referenceNumber,
-        'status.subscriptionStatus':    'pending',
-        'metadata.updatedAt':           new Date(),
-      },
-    });
-
-    return {
-      transactionId:   dto.referenceNumber,
-      doctorId:        dto.doctorId,
-      amount:          dto.amount,
-      currency:        dto.currency,
-      status:          'pending',
-      referenceNumber: dto.referenceNumber,
-      type:            'subscription',
-    };
-  }
+  return {
+    transactionId:   dto.referenceNumber,
+    doctorId:        dto.doctorId,
+    amount:          dto.amount,
+    currency:        dto.currency,
+    status:          'pending',
+    referenceNumber: dto.referenceNumber,
+    type:            'subscription',
+  };
+}
 
   // ── Confirmer consultation (webhook) ──────────────────────────────────────
 
@@ -126,35 +123,45 @@ class PaymentService {
     });
   }
 
-  // ── Confirmer abonnement (webhook) ────────────────────────────────────────
+// ── Confirmer abonnement (webhook) ────────────────────────────────────────
 
-  async confirmSubscription(referenceNumber: string, status: 'success' | 'failed'): Promise<void> {
-    const doctor = await Doctor.findOne({
-      'status.subscriptionReference': referenceNumber,
-    });
-    if (!doctor) throw new Error('Médecin introuvable pour cette référence.');
+async confirmSubscription(referenceNumber: string, status: 'success' | 'failed'): Promise<void> {
+  const doctor = await Doctor.findOne({
+    'status.subscriptionReference': referenceNumber,
+  });
+  if (!doctor) throw new Error('Médecin introuvable pour cette référence.');
 
-    if (status === 'success') {
-      const expiry = new Date();
-      expiry.setMonth(expiry.getMonth() + 1);
-      await Doctor.findByIdAndUpdate(String(doctor._id), {
-        $set: {
-          'status.subscriptionStatus': 'active',
-          'status.subscriptionExpiry': expiry,
-          'metadata.updatedAt':        new Date(),
-        },
-      });
-    } else {
-      // Échec → repasser en free
-      await Doctor.findByIdAndUpdate(String(doctor._id), {
-        $set: {
-          'status.subscription':       'free',
-          'status.subscriptionStatus': 'failed',
-          'metadata.updatedAt':        new Date(),
-        },
-      });
+  if (status === 'success') {
+    // Le plan ciblé n'est pas stocké côté médecin avant confirmation —
+    // on le retrouve depuis la référence, ex: "SUB-<doctorId>-PREMIUM-<ts>"
+    const planMatch = referenceNumber.match(/-(PREMIUM|ELITE)-/i);
+    const plan = planMatch ? (planMatch[1].toLowerCase() as 'premium' | 'elite') : null;
+
+    if (!plan) {
+      throw new Error(`Impossible de déterminer le plan depuis la référence "${referenceNumber}".`);
     }
+
+    const expiry = new Date();
+    expiry.setMonth(expiry.getMonth() + 1);
+
+    await Doctor.findByIdAndUpdate(String(doctor._id), {
+      $set: {
+        'status.subscription':       plan,      // ← activé seulement ici, au succès confirmé
+        'status.subscriptionStatus': 'active',
+        'status.subscriptionExpiry': expiry,
+        'metadata.updatedAt':        new Date(),
+      },
+    });
+  } else {
+    // Échec → rien n'a jamais été activé, on nettoie juste la référence en attente
+    await Doctor.findByIdAndUpdate(String(doctor._id), {
+      $set: {
+        'status.subscriptionStatus': 'failed',
+        'metadata.updatedAt':        new Date(),
+      },
+    });
   }
+}
 
   // ── Simuler (dev uniquement) ───────────────────────────────────────────────
 

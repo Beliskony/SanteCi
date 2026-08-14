@@ -31,6 +31,11 @@ export interface UpdateProfileDTO {
   address?: string;
   phone?: string;
   emergencyContact?: string;
+    privacy?: {
+    showProfile?: boolean;
+    showLocation?: boolean;
+    showBio?: boolean;
+  };
 }
 
 export interface UpdateSubscriptionDTO {
@@ -66,7 +71,7 @@ interface DoctorDashState {
 
   // ── Actions profil ────────────────────────────────────────
   fetchMyProfile:      ()                               => Promise<void>;
-  updateMyProfile:     (data: Partial<DoctorProfile>)  => Promise<void>;
+  updateMyProfile:     (data: Partial<UpdateProfileDTO>)  => Promise<void>;
   uploadPhoto:         (file: File)                     => Promise<void>;
   updateTelemedicine:  (data: Partial<DoctorTelemedicine>) => Promise<void>;
   setOnlineStatus:     (isOnline: boolean)              => Promise<void>;
@@ -140,6 +145,10 @@ export const useDoctorDashStore = create<DoctorDashState>()(
           const updated = await doctorService.updateMyProfile(data);
           // doctorService sync useAuthStore.updateDoctorProfile en interne
           useAuthStore.getState().updateDoctorProfile(updated.profile);
+
+          if (data.privacy) {
+            useAuthStore.getState().updateDoctorPreferences({ privacy: data.privacy as any });
+          }
           
         } catch (err) {
           set({ error: toMessage(err) });

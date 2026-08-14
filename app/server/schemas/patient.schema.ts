@@ -54,6 +54,7 @@ const HealthSchema = z.object({
   height:             z.number().positive().optional(),   // cm
   weight:             z.number().positive().optional(),   // kg
   bmi:                z.number().positive().optional(),
+  bloodPressure:      z.string().optional(),
 }).refine(
   (h) => {
     if (h.height && h.weight) {

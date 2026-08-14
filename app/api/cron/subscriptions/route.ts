@@ -12,8 +12,17 @@ export async function GET(req: NextRequest) {
 
   try {
     await connectDB();
-    const result = await subscriptionService.downgradeExpired();
-    return NextResponse.json({ success: true, downgraded: result.downgraded });
+
+    const [downgradeResult, cleanupResult] = await Promise.all([
+      subscriptionService.downgradeExpired(),
+      subscriptionService.cleanupStalePending(),
+    ]);
+
+    return NextResponse.json({
+      success: true,
+      downgraded: downgradeResult.downgraded,
+      cleanedPending: cleanupResult.cleaned,
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';
     return NextResponse.json({ success: false, message }, { status: 500 });

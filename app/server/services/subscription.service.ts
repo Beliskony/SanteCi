@@ -47,6 +47,31 @@ class SubscriptionService {
   }
 
 
+// ── Nettoyer les demandes d'abonnement restées "pending" trop longtemps ────
+// Le webhook n'est parfois jamais appelé (onglet fermé, réseau coupé) —
+// sans ce nettoyage, subscriptionStatus reste "pending" indéfiniment.
+// Appeler régulièrement (cron), ex: toutes les 15-30 min.
+
+async cleanupStalePending(timeoutMinutes: number = 30): Promise<{ cleaned: number }> {
+  const cutoff = new Date(Date.now() - timeoutMinutes * 60000);
+
+  const result = await Doctor.updateMany(
+    {
+      'status.subscriptionStatus': 'pending',
+      'metadata.updatedAt': { $lt: cutoff },
+    },
+    {
+      $set: {
+        'status.subscriptionStatus': 'failed',
+        'metadata.updatedAt': new Date(),
+      },
+    }
+  );
+
+  return { cleaned: result.modifiedCount };
+}
+
+
     // ── Alerter les médecins dont l'abonnement expire bientôt (cron, ex: 1x/jour) ──
 
   async notifyExpiringSoon(daysBefore: number = 3): Promise<{ notified: number }> {
@@ -95,6 +120,8 @@ class SubscriptionService {
     if (!this.isSubscriptionActive(doctor)) return 'free';
     return doctor?.status?.subscription ?? 'free';
   }
+
+
 }
 
 export const subscriptionService = new SubscriptionService();

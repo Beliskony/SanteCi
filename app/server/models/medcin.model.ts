@@ -60,6 +60,13 @@ const DoctorSchema: Schema = new Schema({
     emailVerified:{type:Boolean,default:false},
     emergencyContact: { type: String, default: '' },
   },
+  preferences: {
+   privacy: {
+    showProfile:  { type: Boolean, default: true },
+    showLocation: { type: Boolean, default: true },
+    showBio:      { type: Boolean, default: true },
+   },
+  },
   telemedicine: {
     isAvailable: { type: Boolean, default: false },
     consultationTypes: [{ type: String, enum: ['video', 'audio', 'chat'] }],

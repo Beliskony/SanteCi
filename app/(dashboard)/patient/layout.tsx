@@ -8,7 +8,7 @@ export default function PatientDashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <RouteGuard role="patient">
+    <RouteGuard>
       <div className="flex h-screen w-full overflow-hidden bg-[#f4f6fb]">
         {/* Sidebar fixe à gauche */}
         <PatSideBar />
