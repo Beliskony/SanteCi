@@ -125,7 +125,7 @@ describe('paymentService.initiateSubscription', () => {
     await expect(paymentService.initiateSubscription(dto)).rejects.toThrow('Médecin introuvable.');
   });
 
-  it("initie l'abonnement et fixe l'expiration à +1 mois", async () => {
+  it("initie l'abonnement et le passe en 'pending' avec la référence", async () => {
     (Doctor.findById as any).mockResolvedValue({ _id: 'doc1' });
     (Doctor.findByIdAndUpdate as any).mockResolvedValue(undefined);
 
@@ -133,9 +133,10 @@ describe('paymentService.initiateSubscription', () => {
 
     expect(result.status).toBe('pending');
     expect(result.type).toBe('subscription');
+
     const updateArg = (Doctor.findByIdAndUpdate as any).mock.calls[0][1];
-    expect(updateArg.$set['status.subscription']).toBe('premium');
-    expect(updateArg.$set['status.subscriptionExpiry']).toBeInstanceOf(Date);
+    expect(updateArg.$set['status.subscriptionReference']).toBe('REF-SUB-001');
+    expect(updateArg.$set['status.subscriptionStatus']).toBe('pending');
   });
 });
 
@@ -184,26 +185,35 @@ describe('paymentService.confirmSubscription', () => {
     );
   });
 
-  it('active l\'abonnement et repousse l\'expiration en cas de succès', async () => {
+  it('rejette si le plan ne peut pas être déduit de la référence', async () => {
+    (Doctor.findOne as any).mockResolvedValue({ _id: 'doc1' });
+
+    await expect(
+      paymentService.confirmSubscription('REF-SUB-001', 'success')
+    ).rejects.toThrow('Impossible de déterminer le plan depuis la référence "REF-SUB-001".');
+  });
+
+  it("active l'abonnement et fixe l'expiration à +1 mois en cas de succès", async () => {
     (Doctor.findOne as any).mockResolvedValue({ _id: 'doc1' });
     (Doctor.findByIdAndUpdate as any).mockResolvedValue(undefined);
 
-    await paymentService.confirmSubscription('REF-SUB-001', 'success');
+    await paymentService.confirmSubscription('SUB-doc1-PREMIUM-123456', 'success');
 
     const updateArg = (Doctor.findByIdAndUpdate as any).mock.calls[0][1];
+    expect(updateArg.$set['status.subscription']).toBe('premium');
     expect(updateArg.$set['status.subscriptionStatus']).toBe('active');
     expect(updateArg.$set['status.subscriptionExpiry']).toBeInstanceOf(Date);
   });
 
-  it('repasse le médecin en "free" en cas d\'échec', async () => {
+  it("laisse 'status.subscription' intact et passe subscriptionStatus à 'failed' en cas d'échec", async () => {
     (Doctor.findOne as any).mockResolvedValue({ _id: 'doc1' });
     (Doctor.findByIdAndUpdate as any).mockResolvedValue(undefined);
 
-    await paymentService.confirmSubscription('REF-SUB-001', 'failed');
+    await paymentService.confirmSubscription('SUB-doc1-PREMIUM-123456', 'failed');
 
     const updateArg = (Doctor.findByIdAndUpdate as any).mock.calls[0][1];
-    expect(updateArg.$set['status.subscription']).toBe('free');
     expect(updateArg.$set['status.subscriptionStatus']).toBe('failed');
+    expect(updateArg.$set['status.subscription']).toBeUndefined();
   });
 });
 

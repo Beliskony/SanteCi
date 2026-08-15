@@ -1,4 +1,4 @@
- /* payment.integration.test.ts
+/* payment.integration.test.ts
  *
  * Tests d'intégration pour payment.service.ts.
  * On teste notamment :
@@ -180,7 +180,7 @@ describe('[intégration] paymentService.confirm — webhook', () => {
 // ─── initiateSubscription + confirmSubscription ───────────────────────────────
 
 describe('[intégration] paymentService — abonnement médecin', () => {
-  it('initie l\'abonnement premium et fixe l\'expiration à +1 mois', async () => {
+  it('initie l\'abonnement et le passe en "pending" avec la référence en DB', async () => {
     const doc   = await createDoctor();
     const docId = String(doc._id);
 
@@ -194,7 +194,32 @@ describe('[intégration] paymentService — abonnement médecin', () => {
     });
 
     const inDb = await Doctor.findById(docId);
+    // L'activation réelle n'a lieu qu'à la confirmation du webhook —
+    // à l'initiation, seuls la référence et le statut "pending" sont posés.
+    expect(inDb!.status.subscription).toBe('free');
+    expect(inDb!.status.subscriptionReference).toBe('REF-SUB-001');
+    expect(inDb!.status.subscriptionStatus).toBe('pending');
+  });
+
+  it('confirmSubscription succès → plan actif et expiration à +1 mois en DB', async () => {
+    const doc   = await createDoctor();
+    const docId = String(doc._id);
+    const referenceNumber = `SUB-${docId}-PREMIUM-${Date.now()}`;
+
+    await paymentService.initiateSubscription({
+      doctorId:        docId,
+      plan:            'premium',
+      amount:          10000,
+      currency:        'XOF',
+      channel:         'ORANGE_MONEY',
+      referenceNumber,
+    });
+
+    await paymentService.confirmSubscription(referenceNumber, 'success');
+
+    const inDb = await Doctor.findById(docId);
     expect(inDb!.status.subscription).toBe('premium');
+    expect(inDb!.status.subscriptionStatus).toBe('active');
 
     // La date d'expiration doit être dans environ 1 mois
     const expiry = inDb!.status.subscriptionExpiry!;
@@ -205,9 +230,10 @@ describe('[intégration] paymentService — abonnement médecin', () => {
     expect(diffDays).toBeLessThan(33);    // au plus 33 jours
   });
 
-  it('confirmSubscription succès → subscription active en DB', async () => {
+  it('confirmSubscription succès (elite) → subscription active en DB', async () => {
     const doc   = await createDoctor();
     const docId = String(doc._id);
+    const referenceNumber = `SUB-${docId}-ELITE-${Date.now()}`;
 
     await paymentService.initiateSubscription({
       doctorId:        docId,
@@ -215,17 +241,18 @@ describe('[intégration] paymentService — abonnement médecin', () => {
       amount:          20000,
       currency:        'XOF',
       channel:         'WAVE',
-      referenceNumber: 'REF-SUB-002',
+      referenceNumber,
     });
 
-    await paymentService.confirmSubscription('REF-SUB-002', 'success');
+    await paymentService.confirmSubscription(referenceNumber, 'success');
 
     const inDb = await Doctor.findById(docId);
+    expect(inDb!.status.subscription).toBe('elite');
     expect(inDb!.status.subscriptionStatus).toBe('active');
     expect(inDb!.status.subscriptionExpiry).toBeInstanceOf(Date);
   });
 
-  it('confirmSubscription échec → repasse en "free" en DB', async () => {
+  it('confirmSubscription échec → subscription reste "free", statut "failed" en DB', async () => {
     const doc   = await createDoctor();
     const docId = String(doc._id);
 
@@ -241,6 +268,7 @@ describe('[intégration] paymentService — abonnement médecin', () => {
     await paymentService.confirmSubscription('REF-SUB-003', 'failed');
 
     const inDb = await Doctor.findById(docId);
+    // L'abonnement n'a jamais été activé, il reste à sa valeur par défaut
     expect(inDb!.status.subscription).toBe('free');
     expect(inDb!.status.subscriptionStatus).toBe('failed');
   });

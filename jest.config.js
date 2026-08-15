@@ -10,6 +10,7 @@ module.exports = {
   },
   testPathIgnorePatterns: [
     '/node_modules/',
-    '/__tests__/integration/', // ← exclure le dossier intégration
+    '/__tests__/integration/',
+    '/.claude/skills/',
   ],
 };
