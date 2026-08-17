@@ -289,6 +289,12 @@ class HospitalClinicService {
     return { message: 'Médecin retiré de l\'établissement.' };
   }
 
+  async updateAccountStatus(id: string, status: 'active' | 'suspended' | 'blocked'): Promise<{ message: string }> {
+  const hospital = await HospitalClinic.findByIdAndUpdate(id, { 'status.accountStatus': status }, { new: true });
+  if (!hospital) throw new Error('Établissement introuvable.');
+  return { message: `Statut mis à jour : ${status}` };
+}
+
   // ── Verify facility (admin) ────────────────────────────────────────────────
 
   async verify(id: string): Promise<{ message: string }> {

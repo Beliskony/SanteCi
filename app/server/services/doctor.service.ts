@@ -1083,6 +1083,18 @@ async updatePrescription(
 
   }
 
+  async verify(doctorId: string): Promise<{ message: string }> {
+  const doctor = await Doctor.findByIdAndUpdate(doctorId, { 'status.isVerified': true }, { new: true });
+  if (!doctor) throw new Error('Médecin introuvable.');
+  return { message: 'Médecin vérifié.' };
+}
+
+async updateAccountStatus(doctorId: string, status: 'active' | 'pending' | 'suspended' | 'blocked'): Promise<{ message: string }> {
+  const doctor = await Doctor.findByIdAndUpdate(doctorId, { 'status.accountStatus': status }, { new: true });
+  if (!doctor) throw new Error('Médecin introuvable.');
+  return { message: `Statut mis à jour : ${status}` };
+}
+
 // ── Delete prescription ────────────────────────────────────────────────────────
 
 async deletePrescription(

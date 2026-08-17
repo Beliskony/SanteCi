@@ -142,6 +142,13 @@ class ReviewService {
     return Review.findOne({ appointmentId, patientId });
   }
 
+  async adminDeleteReview(reviewId: string): Promise<{ message: string }> {
+  const review = await Review.findByIdAndDelete(reviewId);
+  if (!review) throw new Error('Avis introuvable.');
+  await this.recalculateDoctorRating(String(review.doctorId));
+  return { message: 'Avis supprimé.' };
+}
+
   // ── Recalcul de la note moyenne + compteur du médecin ──────────────────
   async recalculateDoctorRating(doctorId: string): Promise<void> {
     const agg = await Review.aggregate([

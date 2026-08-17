@@ -196,15 +196,17 @@ class MailService {
 
   // ─── OTP ──────────────────────────────────────────────────────────────────
 
-  async sendOtp(to: string, otp: string, role: 'patient' | 'doctor'): Promise<void> {
-    const roleLabel = role === 'doctor' ? 'Médecin' : 'Patient';
+  async sendOtp(to: string, otp: string, role: 'patient' | 'doctor' | 'admin'): Promise<void> {
+    const roleLabel = role === 'doctor' ? 'Médecin' : role === 'admin' ? 'Administrateur' : 'Patient';
     const roleBadge = role === 'doctor'
       ? badge('Médecin', COLORS.primary)
-      : badge('Patient', COLORS.success);
+      : role === 'admin'
+        ? badge('Administrateur', COLORS.danger)
+        : badge('Patient', COLORS.success);
 
     await this.send({
       to,
-      subject: '🔐 Votre code de vérification – E-SantéCI',
+      subject: 'Votre code de vérification – E-SantéCI',
       html: baseCard(`
         <p style="margin:0 0 4px; color:${COLORS.textSecondary}; font-size:13px;">Bonjour ${roleLabel} ${roleBadge}</p>
         <h2 style="margin:8px 0 16px; color:${COLORS.textPrimary}; font-size:22px; font-weight:700;">

@@ -86,6 +86,10 @@ export interface IHospitalClinic extends Document {
     accreditation: string[];
     expiryDate: Date;
   };
+
+  status: {
+    accountStatus: 'active' | 'suspended' | 'blocked';
+  };
   
   metadata: {
     createdAt: Date;
@@ -94,4 +98,5 @@ export interface IHospitalClinic extends Document {
     rating: number;
     totalReviews: number;
   };
+
 }

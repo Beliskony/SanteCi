@@ -69,6 +69,9 @@ const HospitalClinicSchema: Schema = new Schema({
     accreditation: [{ type: String, required: true }],
     expiryDate: { type: Date, required: true }
   },
+   status: {
+    accountStatus: { type: String, enum: ['active', 'suspended', 'blocked'], default: 'active' },
+  },
   metadata: {
     createdAt: { type: Date, required: true, default: Date.now },
     updatedAt: { type: Date, required: true, default: Date.now },

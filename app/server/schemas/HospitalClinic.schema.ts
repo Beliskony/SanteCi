@@ -108,6 +108,9 @@ export const HospitalClinicSchema = z.object({
   partnerships: PartnershipsSchema,
   hours:        HoursSchema,
   certification: CertificationSchema,
+  status: {
+  accountStatus: { type: String, enum: ['active', 'suspended', 'blocked'], default: 'active' },
+},
   metadata:     MetadataSchema.default(() => ({
     createdAt:    new Date(),
     updatedAt:    new Date(),
