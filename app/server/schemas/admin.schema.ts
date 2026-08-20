@@ -185,6 +185,41 @@ export const DoctorStatusSchema = z.object({
   reason: z.string().min(5).max(300).optional(),
 });
 
+// ajout dans app/server/schemas/admin.schema.ts
+export const ListDoctorsQuerySchema = z.object({
+  status: z.enum(['all', 'active', 'pending', 'suspended', 'blocked']).optional(),
+  search: z.string().max(100).optional(),
+  page:   z.coerce.number().int().min(1).default(1),
+  limit:  z.coerce.number().int().min(1).max(100).default(20),
+});
+
+export const ListHospitalsQuerySchema = z.object({
+  status:   z.enum(['all', 'active', 'suspended', 'blocked']).optional(),
+  verified: z.enum(['true', 'false']).optional(),
+  search:   z.string().max(100).optional(),
+  page:     z.coerce.number().int().min(1).default(1),
+  limit:    z.coerce.number().int().min(1).max(100).default(20),
+});
+
+export const ListPatientsQuerySchema = z.object({
+  status: z.enum(['all', 'active', 'suspended', 'blocked']).optional(),
+  search: z.string().max(100).optional(),
+  page:   z.coerce.number().int().min(1).default(1),
+  limit:  z.coerce.number().int().min(1).max(100).default(20),
+});
+
+export const ListReviewsQuerySchema = z.object({
+  status: z.enum(['all', 'published', 'flagged', 'hidden']).optional(),
+  page:   z.coerce.number().int().min(1).default(1),
+  limit:  z.coerce.number().int().min(1).max(100).default(20),
+});
+
+export const ListSubscriptionsQuerySchema = z.object({
+  plan:  z.enum(['all', 'free', 'premium', 'elite']).optional(),
+  page:  z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
 // ── Schémas dérivés : pagination & documents ────────────────────────────────
 
 /** Filtre de pagination pour listPayments / listAdmins */

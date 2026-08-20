@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
 import { Admin } from '../models/admin.model';
+import { Review } from '../models/review.model';
 import { IAdmin, AdminPermission, AdminActionType } from '../interfaces/admin.interface';
 import { Doctor } from '../models/medcin.model';
 import { Patient } from '../models/patient.model';
@@ -331,6 +332,200 @@ class AdminService {
       subscriptions: subscriptionBreakdown,
     };
   }
+
+  // ajout dans app/server/services/Admin.Service.ts, dans class AdminService
+
+async listDoctors(
+  adminId: string,
+  filters: { status?: string; search?: string; page?: number; limit?: number }
+) {
+  await this.assertActorPermission(adminId, 'moderate:doctors');
+
+  const { status, search, page = 1, limit = 20 } = filters;
+  const safePage = Math.max(1, Math.floor(page));
+  const safeLimit = Math.min(100, Math.max(1, Math.floor(limit)));
+
+  const query: Record<string, unknown> = {};
+
+  if (status && status !== 'all') {
+    if (!VALID_DOCTOR_STATUSES.includes(status as DoctorStatus)) throw new Error('Statut invalide.');
+    query['status.accountStatus'] = status;
+  }
+
+  if (search) {
+    const safeSearch = search.trim().slice(0, 100); // évite un $regex démesuré
+    query.$or = [
+      { 'profile.firstName': { $regex: safeSearch, $options: 'i' } },
+      { 'profile.lastName': { $regex: safeSearch, $options: 'i' } },
+      { 'contact.email': { $regex: safeSearch, $options: 'i' } },
+      { doctorId: { $regex: safeSearch, $options: 'i' } },
+    ];
+  }
+
+  const [doctors, total] = await Promise.all([
+    Doctor.find(query)
+      .select('doctorId profile contact location status telemedicine.rating metadata.createdAt')
+      .sort({ 'metadata.createdAt': -1 })
+      .skip((safePage - 1) * safeLimit)
+      .limit(safeLimit)
+      .lean(),
+    Doctor.countDocuments(query),
+  ]);
+
+  return { doctors, total, page: safePage, pages: Math.ceil(total / safeLimit) };
+}
+
+// ── Listing : hôpitaux ──────────────────────────────────────────────────────
+
+async listHospitals(
+  adminId: string,
+  filters: { status?: string; verified?: string; search?: string; page?: number; limit?: number }
+) {
+  await this.assertActorPermission(adminId, 'moderate:hospitals');
+
+  const { status, verified, search, page = 1, limit = 20 } = filters;
+  const safePage = Math.max(1, Math.floor(page));
+  const safeLimit = Math.min(100, Math.max(1, Math.floor(limit)));
+
+  const query: Record<string, unknown> = {};
+
+  if (status && status !== 'all') {
+    if (!VALID_ACCOUNT_STATUSES.includes(status as AccountStatus)) throw new Error('Statut invalide.');
+    query['status.accountStatus'] = status;
+  }
+
+  if (verified === 'true' || verified === 'false') {
+    query['metadata.verified'] = verified === 'true';
+  }
+
+  if (search) {
+    const safeSearch = search.trim().slice(0, 100);
+    query.$or = [
+      { name: { $regex: safeSearch, $options: 'i' } },
+      { 'location.city': { $regex: safeSearch, $options: 'i' } },
+      { 'contact.email': { $regex: safeSearch, $options: 'i' } },
+      { facilityId: { $regex: safeSearch, $options: 'i' } },
+    ];
+  }
+
+  const [hospitals, total] = await Promise.all([
+    HospitalClinic.find(query)
+      .select('facilityId name type category location contact status metadata.verified metadata.createdAt')
+      .sort({ 'metadata.createdAt': -1 })
+      .skip((safePage - 1) * safeLimit)
+      .limit(safeLimit)
+      .lean(),
+    HospitalClinic.countDocuments(query),
+  ]);
+
+  return { hospitals, total, page: safePage, pages: Math.ceil(total / safeLimit) };
+}
+
+// ── Listing : patients ────────────────────────────────────────────────────
+
+async listPatients(
+  adminId: string,
+  filters: { status?: string; search?: string; page?: number; limit?: number }
+) {
+  await this.assertActorPermission(adminId, 'moderate:patients');
+
+  const { status, search, page = 1, limit = 20 } = filters;
+  const safePage = Math.max(1, Math.floor(page));
+  const safeLimit = Math.min(100, Math.max(1, Math.floor(limit)));
+
+  const query: Record<string, unknown> = {};
+
+  if (status && status !== 'all') {
+    if (!VALID_ACCOUNT_STATUSES.includes(status as AccountStatus)) throw new Error('Statut invalide.');
+    query['status.accountStatus'] = status;
+  }
+
+  if (search) {
+    const safeSearch = search.trim().slice(0, 100);
+    query.$or = [
+      { 'profile.firstName': { $regex: safeSearch, $options: 'i' } },
+      { 'profile.lastName': { $regex: safeSearch, $options: 'i' } },
+      { 'contact.phone': { $regex: safeSearch, $options: 'i' } },
+      { 'contact.email': { $regex: safeSearch, $options: 'i' } },
+      { patientId: { $regex: safeSearch, $options: 'i' } },
+    ];
+  }
+
+  const [patients, total] = await Promise.all([
+    Patient.find(query)
+      .select('patientId profile contact location status metadata.createdAt metadata.totalConsultations')
+      .sort({ 'metadata.createdAt': -1 })
+      .skip((safePage - 1) * safeLimit)
+      .limit(safeLimit)
+      .lean(),
+    Patient.countDocuments(query),
+  ]);
+
+  return { patients, total, page: safePage, pages: Math.ceil(total / safeLimit) };
+}
+
+// ── Listing : avis ─────────────────────────────────────────────────────────
+
+async listReviews(
+  adminId: string,
+  filters: { status?: string; page?: number; limit?: number }
+) {
+  await this.assertActorPermission(adminId, 'moderate:reviews');
+
+  const { status, page = 1, limit = 20 } = filters;
+  const safePage = Math.max(1, Math.floor(page));
+  const safeLimit = Math.min(100, Math.max(1, Math.floor(limit)));
+
+  const query: Record<string, unknown> = {};
+  if (status && status !== 'all') {
+    if (!['published', 'flagged', 'hidden'].includes(status)) throw new Error('Statut invalide.');
+    query.status = status;
+  }
+
+  const [reviews, total] = await Promise.all([
+    Review.find(query)
+      .select('rating comment isAnonymous status metadata.createdAt doctorId patientId')
+      .populate('doctorId', 'profile.firstName profile.lastName')
+      .populate('patientId', 'profile.firstName profile.lastName')
+      .sort({ 'metadata.createdAt': -1 })
+      .skip((safePage - 1) * safeLimit)
+      .limit(safeLimit)
+      .lean(),
+    Review.countDocuments(query),
+  ]);
+
+  return { reviews, total, page: safePage, pages: Math.ceil(total / safeLimit) };
+}
+
+
+async listSubscriptions(
+  adminId: string,
+  filters: { plan?: string; page?: number; limit?: number }
+) {
+  await this.assertActorPermission(adminId, 'manage:subscriptions');
+
+  const { plan, page = 1, limit = 20 } = filters;
+  const safePage = Math.max(1, Math.floor(page));
+  const safeLimit = Math.min(100, Math.max(1, Math.floor(limit)));
+
+  const query: Record<string, unknown> = {};
+  if (plan && plan !== 'all') {
+    if (!['free', 'premium', 'elite'].includes(plan)) throw new Error('Plan invalide.');
+    query['status.subscription'] = plan;
+  }
+
+  const [doctors, total] = await Promise.all([
+    Doctor.find(query)
+      .select('doctorId profile.firstName profile.lastName contact.email status.subscription status.subscriptionStatus status.subscriptionExpiry')
+      .sort({ 'status.subscriptionExpiry': 1 })
+      .skip((safePage - 1) * safeLimit)
+      .limit(safeLimit)
+      .lean(),
+    Doctor.countDocuments(query),
+  ]);
+
+  return { doctors, total, page: safePage, pages: Math.ceil(total / safeLimit) };
+}
 
   // ── Paiements (perm: manage:payments) ────────────────────────────────────────
 
