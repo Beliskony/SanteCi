@@ -217,6 +217,25 @@ class AdminService {
     return result;
   }
 
+  // ── Détails de vérification d'un médecin (perm: moderate:doctors) ─────────────
+  async getDoctorVerificationDetails(adminId: string, doctorId: string) {
+  await this.assertActorPermission(adminId, 'moderate:doctors');
+  this.assertValidObjectId(doctorId, 'Identifiant médecin');
+ 
+  const doctor = await Doctor.findById(doctorId)
+    .select(
+      'doctorId profile.firstName profile.lastName ' +
+      'professional.licenseNumber professional.licenseExpiry professional.university ' +
+      'professional.graduationYear professional.certifications professional.verificationDocuments ' +
+      'professional.currentPractice status.isVerified status.accountStatus'
+    )
+    .lean();
+ 
+  if (!doctor) throw new Error('Médecin introuvable.');
+  return doctor;
+}
+ 
+
   async setDoctorStatus(
     adminId: string,
     doctorId: string,
@@ -246,6 +265,20 @@ class AdminService {
     await this.logAction(adminId, 'verify_hospital', hospitalId, 'hospital');
     return result;
   }
+
+  // ── Dans la section "Modération : hôpitaux (perm: moderate:hospitals)" ──
+ 
+async getHospitalVerificationDetails(adminId: string, hospitalId: string) {
+  await this.assertActorPermission(adminId, 'moderate:hospitals');
+  this.assertValidObjectId(hospitalId, 'Identifiant établissement');
+ 
+  const hospital = await HospitalClinic.findById(hospitalId)
+    .select('facilityId name certification metadata.verified')
+    .lean();
+ 
+  if (!hospital) throw new Error('Établissement introuvable.');
+  return hospital;
+}
 
   async setHospitalStatus(
     adminId: string,

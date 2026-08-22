@@ -1,4 +1,3 @@
-// app/server/middleware/Admin.Auth.middleware.ts
 import { NextRequest } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { Admin } from '../models/admin.model';
@@ -12,11 +11,19 @@ interface AdminTokenPayload {
   email: string;
 }
 
+// ─── Helper interne : lève une erreur avec un status HTTP attaché ───────────
+// Pas de classe/lib dédiée : juste une Error normale avec .status en plus,
+// que les routes lisent dans leur catch (error.status ?? 400).
+
+function authError(message: string, status: number): Error {
+  return Object.assign(new Error(message), { status });
+}
+
 // ─── Helper interne : décoder le token ───────────────────────────────────────
 
 function decodeToken(req: NextRequest): AdminTokenPayload {
   const token = req.headers.get('authorization')?.split(' ')[1];
-  if (!token) throw new Error('Unauthorized');
+  if (!token) throw authError('Non authentifié.', 401);
 
   let payload: AdminTokenPayload;
   try {
@@ -25,11 +32,11 @@ function decodeToken(req: NextRequest): AdminTokenPayload {
       process.env.JWT_ACCESS_SECRET || "monSuperCodeSecretAxel123456@" as string
     ) as AdminTokenPayload;
   } catch {
-    throw new Error('Unauthorized');
+    throw authError('Token invalide ou expiré.', 401);
   }
 
   // Un token doctor/patient valide mais mal aiguillé ne doit jamais passer ici
-  if (payload.role !== 'admin') throw new Error('Accès réservé aux administrateurs.');
+  if (payload.role !== 'admin') throw authError('Accès réservé aux administrateurs.', 401);
 
   return payload;
 }
@@ -43,32 +50,32 @@ export async function getAuthAdmin(
   const payload = decodeToken(req);
 
   const admin = await Admin.findById(payload.id).select('-security.password');
-  if (!admin) throw new Error('Administrateur introuvable.');
+  if (!admin) throw authError('Administrateur introuvable.', 401);
 
   if (admin.status.accountStatus !== 'active') {
-    throw new Error('Compte administrateur suspendu ou bloqué.');
+    // Identité authentifiée mais accès refusé — 403, pas 401 : rafraîchir
+    // le token ne changera rien, ce n'est pas un problème de session.
+    throw authError('Compte administrateur suspendu ou bloqué.', 403);
   }
 
   // Cohérence email : détecte un token émis avant un changement d'email
-  // resté valide (edge case rare mais évite une désynchronisation silencieuse)
+  // resté valide. C'est un problème de session (401), pas de permission.
   if (admin.contact.email !== payload.email) {
-    throw new Error('Session invalide. Merci de vous reconnecter.');
+    throw authError('Session invalide. Merci de vous reconnecter.', 401);
   }
 
   const isSuperAdmin = admin.role === 'superadmin';
   if (!isSuperAdmin && requiredPermission && !admin.permissions.includes(requiredPermission)) {
-    throw new Error('Permission insuffisante.');
+    throw authError('Permission insuffisante.', 403);
   }
 
   return admin;
 }
 
 // ─── getAuthSuperAdmin : lève une erreur si ce n'est pas un superadmin ───────
-// Raccourci pour les routes de gestion des admins — plus explicite dans le
-// code de la route qu'un `if (admin.role !== 'superadmin') throw ...` répété.
 
 export async function getAuthSuperAdmin(req: NextRequest): Promise<IAdmin> {
   const admin = await getAuthAdmin(req);
-  if (admin.role !== 'superadmin') throw new Error('Réservé au superadmin.');
+  if (admin.role !== 'superadmin') throw authError('Réservé au superadmin.', 403);
   return admin;
 }

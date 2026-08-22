@@ -1,5 +1,9 @@
 import type { NextConfig } from "next";
 
+const ADMIN_ORIGIN = process.env.NODE_ENV === 'production'
+  ? 'https://santeciadmin.vercel.app'
+  : 'http://localhost:5173';
+
 const nextConfig: NextConfig = {
     images: {
     remotePatterns: [
@@ -18,6 +22,19 @@ const nextConfig: NextConfig = {
   /* config options here */
   typescript: {
     ignoreBuildErrors: true,
+  },
+  async headers() {
+    return [
+      {
+        source: '/api/admin/:path*',
+        headers: [
+          { key: 'Access-Control-Allow-Credentials', value: 'true' },
+          { key: 'Access-Control-Allow-Origin', value: ADMIN_ORIGIN },
+          { key: 'Access-Control-Allow-Methods', value: 'GET,OPTIONS,PATCH,DELETE,POST,PUT' },
+          { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' },
+        ],
+      },
+    ];
   }
 };
 
