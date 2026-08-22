@@ -148,6 +148,10 @@ export const ResetPasswordWithOtpSchema = z.object({
   newPassword: z.string().min(8),
 });
 
+export const RevenuePeriodQuerySchema = z.object({
+  period: z.enum(['week', 'month', 'year']).default('month'),
+});
+
 // ── Schémas dérivés : gestion des comptes admin ─────────────────────────────
 
 /** Création d'un sous-admin par le superadmin */

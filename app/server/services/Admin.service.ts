@@ -25,6 +25,13 @@ interface CreateSubAdminDTO {
   permissions: AdminPermission[];
 }
 
+interface RevenueBucket {
+  label: string;
+  total: number;
+  count: number;
+}
+
+type RevenuePeriod = 'week' | 'month' | 'year';
 type TargetType = 'doctor' | 'patient' | 'hospital' | 'review' | 'payment' | 'admin';
 type AccountStatus = 'active' | 'suspended' | 'blocked';
 type DoctorStatus = 'active' | 'pending' | 'suspended' | 'blocked';
@@ -38,6 +45,88 @@ const VALID_PAYMENT_STATUSES = ['pending', 'paid', 'failed', 'refunded'];
 class AdminService {
 
   // ── Helpers internes de sécurité ────────────────────────────────────────────
+
+    // ── Helper interne : buckets de revenu (plateforme entière ou un médecin) ────
+
+  private async aggregateRevenueTimeseries(period: RevenuePeriod, doctorId?: string): Promise<{
+    period: RevenuePeriod;
+    startDate: Date;
+    data: RevenueBucket[];
+  }> {
+    const now = new Date();
+    let startDate: Date;
+    let dateFormat: string;
+    let bucketCount: number;
+    let bucketUnit: 'day' | 'month';
+
+    if (period === 'week') {
+      startDate = new Date(now);
+      startDate.setDate(now.getDate() - 6);
+      startDate.setHours(0, 0, 0, 0);
+      dateFormat = '%Y-%m-%d';
+      bucketCount = 7;
+      bucketUnit = 'day';
+    } else if (period === 'month') {
+      startDate = new Date(now);
+      startDate.setDate(now.getDate() - 29);
+      startDate.setHours(0, 0, 0, 0);
+      dateFormat = '%Y-%m-%d';
+      bucketCount = 30;
+      bucketUnit = 'day';
+    } else {
+      startDate = new Date(now);
+      startDate.setMonth(now.getMonth() - 11);
+      startDate.setDate(1);
+      startDate.setHours(0, 0, 0, 0);
+      dateFormat = '%Y-%m';
+      bucketCount = 12;
+      bucketUnit = 'month';
+    }
+
+    const match: Record<string, unknown> = {
+      'status.paymentStatus': 'paid',
+      $expr: {
+        $gte: [{ $ifNull: ['$payment.paidAt', '$metadata.createdAt'] }, startDate],
+      },
+    };
+    if (doctorId) match.doctorId = new mongoose.Types.ObjectId(doctorId);
+
+    const results = await Appointment.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: dateFormat,
+              date: { $ifNull: ['$payment.paidAt', '$metadata.createdAt'] },
+            },
+          },
+          total: { $sum: '$payment.amount' },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    const byLabel = new Map(results.map((r) => [r._id, { total: r.total, count: r.count }]));
+
+    // Comble les buckets vides (jours/mois sans paiement) pour un graphique continu
+    const data: RevenueBucket[] = [];
+    for (let i = 0; i < bucketCount; i++) {
+      const d = new Date(startDate);
+      if (bucketUnit === 'day') d.setDate(startDate.getDate() + i);
+      else d.setMonth(startDate.getMonth() + i);
+
+      const label = bucketUnit === 'day'
+        ? d.toISOString().slice(0, 10)
+        : d.toISOString().slice(0, 7);
+
+      const entry = byLabel.get(label);
+      data.push({ label, total: entry?.total ?? 0, count: entry?.count ?? 0 });
+    }
+
+    return { period, startDate, data };
+  }
 
   private assertValidObjectId(id: string, label = 'ID'): void {
     if (!mongoose.isValidObjectId(id)) {
@@ -356,6 +445,10 @@ async getHospitalVerificationDetails(adminId: string, hospitalId: string) {
       { $group: { _id: '$status.subscription', count: { $sum: 1 } } },
     ]);
 
+    const appointmentsByStatus = await Appointment.aggregate([
+      { $group: { _id: '$status.current', count: { $sum: 1 } } },
+    ]);
+
     return {
       doctors: { total: totalDoctors, verified: verifiedDoctors, pending: totalDoctors - verifiedDoctors },
       patients: { total: totalPatients },
@@ -454,6 +547,57 @@ async listHospitals(
   return { hospitals, total, page: safePage, pages: Math.ceil(total / safeLimit) };
 }
 
+
+  // ── Supervision : CA brut plateforme dans le temps (perm: view:analytics) ────
+
+  async getRevenueTimeseries(adminId: string, period: RevenuePeriod) {
+    await this.assertActorPermission(adminId, 'view:analytics');
+    const result = await this.aggregateRevenueTimeseries(period);
+    const grandTotal = result.data.reduce((acc, b) => acc + b.total, 0);
+    return { ...result, grandTotal };
+  }
+
+  // ── Performance d'un médecin : CA généré + rendez-vous par statut (perm: moderate:doctors) ──
+
+  async getDoctorPerformance(adminId: string, doctorId: string, period: RevenuePeriod = 'month') {
+    await this.assertActorPermission(adminId, 'moderate:doctors');
+    this.assertValidObjectId(doctorId, 'Identifiant médecin');
+
+    const doctorObjectId = new mongoose.Types.ObjectId(doctorId);
+
+    const [doctor, revenueAgg, statusCounts, timeseries] = await Promise.all([
+      Doctor.findById(doctorId).select('metadata.createdAt').lean(),
+      Appointment.aggregate([
+        { $match: { doctorId: doctorObjectId, 'status.paymentStatus': 'paid' } },
+        { $group: { _id: null, total: { $sum: '$payment.amount' }, count: { $sum: 1 } } },
+      ]),
+      Appointment.aggregate([
+        { $match: { doctorId: doctorObjectId } },
+        { $group: { _id: '$status.current', count: { $sum: 1 } } },
+      ]),
+      this.aggregateRevenueTimeseries(period, doctorId),
+    ]);
+
+    if (!doctor) throw new Error('Médecin introuvable.');
+
+    // Regroupement des 6 statuts bruts vers les 4 catégories métier demandées
+    const appointments = { active: 0, completed: 0, noShow: 0, cancelled: 0 };
+    for (const s of statusCounts) {
+      if (['pending', 'confirmed', 'ongoing'].includes(s._id)) appointments.active += s.count;
+      else if (s._id === 'completed') appointments.completed += s.count;
+      else if (s._id === 'no_show') appointments.noShow += s.count;
+      else if (s._id === 'cancelled') appointments.cancelled += s.count;
+    }
+
+    return {
+      memberSince: doctor.metadata?.createdAt ?? null,
+      totalRevenue: revenueAgg[0]?.total ?? 0,
+      totalPaidAppointments: revenueAgg[0]?.count ?? 0,
+      appointments,
+      revenueTimeseries: { period: timeseries.period, data: timeseries.data },
+    };
+  }
+
 // ── Listing : patients ────────────────────────────────────────────────────
 
 async listPatients(
@@ -496,6 +640,8 @@ async listPatients(
 
   return { patients, total, page: safePage, pages: Math.ceil(total / safeLimit) };
 }
+
+
 
 // ── Listing : avis ─────────────────────────────────────────────────────────
 
