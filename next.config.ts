@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const ADMIN_ORIGIN = process.env.NODE_ENV === 'production'
-  ? 'https://santeciadmin.vercel.app'
+  ? 'https://sante-ci-xi.vercel.app'
   : 'http://localhost:5173';
 
 const nextConfig: NextConfig = {
