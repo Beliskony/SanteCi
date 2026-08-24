@@ -20,7 +20,7 @@ export async function PATCH(
       );
     }
 
-    const { id } = await params; // ⚠️ Next.js 15 : params est une Promise, toujours await avant destructuration
+    const { id } = await params; // Next.js 15 : params est une Promise, toujours await avant destructuration
 
     const body = await req.json();
     const parsed = updateReviewSchema.safeParse(body);

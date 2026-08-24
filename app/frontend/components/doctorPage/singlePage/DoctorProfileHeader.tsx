@@ -13,7 +13,7 @@ export default function DoctorProfileHeader({ doctor }: DoctorProfileHeaderProps
 
   const fullName = `${profile?.title ?? "Dr"} ${profile?.firstName ?? ""} ${profile?.lastName ?? ""}`
   const rating = telemedicine?.rating ?? 0
-  // ⚠️ reviewCount (nombre d'avis) ≠ totalConsultations (nombre de RDV honorés)
+  // reviewCount (nombre d'avis) ≠ totalConsultations (nombre de RDV honorés)
   // Ajoute `reviewCount?: number` dans le type analytics de DoctorUser si pas déjà fait
   const reviewCount = (analytics as any)?.reviewCount ?? 0
   const tier = getDoctorTier(status);

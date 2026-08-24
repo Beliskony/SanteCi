@@ -133,7 +133,6 @@ const RegisterPatientPage = () => {
             {/* Bannière erreur */}
             {error && (
               <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl mb-6">
-                <span className="shrink-0 mt-0.5">⚠</span>
                 <span>{error}</span>
               </div>
             )}

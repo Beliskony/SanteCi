@@ -224,7 +224,7 @@ class MailService {
           margin-top: 8px;
         ">
           <p style="margin:0; color:${COLORS.textSecondary}; font-size:13px;">
-            ⚠️ Ne partagez jamais ce code. E-SantéCI ne vous le demandera jamais.
+             Ne partagez jamais ce code. E-SantéCI ne vous le demandera jamais.
           </p>
         </div>
       `),

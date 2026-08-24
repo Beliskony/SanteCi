@@ -27,7 +27,7 @@ export function DoctorCard({ doctor }: DoctorCardProps) {
   const loc     = doctor.location;
 
   const rating  = tele?.rating ?? 0;
-  // ⚠️ reviewCount (nombre d'avis) ≠ totalConsultations (nombre de RDV honorés) —
+  // reviewCount (nombre d'avis) ≠ totalConsultations (nombre de RDV honorés) —
   // même distinction que sur DoctorProfileHeader. Ajoute `reviewCount?: number`
   // dans analytics de DoctorUser si pas déjà fait.
   const reviewCount = (doctor.analytics as any)?.reviewCount ?? 0;

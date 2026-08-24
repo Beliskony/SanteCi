@@ -9,8 +9,8 @@ import { Server as SocketServer }               from "socket.io";
 import type { Server as HttpServer }            from "http";
 import type { Socket as NetSocket }             from "net";
 import { CallGateway } from "@/app/server/services/Call.gateway";
-import { ChatGateway } from "@/app/server/services/Chat.gateway"; // ⚠️ adapte le chemin si différent
-import { setIO }       from "@/app/server/services/socketRegistry"; // ⚠️ adapte le chemin si différent
+import { ChatGateway } from "@/app/server/services/Chat.gateway"; // adapte le chemin si différent
+import { setIO }       from "@/app/server/services/socketRegistry"; // adapte le chemin si différent
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
