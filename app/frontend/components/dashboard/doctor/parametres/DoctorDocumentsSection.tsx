@@ -112,11 +112,6 @@ export default function DoctorDocumentsSection() {
       return;
     }
 
-    if (!practiceName.trim()) {
-      setLocalError('Veuillez indiquer le nom de votre lieu d\'exercice.');
-      return;
-    }
-
     setUploading(prev => ({ ...prev, [selectedType]: true }));
     setLocalError(null);
     clearError();
