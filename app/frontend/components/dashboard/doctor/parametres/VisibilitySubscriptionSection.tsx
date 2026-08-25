@@ -37,7 +37,7 @@ const PLANS = [
     icon:     <Zap size={18} className="text-slate-400" />,
     price:    '0 FCFA',
     amount:   0,
-    features: ['5 consultations/mois', 'Profil basique', 'Support email'],
+    features: ['limite de consultations/mois', 'Profil basique', 'Support email'],
   },
   {
     key:      'premium' as const,

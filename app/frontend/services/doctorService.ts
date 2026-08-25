@@ -344,9 +344,6 @@ async updateMyProfile(data: Partial<DoctorProfile>): Promise<DoctorUser> {
     return res.data;
   },
 
-  // app/frontend/services/doctorService.ts
-// Ajouter après la méthode uploadVerificationDocuments
-
   /**
    * Récupère le statut de vérification et les documents du médecin
    * GET /doctor/ligne/verification-status
@@ -368,7 +365,7 @@ async updateMyProfile(data: Partial<DoctorProfile>): Promise<DoctorUser> {
     if (!user) throw new Error("Non authentifié.");
 
     const res = await api.get<ApiResponse<any>>(
-      `/doctor/ligne/verification-documents`
+      `/doctor/ligne/verification-status`
     );
     return res.data;
   },
