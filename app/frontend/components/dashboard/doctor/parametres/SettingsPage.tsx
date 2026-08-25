@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { User, Shield, Video, Eye, CreditCard } from "lucide-react";
+import { User, Shield, Video, Eye, CreditCard, icons, FileCheck } from "lucide-react";
 import { AccountSection } from "./AccountSection";
 import { TelemedicineSection } from "./Telemedicinesection";
 import DoctorSecuritySection  from "@/app/frontend/components/dashboard/doctor/parametres/DoctorSecuritySection"
@@ -12,6 +12,7 @@ import { VisibilitySection, SubscriptionSection } from "./VisibilitySubscription
 const NAV_ITEMS = [
   { key: "compte",       label: "Compte",       icon: User       },
   { key: "securite",     label: "Sécurité",     icon: Shield     },
+  { key: "document",     label: "Documents",    icon: FileCheck  },
   { key: "telemedecine", label: "Télémedecine", icon: Video      },
   { key: "visibilite",   label: "Visibilité",   icon: Eye        },
   { key: "abonnement",   label: "Abonnement",   icon: CreditCard },

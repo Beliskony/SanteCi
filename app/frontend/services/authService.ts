@@ -177,6 +177,7 @@ function mapToAuthUser(backendUser: BackendUser): AuthUser {
         district:    loc?.district,
         address:     loc?.address,
         coordinates: loc?.coordinates,
+        consultationRadius: 0,
       },
       professional: {
         licenseNumber: pro?.licenseNumber ?? "",
@@ -195,6 +196,13 @@ function mapToAuthUser(backendUser: BackendUser): AuthUser {
         totalConsultations:  tel?.totalConsultations  ?? 0,
       },
       affiliations: { hospitals: [], clinics: [], insuranceCompanies: [] },
+       preferences: { // ← AJOUT OBLIGATOIRE
+        privacy: {
+          showProfile: true,
+          showLocation: true,
+          showBio: true,
+        },
+      },
       security: { isMedcin: true, twoFactorEnabled: false, devices: [] },
       status: {
         isVerified:     backendUser.status?.isVerified     ?? false,

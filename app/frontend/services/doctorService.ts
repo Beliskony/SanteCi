@@ -344,6 +344,58 @@ async updateMyProfile(data: Partial<DoctorProfile>): Promise<DoctorUser> {
     return res.data;
   },
 
+  // app/frontend/services/doctorService.ts
+// Ajouter après la méthode uploadVerificationDocuments
+
+  /**
+   * Récupère le statut de vérification et les documents du médecin
+   * GET /doctor/ligne/verification-status
+   */
+  async getVerificationStatus(): Promise<{
+    isVerified: boolean;
+    accountStatus: string;
+    documentsSubmitted: number;
+    currentPractice: { name: string; type: string };
+    documents: Array<{
+      _id?: string;
+      type: 'diploma' | 'license_certificate' | 'practice_attestation' | 'other';
+      url: string;
+      fileName: string;
+      uploadedAt: Date;
+    }>;
+  }> {
+    const { user } = useAuthStore.getState();
+    if (!user) throw new Error("Non authentifié.");
+
+    const res = await api.get<ApiResponse<any>>(
+      `/doctor/ligne/verification-status`
+    );
+    return res.data;
+  },
+
+  /**
+   * Supprime un document de vérification
+   * DELETE /doctor/ligne/verification-documents/:documentId
+   */
+  async deleteVerificationDocument(documentId: string): Promise<{ message: string }> {
+    const res = await api.del<{ success: boolean; message: string }>(
+      `/doctor/ligne/verification-documents/${documentId}`
+    );
+    return { message: res.message };
+  },
+
+  /**
+   * Met à jour le lieu d'exercice du médecin
+   * PUT /doctor/ligne/practice
+   */
+  async updatePracticeLocation(practice: { name: string; type: string }): Promise<{ message: string }> {
+    const res = await api.put<ApiResponse<{ message: string }>>(
+      "/doctor/ligne/practice",
+      practice
+    );
+    return res.data;
+  },
+
   /**
    * Supprimer mon compte
    * DELETE /doctor/(auth)/ligne/delete
