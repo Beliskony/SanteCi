@@ -69,30 +69,6 @@ export default function DoctorDocumentsSection() {
   const [practiceName, setPracticeName] = useState('');
   const [practiceType, setPracticeType] = useState<'hospital' | 'clinic' | 'private' | 'other'>('private');
 
-  // ── Chargement du statut ────────────────────────────────────────────────────
-
-  const loadStatus = async () => {
-    setLoading(true);
-    setLocalError(null);
-    clearError();
-    try {
-      const status = await doctorService.getVerificationStatus();
-      setDocuments(status.documents || []);
-      setIsVerified(status.isVerified);
-      setPracticeName(status.currentPractice?.name || '');
-      setPracticeType(
-        (status.currentPractice?.type as 'hospital' | 'clinic' | 'private' | 'other') || 'private'
-      );
-    } catch (err: any) {
-      setLocalError(err?.message || 'Impossible de charger le statut.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadStatus();
-  }, []);
 
   // ── Upload d'un document ────────────────────────────────────────────────────
 
@@ -142,7 +118,6 @@ export default function DoctorDocumentsSection() {
         type: practiceType
       });
       
-      await loadStatus();
       setSuccess(`${TYPE_LABELS[selectedType]} téléchargé avec succès. En attente de validation par l'administrateur.`);
       
       setSelectedFile(null);
@@ -165,7 +140,6 @@ export default function DoctorDocumentsSection() {
 
     try {
       await doctorService.deleteVerificationDocument(docId);
-      await loadStatus();
       setSuccess('Document supprimé avec succès.');
     } catch (err: any) {
       setLocalError(err?.message || 'Échec de la suppression.');
