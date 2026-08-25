@@ -352,9 +352,9 @@ export default function DoctorDocumentsSection() {
             
             <button
               onClick={handleUpload}
-              disabled={!selectedFile || uploading[selectedType] || !practiceName.trim()}
+              disabled={!selectedFile || uploading[selectedType]}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-colors
-                ${!selectedFile || uploading[selectedType] || !practiceName.trim()
+                ${!selectedFile || uploading[selectedType]
                   ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                   : 'bg-[#1e3a8a] text-white hover:bg-blue-800'
                 }`}
