@@ -381,7 +381,7 @@ export default function DoctorDocumentsSection() {
 
         <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
           <p className="text-xs text-amber-700">
-            <span className="font-semibold">📌 Important :</span> 
+            <span className="font-semibold">Important :</span> 
             Une fois vos documents téléchargés, l&apos;administrateur les vérifiera et validera votre compte 
             sous 24h. Vous recevrez une notification par email.
           </p>
