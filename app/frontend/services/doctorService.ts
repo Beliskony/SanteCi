@@ -368,7 +368,7 @@ async updateMyProfile(data: Partial<DoctorProfile>): Promise<DoctorUser> {
     if (!user) throw new Error("Non authentifié.");
 
     const res = await api.get<ApiResponse<any>>(
-      `/doctor/ligne/verification-status`
+      `/doctor/ligne/verification-documents`
     );
     return res.data;
   },
