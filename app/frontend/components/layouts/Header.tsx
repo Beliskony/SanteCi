@@ -138,7 +138,7 @@ const isAuthenticated = hasHydrated && !!role && !!firstName;
 
         {/* Logo */}
         <Link href="/" className="text-xl font-bold text-[#1e3a8a] shrink-0">
-          SanteMedCI
+          <img src={'/icon/favicon.svg'} className="w-30 h-30" />
         </Link>
 
         {/* Nav desktop */}

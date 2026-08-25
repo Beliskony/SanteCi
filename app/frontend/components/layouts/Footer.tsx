@@ -11,11 +11,10 @@ const Footer = () => {
         {/* Colonne 1 — Branding */}
         <div className="flex flex-col gap-6">
           {/* Logo */}
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-[#1e3a8a] flex items-center justify-center shrink-0">
-              <Heart size={18} stroke="white" fill="white" />
+          <div className="flex items-center">
+            <div className="w-20 h-20 rounded-xl bg-white shrink-0">
+              <img src={'/icon/favicon.svg'} className="w-full h-full object-cover" />
             </div>
-            <span className="text-xl font-bold tracking-tight">SanteCi</span>
           </div>
 
           {/* Description */}

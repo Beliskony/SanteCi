@@ -92,10 +92,9 @@ const SidebarContent = ({
       <div className="flex items-center gap-3 px-2 mb-8">
         <Link href="/" className="flex items-center gap-3 px-2 mb-8">
         <div className="flex items-center gap-3 shrink-0">
-          <div className="w-9 h-9 rounded-xl bg-[#1e3a8a] flex items-center justify-center">
-            <Heart size={18} stroke="white" fill="white" />
+          <div className="w-20 h-20 rounded-xl">
+            <img src={'/icon/favicon.svg'} className="w-full h-full object-cover" />
           </div>
-          <span className="text-base font-bold text-gray-900">SanteCi</span>
         </div>
       </Link>
         <span className="text-[10px] font-bold text-[#1e3a8a] bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full tracking-wide">
