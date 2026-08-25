@@ -6,6 +6,7 @@ import { AccountSection } from "./AccountSection";
 import { TelemedicineSection } from "./Telemedicinesection";
 import DoctorSecuritySection  from "@/app/frontend/components/dashboard/doctor/parametres/DoctorSecuritySection"
 import { VisibilitySection, SubscriptionSection } from "./VisibilitySubscriptionSection";
+import DoctorDocumentsSection from "./DoctorDocumentsSection";
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
 
@@ -63,6 +64,7 @@ export default function SettingsPage() {
           <div className="flex-1 min-w-0">
             {active === "compte"       && <AccountSection />}
             {active === "securite"     && <DoctorSecuritySection />}
+            {active === "document"     && <DoctorDocumentsSection/>}
             {active === "telemedecine" && <TelemedicineSection />}
             {active === "visibilite"   && <VisibilitySection />}
             {active === "abonnement"   && <SubscriptionSection />}
