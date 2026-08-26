@@ -9,8 +9,8 @@ const timeString = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Format HH:MM r
 // ── Sous-schémas ───────────────────────────────────────────────────────────────
 
 const CoordinatesSchema = z.object({
-  latitude:  z.number().min(-90).max(90),
-  longitude: z.number().min(-180).max(180),
+  latitude:  z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
 });
 
 const LocationSchema = z.object({

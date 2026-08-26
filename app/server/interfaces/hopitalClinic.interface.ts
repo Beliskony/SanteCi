@@ -23,9 +23,9 @@ export interface IHospitalClinic extends Document {
     city: string;
     district: string;
     commune?: string;
-    coordinates: {
-      latitude: number;
-      longitude: number;
+    coordinates?: {
+      latitude?: number;
+      longitude?: number;
     };
   };
   

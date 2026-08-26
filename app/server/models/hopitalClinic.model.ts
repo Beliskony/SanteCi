@@ -19,8 +19,8 @@ const HospitalClinicSchema: Schema = new Schema({
     district: { type: String, required: true },
     commune: { type: String },
     coordinates: {
-      latitude: { type: Number, required: true },
-      longitude: { type: Number, required: true }
+      latitude: { type: Number },
+      longitude: { type: Number }
     }
   },
   contact: {
