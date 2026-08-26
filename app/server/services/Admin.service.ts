@@ -5,6 +5,8 @@ import mongoose from 'mongoose';
 import { Admin } from '../models/admin.model';
 import { Review } from '../models/review.model';
 import { IAdmin, AdminPermission, AdminActionType } from '../interfaces/admin.interface';
+import { IHospitalClinic } from '../interfaces/hopitalClinic.interface';
+import { TCreateHospitalClinic, TUpdateHospitalClinic } from '../schemas/HospitalClinic.schema';
 import { Doctor } from '../models/medcin.model';
 import { Patient } from '../models/patient.model';
 import HospitalClinic from '../models/hopitalClinic.model';
@@ -499,6 +501,51 @@ async listDoctors(
   ]);
 
   return { doctors, total, page: safePage, pages: Math.ceil(total / safeLimit) };
+}
+
+// ── Création : hôpitaux (perm: moderate:hospitals) ───────────────────────────
+
+async createHospital(
+  adminId: string,
+  dto: Omit<TCreateHospitalClinic, 'facilityId'>,
+  imageBuffer?: Buffer
+): Promise<IHospitalClinic> {
+  await this.assertActorPermission(adminId, 'moderate:hospitals');
+
+  const facility = await hospitalClinicService.create(dto, imageBuffer);
+  await this.logAction(adminId, 'create_hospital', String(facility._id), 'hospital');
+
+  return facility;
+}
+
+async updateHospital(
+  adminId: string,
+  hospitalId: string,
+  dto: TUpdateHospitalClinic,
+  imageBuffer?: Buffer
+): Promise<IHospitalClinic> {
+  await this.assertActorPermission(adminId, 'moderate:hospitals');
+  this.assertValidObjectId(hospitalId, 'Identifiant établissement');
+
+  const facility = await hospitalClinicService.update(hospitalId, dto, imageBuffer);
+  await this.logAction(adminId, 'update_hospital', hospitalId, 'hospital');
+
+  return facility;
+}
+
+async deleteHospital(
+  adminId: string,
+  hospitalId: string,
+  reason?: string
+): Promise<{ message: string }> {
+  await this.assertActorPermission(adminId, 'moderate:hospitals');
+  this.assertValidObjectId(hospitalId, 'Identifiant établissement');
+  this.assertReason(reason, 'suppression de l\'établissement');
+
+  const result = await hospitalClinicService.delete(hospitalId);
+  await this.logAction(adminId, 'remove_hospital', hospitalId, 'hospital', reason);
+
+  return result;
 }
 
 // ── Listing : hôpitaux ──────────────────────────────────────────────────────

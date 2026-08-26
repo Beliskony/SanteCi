@@ -92,6 +92,10 @@ const ImageCoverSchema = z.object({
   publicId: z.string().min(1),
 }).optional();
 
+const StatusSchema = z.object({
+  accountStatus: z.enum(['active', 'suspended', 'blocked']).default('active'),
+});
+
 // ── Schéma principal ───────────────────────────────────────────────────────────
 
 export const HospitalClinicSchema = z.object({
@@ -109,7 +113,7 @@ export const HospitalClinicSchema = z.object({
   hours:        HoursSchema,
   certification: CertificationSchema,
   status: {
-  accountStatus: { type: String, enum: ['active', 'suspended', 'blocked'], default: 'active' },
+  accountStatus: StatusSchema,
 },
   metadata:     MetadataSchema.default(() => ({
     createdAt:    new Date(),
@@ -137,6 +141,8 @@ export type TCertification    = z.infer<typeof CertificationSchema>;
 /** Création d'un établissement */
 export const CreateHospitalClinicSchema = HospitalClinicSchema.omit({
   metadata: true,
+  facilityId: true,
+  status: true,
 });
 
 /** Mise à jour partielle */

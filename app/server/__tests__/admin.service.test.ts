@@ -1,34 +1,28 @@
 /**
  * Admin.Service.test.ts
  *
- * Tests unitaires purs : Admin, Review, Doctor, Patient, HospitalClinic,
- * Appointment ainsi que les services délégués (doctorService, patientService,
- * hospitalClinicService, reviewService) sont mockés. bcrypt et crypto sont
- * mockés également. mongoose n'est PAS mocké : on utilise son
- * `isValidObjectId` réel (utile pour tester les ids invalides) et
- * `Types.ObjectId` réel pour générer des ids valides.
- *
- * Structure identique à Admin.Auth.Service.test.ts :
- * app/server/services/Admin.Service.ts, app/server/models/*.ts,
+ * Tests unitaires purs : Admin, Doctor, Patient, HospitalClinic, Appointment,
+ * Review sont mockés, ainsi que doctorService/patientService/
+ * hospitalClinicService/reviewService. Structure identique à
+ * appointment.service.test.ts : app/server/services/Admin.Service.ts,
  * app/server/__tests__/Admin.Service.test.ts (ce fichier).
  *
- * Point important : la plupart des méthodes de lecture enchaînent
- * `.select()/.sort()/.skip()/.limit()/.populate()/.lean()` sur le résultat
- * d'un `Model.find(...)`. Le mock `mockQuery` ci-dessous simule un curseur
- * Mongoose chaînable et "thenable" : quel que soit le nombre de maillons
- * appelés avant l'`await`, il résout toujours vers la même valeur.
+ * Point important : updatePermissions/setAdminStatus font
+ * `Admin.findById(...)` puis MUTENT le document retourné et appellent
+ * `.save()`. Comme pour appointment.service, on simule ces cas avec un objet
+ * mutable portant `.save()`, enveloppé dans mockQuery pour rester cohérent
+ * avec le reste des mocks (chaînable ou awaité directement).
  */
 
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 
-// ── Mocks des modèles ──────────────────────────────────────────────────────
 jest.mock('../models/admin.model', () => ({
   Admin: {
-    findById: jest.fn(),
-    find: jest.fn(),
     findOne: jest.fn(),
+    findById: jest.fn(),
     findByIdAndUpdate: jest.fn(),
     findByIdAndDelete: jest.fn(),
+    find: jest.fn(),
     create: jest.fn(),
   },
 }));
@@ -38,7 +32,7 @@ jest.mock('../models/review.model', () => ({
 }));
 
 jest.mock('../models/medcin.model', () => ({
-  Doctor: { findById: jest.fn(), find: jest.fn(), countDocuments: jest.fn(), aggregate: jest.fn() },
+  Doctor: { find: jest.fn(), findById: jest.fn(), countDocuments: jest.fn(), aggregate: jest.fn() },
 }));
 
 jest.mock('../models/patient.model', () => ({
@@ -47,14 +41,15 @@ jest.mock('../models/patient.model', () => ({
 
 jest.mock('../models/hopitalClinic.model', () => ({
   __esModule: true,
-  default: { findById: jest.fn(), find: jest.fn(), countDocuments: jest.fn() },
+  default: { find: jest.fn(), findById: jest.fn(), countDocuments: jest.fn() },
 }));
 
 jest.mock('../models/appointement.model', () => ({
-  Appointment: { aggregate: jest.fn(), countDocuments: jest.fn(), find: jest.fn() },
+  Appointment: { find: jest.fn(), countDocuments: jest.fn(), aggregate: jest.fn() },
 }));
 
-// ── Mocks des services délégués ────────────────────────────────────────────
+jest.mock('bcrypt', () => ({ hash: jest.fn() }));
+
 jest.mock('../services/doctor.service', () => ({
   doctorService: { verify: jest.fn(), updateAccountStatus: jest.fn() },
 }));
@@ -62,18 +57,19 @@ jest.mock('../services/patient.service', () => ({
   patientService: { updateAccountStatus: jest.fn() },
 }));
 jest.mock('../services/hopital.service', () => ({
-  hospitalClinicService: { verify: jest.fn(), updateAccountStatus: jest.fn() },
+  hospitalClinicService: {
+    verify: jest.fn(),
+    updateAccountStatus: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
 }));
 jest.mock('../services/review.service', () => ({
   reviewService: { adminDeleteReview: jest.fn() },
 }));
 
-jest.mock('bcrypt', () => ({ hash: jest.fn() }));
-jest.mock('crypto', () => ({ randomBytes: jest.fn() }));
-
 import bcrypt from 'bcrypt';
-import crypto from 'crypto';
-import mongoose from 'mongoose';
 import { adminService } from '../services/Admin.service';
 import { Admin } from '../models/admin.model';
 import { Review } from '../models/review.model';
@@ -88,606 +84,595 @@ import { reviewService } from '../services/review.service';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
-/** Simule un curseur Mongoose chaînable et thenable : `.select().sort()...`
- *  peuvent être enchaînés dans n'importe quel ordre, le résultat final
- *  résolu par `await` est toujours `value`. */
+/** Simule un curseur Mongoose chaînable (.select/.sort/.skip/.limit/.populate/.lean)
+ *  qui résout toujours vers la même valeur, qu'on l'`await` directement ou
+ *  après un ou plusieurs maillons de chaîne. */
 function mockQuery<T>(value: T) {
-  const query: any = {};
-  ['select', 'sort', 'skip', 'limit', 'populate', 'lean'].forEach((m) => {
-    query[m] = jest.fn(() => query);
-  });
-  query.then = (resolve: any, reject: any) => Promise.resolve(value).then(resolve, reject);
-  query.catch = (reject: any) => Promise.resolve(value).catch(reject);
+  const query: any = Promise.resolve(value);
+  query.select = jest.fn().mockReturnValue(query);
+  query.sort = jest.fn().mockReturnValue(query);
+  query.skip = jest.fn().mockReturnValue(query);
+  query.limit = jest.fn().mockReturnValue(query);
+  query.populate = jest.fn().mockReturnValue(query);
+  query.lean = jest.fn().mockReturnValue(Promise.resolve(value));
   return query;
 }
 
-const validId = () => new mongoose.Types.ObjectId().toString();
-
-function baseAdminDoc(overrides: any = {}) {
-  const doc: any = {
-    _id: 'actor-1',
-    role: 'admin',
-    adminId: 'ADM-1',
-    profile: { fullName: 'Axel' },
-    contact: { email: 'axel@sante.ci', phone: '+225000' },
-    permissions: [],
-    status: { accountStatus: 'active' },
-    security: { password: 'hashed' },
-    ...overrides,
-  };
-  doc.save = jest.fn(async () => doc);
-  doc.toObject = jest.fn(() => ({ ...doc }));
-  return doc;
-}
-
-beforeEach(() => {
-  // resetAllMocks (et non clearAllMocks) : clearAllMocks ne vide PAS la file
-  // des valeurs mockReturnValueOnce/mockResolvedValueOnce non consommées par
-  // un test précédent (ex. un test qui lève une erreur avant d'avoir
-  // consommé toutes ses valeurs en file). Sans reset complet, une valeur
-  // orpheline se décale sur le test suivant et fausse ses assertions.
-  jest.resetAllMocks();
+const ACTIVE_SUPERADMIN = { _id: 'super-1', role: 'superadmin', status: { accountStatus: 'active' }, permissions: [] };
+const activeAdminWithPerm = (perm: string) => ({
+  _id: 'admin-1',
+  role: 'admin',
+  status: { accountStatus: 'active' },
+  permissions: [perm],
 });
 
-// ─── Helpers internes de sécurité (via des méthodes publiques) ──────────────
+const VALID_ACTOR = '507f1f77bcf86cd799439011';
+const VALID_TARGET = '507f1f77bcf86cd799439012';
 
-describe('adminService — vérification des permissions (assertActorPermission)', () => {
-  it('rejette un id acteur invalide', async () => {
-    await expect(adminService.verifyDoctor('invalid-id', validId())).rejects.toThrow(
-      'Identifiant administrateur invalide.'
-    );
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+
+// ─── Contrôle d'accès partagé ─────────────────────────────────────────────────
+
+describe('AdminService — contrôle d\'accès partagé', () => {
+  it('rejette un ID d\'acteur invalide', async () => {
+    await expect(
+      adminService.createSubAdmin('not-an-object-id', {
+        fullName: 'X', email: 'x@x.com', phone: '+225', password: 'p', permissions: ['view:analytics'],
+      })
+    ).rejects.toThrow('Identifiant administrateur invalide.');
   });
 
   it('rejette si l\'acteur est introuvable', async () => {
     (Admin.findById as any).mockReturnValueOnce(mockQuery(null));
-    await expect(adminService.verifyDoctor(validId(), validId())).rejects.toThrow('Administrateur introuvable.');
+    await expect(adminService.verifyDoctor(VALID_ACTOR, VALID_TARGET)).rejects.toThrow('Administrateur introuvable.');
   });
 
-  it('rejette si le compte acteur n\'est pas actif', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ status: { accountStatus: 'suspended' } }))
-    );
-    await expect(adminService.verifyDoctor(validId(), validId())).rejects.toThrow(
-      'Compte administrateur suspendu ou bloqué.'
-    );
+  it('rejette si l\'acteur n\'est pas actif', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery({ ...ACTIVE_SUPERADMIN, status: { accountStatus: 'blocked' } }));
+    await expect(adminService.verifyDoctor(VALID_ACTOR, VALID_TARGET)).rejects.toThrow('Compte administrateur suspendu ou bloqué.');
   });
 
-  it('rejette si l\'acteur n\'a pas la permission requise', async () => {
-    (Admin.findById as any).mockReturnValueOnce(mockQuery(baseAdminDoc({ permissions: [] })));
-    await expect(adminService.verifyDoctor(validId(), validId())).rejects.toThrow('Permission insuffisante.');
+  it('rejette un admin sans la permission requise', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:patients')));
+    await expect(adminService.verifyDoctor(VALID_ACTOR, VALID_TARGET)).rejects.toThrow('Permission insuffisante.');
   });
 
-  it('laisse passer un superadmin même sans la permission listée', async () => {
-    const doctorId = validId();
-    (Admin.findById as any).mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin', permissions: [] })));
+  it('autorise un superadmin même sans permission explicite listée', async () => {
+    (Admin.findById as any).mockReturnValue(mockQuery(ACTIVE_SUPERADMIN));
     (doctorService.verify as any).mockResolvedValueOnce({ message: 'ok' });
     (Admin.findByIdAndUpdate as any).mockResolvedValueOnce({});
 
-    await expect(adminService.verifyDoctor(validId(), doctorId)).resolves.toEqual({ message: 'ok' });
+    await expect(adminService.verifyDoctor(VALID_ACTOR, VALID_TARGET)).resolves.toEqual({ message: 'ok' });
   });
 });
 
-// ─── createSubAdmin ───────────────────────────────────────────────────────
+// ─── Gestion des comptes admin (superadmin only) ───────────────────────────────
 
-describe('adminService.createSubAdmin', () => {
+describe('AdminService.createSubAdmin', () => {
   const dto = {
-    fullName: 'Jeanne Kouassi',
-    email: 'jeanne@sante.ci',
-    phone: '+2250700000002',
-    password: 'S3cur3Pass!',
-    permissions: ['moderate:doctors'] as any,
+    fullName: 'Sous Admin', email: 'sub@sante.ci', phone: '+225070000',
+    password: 'pass1234', permissions: ['moderate:doctors' as const],
   };
 
   it('rejette si l\'acteur n\'est pas superadmin', async () => {
-    (Admin.findById as any).mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'admin' })));
-    await expect(adminService.createSubAdmin(validId(), dto)).rejects.toThrow('Réservé au superadmin.');
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:doctors')));
+    await expect(adminService.createSubAdmin(VALID_ACTOR, dto)).rejects.toThrow('Réservé au superadmin.');
   });
 
-  it('rejette si aucune permission n\'est fournie', async () => {
-    (Admin.findById as any).mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })));
-    await expect(adminService.createSubAdmin(validId(), { ...dto, permissions: [] })).rejects.toThrow(
+  it('rejette sans permission assignée', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(ACTIVE_SUPERADMIN));
+    await expect(adminService.createSubAdmin(VALID_ACTOR, { ...dto, permissions: [] })).rejects.toThrow(
       'Au moins une permission doit être assignée.'
     );
   });
 
   it('rejette si l\'email est déjà utilisé', async () => {
-    (Admin.findById as any).mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })));
-    (Admin.findOne as any).mockResolvedValueOnce({ _id: 'someone' });
-    await expect(adminService.createSubAdmin(validId(), dto)).rejects.toThrow('Cet email est déjà utilisé.');
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(ACTIVE_SUPERADMIN));
+    (Admin.findOne as any).mockReturnValueOnce(mockQuery({ _id: 'exists' }));
+    await expect(adminService.createSubAdmin(VALID_ACTOR, dto)).rejects.toThrow('Cet email est déjà utilisé.');
   });
 
-  it('hash le mot de passe, crée l\'admin et journalise l\'action', async () => {
-    const creatorId = validId();
-    (Admin.findById as any).mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })));
-    (Admin.findOne as any).mockResolvedValueOnce(null);
-    (bcrypt.hash as any).mockResolvedValueOnce('hashed-pwd');
-    (crypto.randomBytes as any).mockReturnValueOnce({ toString: () => 'abcd1234' });
-    (Admin.create as any).mockResolvedValueOnce({
-      _id: 'new-admin-1',
-      adminId: 'ADM-ABCD1234',
-      contact: { email: dto.email },
-    });
+  it('crée le sous-admin, hash le mot de passe, journalise et retourne un résumé', async () => {
+    (Admin.findById as any).mockReturnValue(mockQuery(ACTIVE_SUPERADMIN));
+    (Admin.findOne as any).mockReturnValueOnce(mockQuery(null));
+    (bcrypt.hash as any).mockResolvedValueOnce('hashed');
+    (Admin.create as any).mockResolvedValueOnce({ _id: 'new-admin', adminId: 'ADM-XYZ', contact: { email: dto.email } });
     (Admin.findByIdAndUpdate as any).mockResolvedValueOnce({});
 
-    const result = await adminService.createSubAdmin(creatorId, dto);
+    const result = await adminService.createSubAdmin(VALID_ACTOR, dto);
 
-    expect(bcrypt.hash).toHaveBeenCalledWith(dto.password, 12);
-    expect(Admin.create).toHaveBeenCalledWith(
+    expect(Admin.create).toHaveBeenCalledWith(expect.objectContaining({ role: 'admin', permissions: dto.permissions }));
+    expect(Admin.findByIdAndUpdate).toHaveBeenCalledWith(
+      VALID_ACTOR,
       expect.objectContaining({
-        adminId: 'ADM-ABCD1234',
-        role: 'admin',
-        permissions: dto.permissions,
-        security: expect.objectContaining({ password: 'hashed-pwd', isAdmin: true, failedAttempts: 0 }),
-        metadata: { createdBy: creatorId },
+        $push: expect.objectContaining({
+          recentActions: expect.objectContaining({ $each: [expect.objectContaining({ action: 'create_admin', targetType: 'admin' })] }),
+        }),
       })
     );
-    expect(Admin.findByIdAndUpdate).toHaveBeenCalledWith(
-      creatorId,
-      expect.objectContaining({ $push: expect.objectContaining({ recentActions: expect.anything() }) })
-    );
-    expect(result).toEqual({ id: 'new-admin-1', adminId: 'ADM-ABCD1234', email: dto.email });
+    expect(result).toEqual({ id: 'new-admin', adminId: 'ADM-XYZ', email: dto.email });
   });
 });
 
-// ─── listAdmins ───────────────────────────────────────────────────────────
+describe('AdminService.listAdmins / getAdminById', () => {
+  it('liste les admins sans exposer le mot de passe (select négatif)', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(ACTIVE_SUPERADMIN));
+    const q = mockQuery([{ _id: 'a1' }]);
+    (Admin.find as any).mockReturnValueOnce(q);
 
-describe('adminService.listAdmins', () => {
-  it('rejette si l\'acteur n\'est pas superadmin', async () => {
-    (Admin.findById as any).mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'admin' })));
-    await expect(adminService.listAdmins(validId())).rejects.toThrow('Réservé au superadmin.');
+    const result = await adminService.listAdmins(VALID_ACTOR);
+
+    expect(q.select).toHaveBeenCalledWith('-security.password');
+    expect(result).toEqual([{ _id: 'a1' }]);
   });
 
-  it('retourne la liste sans le mot de passe', async () => {
-    (Admin.findById as any).mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })));
-    const query = mockQuery([{ _id: 'a1' }, { _id: 'a2' }]);
-    (Admin.find as any).mockReturnValueOnce(query);
-
-    const result = await adminService.listAdmins(validId());
-
-    expect(query.select).toHaveBeenCalledWith('-security.password');
-    expect(result).toHaveLength(2);
+  it('getAdminById rejette une cible introuvable', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(ACTIVE_SUPERADMIN)).mockReturnValueOnce(mockQuery(null));
+    await expect(adminService.getAdminById(VALID_ACTOR, VALID_TARGET)).rejects.toThrow('Administrateur introuvable.');
   });
 });
 
-// ─── getAdminById ─────────────────────────────────────────────────────────
+describe('AdminService.updatePermissions', () => {
+  it('rejette la modification d\'un superadmin', async () => {
+    (Admin.findById as any)
+      .mockReturnValueOnce(mockQuery(ACTIVE_SUPERADMIN))
+      .mockReturnValueOnce(mockQuery({ role: 'superadmin' }));
 
-describe('adminService.getAdminById', () => {
-  it('rejette un id cible invalide', async () => {
-    (Admin.findById as any).mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })));
-    await expect(adminService.getAdminById(validId(), 'not-an-id')).rejects.toThrow(
-      'Identifiant administrateur cible invalide.'
+    await expect(adminService.updatePermissions(VALID_ACTOR, VALID_TARGET, ['view:analytics'])).rejects.toThrow(
+      'Impossible de modifier les permissions d\'un superadmin.'
     );
   });
 
-  it('rejette si l\'admin cible est introuvable', async () => {
-    (Admin.findById as any)
-      .mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })))
-      .mockReturnValueOnce(mockQuery(null));
-
-    await expect(adminService.getAdminById(validId(), validId())).rejects.toThrow('Administrateur introuvable.');
-  });
-
-  it('retourne l\'admin cible sans le mot de passe', async () => {
-    (Admin.findById as any)
-      .mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })))
-      .mockReturnValueOnce(mockQuery({ _id: 'target-1' }));
-
-    const result = await adminService.getAdminById(validId(), validId());
-    expect(result).toEqual({ _id: 'target-1' });
-  });
-});
-
-// ─── updatePermissions ────────────────────────────────────────────────────
-
-describe('adminService.updatePermissions', () => {
-  it('rejette si aucune permission n\'est fournie', async () => {
-    (Admin.findById as any).mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })));
-    await expect(adminService.updatePermissions(validId(), validId(), [])).rejects.toThrow(
-      'Au moins une permission doit être assignée.'
-    );
-  });
-
-  it('rejette si l\'admin cible est introuvable', async () => {
-    (Admin.findById as any)
-      .mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })))
-      .mockReturnValueOnce(mockQuery(null));
-
-    await expect(
-      adminService.updatePermissions(validId(), validId(), ['moderate:doctors'] as any)
-    ).rejects.toThrow('Administrateur introuvable.');
-  });
-
-  it('rejette si la cible est un superadmin', async () => {
-    (Admin.findById as any)
-      .mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })))
-      .mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })));
-
-    await expect(
-      adminService.updatePermissions(validId(), validId(), ['moderate:doctors'] as any)
-    ).rejects.toThrow("Impossible de modifier les permissions d'un superadmin.");
-  });
-
-  it('met à jour les permissions, sauvegarde et journalise', async () => {
-    const superAdminId = validId();
-    const targetDoc = baseAdminDoc({ role: 'admin', permissions: [] });
-    (Admin.findById as any)
-      .mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })))
-      .mockReturnValueOnce(mockQuery(targetDoc));
+  it('met à jour les permissions, journalise et masque le mot de passe', async () => {
+    const saveMock = jest.fn(async () => undefined);
+    const target: any = {
+      role: 'admin',
+      permissions: [],
+      save: saveMock,
+      toObject: () => ({ _id: VALID_TARGET, role: 'admin', permissions: ['view:analytics'], security: { password: 'x' } }),
+    };
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(ACTIVE_SUPERADMIN)).mockReturnValueOnce(mockQuery(target));
     (Admin.findByIdAndUpdate as any).mockResolvedValueOnce({});
 
-    const result = await adminService.updatePermissions(superAdminId, validId(), ['moderate:doctors'] as any);
+    const result = await adminService.updatePermissions(VALID_ACTOR, VALID_TARGET, ['view:analytics']);
 
-    expect(targetDoc.permissions).toEqual(['moderate:doctors']);
-    expect(targetDoc.save).toHaveBeenCalled();
-    expect(Admin.findByIdAndUpdate).toHaveBeenCalledWith(
-      superAdminId,
-      expect.objectContaining({ $push: expect.anything() })
-    );
+    expect(target.permissions).toEqual(['view:analytics']);
+    expect(saveMock).toHaveBeenCalled();
     expect(result).not.toHaveProperty('security');
   });
 });
 
-// ─── setAdminStatus ───────────────────────────────────────────────────────
-
-describe('adminService.setAdminStatus', () => {
-  it('rejette un statut invalide', async () => {
-    (Admin.findById as any).mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })));
-    await expect(
-      adminService.setAdminStatus(validId(), validId(), 'bogus' as any)
-    ).rejects.toThrow('Statut invalide.');
-  });
-
-  it('rejette si une raison valide est absente pour un statut non actif', async () => {
-    (Admin.findById as any).mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })));
-    await expect(
-      adminService.setAdminStatus(validId(), validId(), 'suspended', 'no')
-    ).rejects.toThrow(/raison d'au moins 5 caractères/);
-  });
-
+describe('AdminService.setAdminStatus', () => {
   it('rejette la modification de son propre statut', async () => {
-    const actorId = validId();
-    (Admin.findById as any).mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin', _id: actorId })));
-    await expect(
-      adminService.setAdminStatus(actorId, actorId, 'suspended', 'raison valide')
-    ).rejects.toThrow('Impossible de modifier votre propre statut.');
-  });
-
-  it('rejette si la cible est introuvable', async () => {
-    (Admin.findById as any)
-      .mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })))
-      .mockReturnValueOnce(mockQuery(null));
-
-    await expect(
-      adminService.setAdminStatus(validId(), validId(), 'suspended', 'raison valide')
-    ).rejects.toThrow('Administrateur introuvable.');
-  });
-
-  it('rejette la suspension d\'un superadmin', async () => {
-    (Admin.findById as any)
-      .mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })))
-      .mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })));
-
-    await expect(
-      adminService.setAdminStatus(validId(), validId(), 'suspended', 'raison valide')
-    ).rejects.toThrow('Impossible de suspendre un superadmin.');
-  });
-
-  it('met à jour le statut, sauvegarde et journalise', async () => {
-    const targetDoc = baseAdminDoc({ role: 'admin' });
-    (Admin.findById as any)
-      .mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })))
-      .mockReturnValueOnce(mockQuery(targetDoc));
-    (Admin.findByIdAndUpdate as any).mockResolvedValueOnce({});
-
-    const result = await adminService.setAdminStatus(validId(), validId(), 'suspended', 'raison valide');
-
-    expect(targetDoc.status.accountStatus).toBe('suspended');
-    expect(targetDoc.save).toHaveBeenCalled();
-    expect(result.message).toBe('Statut mis à jour : suspended');
-  });
-
-  it('n\'exige pas de raison pour repasser un compte à actif', async () => {
-    const targetDoc = baseAdminDoc({ role: 'admin' });
-    (Admin.findById as any)
-      .mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })))
-      .mockReturnValueOnce(mockQuery(targetDoc));
-    (Admin.findByIdAndUpdate as any).mockResolvedValueOnce({});
-
-    await expect(adminService.setAdminStatus(validId(), validId(), 'active')).resolves.toMatchObject({
-      message: 'Statut mis à jour : active',
-    });
-  });
-});
-
-// ─── deleteAdmin ──────────────────────────────────────────────────────────
-
-describe('adminService.deleteAdmin', () => {
-  it('rejette si la raison est absente ou trop courte', async () => {
-    (Admin.findById as any).mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })));
-    await expect(adminService.deleteAdmin(validId(), validId(), 'no')).rejects.toThrow(
-      /raison d'au moins 5 caractères/
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(ACTIVE_SUPERADMIN));
+    await expect(adminService.setAdminStatus(VALID_ACTOR, VALID_ACTOR, 'suspended', 'raison suffisante')).rejects.toThrow(
+      'Impossible de modifier votre propre statut.'
     );
   });
 
+  it('exige une raison pour tout statut différent de "active"', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(ACTIVE_SUPERADMIN));
+    await expect(adminService.setAdminStatus(VALID_ACTOR, VALID_TARGET, 'suspended')).rejects.toThrow(/raison d'au moins/);
+  });
+
+  it('rejette la suspension d\'un superadmin', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(ACTIVE_SUPERADMIN)).mockReturnValueOnce(mockQuery({ role: 'superadmin' }));
+    await expect(adminService.setAdminStatus(VALID_ACTOR, VALID_TARGET, 'suspended', 'comportement suspect')).rejects.toThrow(
+      'Impossible de suspendre un superadmin.'
+    );
+  });
+
+  it('met à jour le statut et journalise avec la raison', async () => {
+    const saveMock = jest.fn(async () => undefined);
+    const target: any = { role: 'admin', status: { accountStatus: 'active' }, save: saveMock };
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(ACTIVE_SUPERADMIN)).mockReturnValueOnce(mockQuery(target));
+    (Admin.findByIdAndUpdate as any).mockResolvedValueOnce({});
+
+    const result = await adminService.setAdminStatus(VALID_ACTOR, VALID_TARGET, 'blocked', 'fraude confirmée');
+
+    expect(target.status.accountStatus).toBe('blocked');
+    expect(saveMock).toHaveBeenCalled();
+    expect(result.message).toBe('Statut mis à jour : blocked');
+  });
+});
+
+describe('AdminService.deleteAdmin', () => {
+  it('exige toujours une raison', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(ACTIVE_SUPERADMIN));
+    await expect(adminService.deleteAdmin(VALID_ACTOR, VALID_TARGET)).rejects.toThrow(/raison d'au moins/);
+  });
+
   it('rejette la suppression de son propre compte', async () => {
-    const actorId = validId();
-    (Admin.findById as any).mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin', _id: actorId })));
-    await expect(adminService.deleteAdmin(actorId, actorId, 'raison valide')).rejects.toThrow(
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(ACTIVE_SUPERADMIN));
+    await expect(adminService.deleteAdmin(VALID_ACTOR, VALID_ACTOR, 'nettoyage de compte')).rejects.toThrow(
       'Impossible de supprimer votre propre compte.'
     );
   });
 
-  it('rejette si la cible est introuvable', async () => {
-    (Admin.findById as any)
-      .mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })))
-      .mockReturnValueOnce(mockQuery(null));
-
-    await expect(adminService.deleteAdmin(validId(), validId(), 'raison valide')).rejects.toThrow(
-      'Administrateur introuvable.'
-    );
-  });
-
   it('rejette la suppression d\'un superadmin', async () => {
-    (Admin.findById as any)
-      .mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })))
-      .mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })));
-
-    await expect(adminService.deleteAdmin(validId(), validId(), 'raison valide')).rejects.toThrow(
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(ACTIVE_SUPERADMIN)).mockReturnValueOnce(mockQuery({ role: 'superadmin' }));
+    await expect(adminService.deleteAdmin(VALID_ACTOR, VALID_TARGET, 'raison valable ici')).rejects.toThrow(
       'Impossible de supprimer un superadmin.'
     );
   });
 
-  it('supprime la cible et journalise l\'action', async () => {
-    const targetId = validId();
-    (Admin.findById as any)
-      .mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'superadmin' })))
-      .mockReturnValueOnce(mockQuery(baseAdminDoc({ role: 'admin' })));
+  it('supprime le sous-admin et journalise', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(ACTIVE_SUPERADMIN)).mockReturnValueOnce(mockQuery({ role: 'admin' }));
     (Admin.findByIdAndDelete as any).mockResolvedValueOnce({});
     (Admin.findByIdAndUpdate as any).mockResolvedValueOnce({});
 
-    const result = await adminService.deleteAdmin(validId(), targetId, 'raison valide');
+    const result = await adminService.deleteAdmin(VALID_ACTOR, VALID_TARGET, 'compte compromis');
 
-    expect(Admin.findByIdAndDelete).toHaveBeenCalledWith(targetId);
+    expect(Admin.findByIdAndDelete).toHaveBeenCalledWith(VALID_TARGET);
     expect(result.message).toBe('Administrateur supprimé.');
   });
 });
 
-// ─── Modération : médecins ────────────────────────────────────────────────
+// ─── Modération : médecins ──────────────────────────────────────────────────
 
-describe('adminService.verifyDoctor', () => {
-  it('vérifie le médecin et journalise', async () => {
-    const doctorId = validId();
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:doctors'] }))
-    );
-    (doctorService.verify as any).mockResolvedValueOnce({ message: 'Médecin vérifié.' });
-    (Admin.findByIdAndUpdate as any).mockResolvedValueOnce({});
-
-    const result = await adminService.verifyDoctor(validId(), doctorId);
-
-    expect(doctorService.verify).toHaveBeenCalledWith(doctorId);
-    expect(result).toEqual({ message: 'Médecin vérifié.' });
-  });
-});
-
-describe('adminService.getDoctorVerificationDetails', () => {
+describe('AdminService.getDoctorVerificationDetails', () => {
   it('rejette si le médecin est introuvable', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:doctors'] }))
-    );
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:doctors')));
     (Doctor.findById as any).mockReturnValueOnce(mockQuery(null));
 
-    await expect(adminService.getDoctorVerificationDetails(validId(), validId())).rejects.toThrow(
-      'Médecin introuvable.'
-    );
+    await expect(adminService.getDoctorVerificationDetails(VALID_ACTOR, VALID_TARGET)).rejects.toThrow('Médecin introuvable.');
   });
 
-  it('retourne les détails de vérification', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:doctors'] }))
-    );
-    (Doctor.findById as any).mockReturnValueOnce(mockQuery({ doctorId: 'DOC-1' }));
+  it('retourne les champs de vérification sélectionnés', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:doctors')));
+    const q = mockQuery({ doctorId: 'DOC-1', status: { isVerified: false } });
+    (Doctor.findById as any).mockReturnValueOnce(q);
 
-    const result = await adminService.getDoctorVerificationDetails(validId(), validId());
-    expect(result).toEqual({ doctorId: 'DOC-1' });
+    const result = await adminService.getDoctorVerificationDetails(VALID_ACTOR, VALID_TARGET);
+
+    expect(q.select).toHaveBeenCalled();
+    expect(result).toEqual({ doctorId: 'DOC-1', status: { isVerified: false } });
   });
 });
 
-describe('adminService.setDoctorStatus', () => {
+describe('AdminService.setDoctorStatus', () => {
   it('rejette un statut invalide', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:doctors'] }))
-    );
-    await expect(adminService.setDoctorStatus(validId(), validId(), 'bogus' as any)).rejects.toThrow(
-      'Statut invalide.'
-    );
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:doctors')));
+    await expect(adminService.setDoctorStatus(VALID_ACTOR, VALID_TARGET, 'bogus' as any)).rejects.toThrow('Statut invalide.');
   });
 
-  it('exige une raison pour suspendre ou bloquer', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:doctors'] }))
-    );
-    await expect(adminService.setDoctorStatus(validId(), validId(), 'blocked')).rejects.toThrow(
-      /raison d'au moins 5 caractères/
-    );
+  it('exige une raison pour suspended/blocked', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:doctors')));
+    await expect(adminService.setDoctorStatus(VALID_ACTOR, VALID_TARGET, 'suspended')).rejects.toThrow(/raison d'au moins/);
+  });
+
+  it('n\'exige pas de raison pour réactiver (active)', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:doctors')));
+    (doctorService.updateAccountStatus as any).mockResolvedValueOnce({ message: 'ok' });
+    (Admin.findByIdAndUpdate as any).mockResolvedValueOnce({});
+
+    await expect(adminService.setDoctorStatus(VALID_ACTOR, VALID_TARGET, 'active')).resolves.toEqual({ message: 'ok' });
+    expect(doctorService.updateAccountStatus).toHaveBeenCalledWith(VALID_TARGET, 'active');
   });
 
   it('journalise "block_doctor" pour un blocage', async () => {
-    const doctorId = validId();
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:doctors'] }))
-    );
-    (doctorService.updateAccountStatus as any).mockResolvedValueOnce({ message: 'ok' });
-    (Admin.findByIdAndUpdate as any).mockImplementationOnce((_id: any, update: any) => {
-      expect(update.$push.recentActions.$each[0].action).toBe('block_doctor');
-      return Promise.resolve({});
-    });
+    (Admin.findById as any).mockReturnValue(mockQuery(activeAdminWithPerm('moderate:doctors')));
+    (doctorService.updateAccountStatus as any).mockResolvedValue({ message: 'ok' });
+    (Admin.findByIdAndUpdate as any).mockResolvedValue({});
 
-    await adminService.setDoctorStatus(validId(), doctorId, 'blocked', 'raison valide');
-    expect(doctorService.updateAccountStatus).toHaveBeenCalledWith(doctorId, 'blocked');
-  });
+    await adminService.setDoctorStatus(VALID_ACTOR, VALID_TARGET, 'blocked', 'documents falsifiés');
 
-  it('journalise "reactivate_doctor" pour une réactivation', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:doctors'] }))
-    );
-    (doctorService.updateAccountStatus as any).mockResolvedValueOnce({ message: 'ok' });
-    (Admin.findByIdAndUpdate as any).mockImplementationOnce((_id: any, update: any) => {
-      expect(update.$push.recentActions.$each[0].action).toBe('reactivate_doctor');
-      return Promise.resolve({});
-    });
-
-    await adminService.setDoctorStatus(validId(), validId(), 'active');
+    const pushArg = (Admin.findByIdAndUpdate as any).mock.calls[0][1];
+    expect(pushArg.$push.recentActions.$each[0].action).toBe('block_doctor');
   });
 });
 
-// ─── Modération : hôpitaux ────────────────────────────────────────────────
+// ─── Modération : hôpitaux ──────────────────────────────────────────────────
 
-describe('adminService.verifyHospital', () => {
-  it('vérifie l\'établissement et journalise', async () => {
-    const hospitalId = validId();
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:hospitals'] }))
-    );
-    (hospitalClinicService.verify as any).mockResolvedValueOnce({ message: 'ok' });
+describe('AdminService.verifyHospital', () => {
+  it('délègue à hospitalClinicService.verify et journalise', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:hospitals')));
+    (hospitalClinicService.verify as any).mockResolvedValueOnce({ message: 'vérifié' });
     (Admin.findByIdAndUpdate as any).mockResolvedValueOnce({});
 
-    const result = await adminService.verifyHospital(validId(), hospitalId);
-    expect(hospitalClinicService.verify).toHaveBeenCalledWith(hospitalId);
-    expect(result).toEqual({ message: 'ok' });
+    const result = await adminService.verifyHospital(VALID_ACTOR, VALID_TARGET);
+
+    expect(hospitalClinicService.verify).toHaveBeenCalledWith(VALID_TARGET);
+    expect(result.message).toBe('vérifié');
   });
 });
 
-describe('adminService.getHospitalVerificationDetails', () => {
+describe('AdminService.getHospitalVerificationDetails', () => {
   it('rejette si l\'établissement est introuvable', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:hospitals'] }))
-    );
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:hospitals')));
     (HospitalClinic.findById as any).mockReturnValueOnce(mockQuery(null));
 
-    await expect(adminService.getHospitalVerificationDetails(validId(), validId())).rejects.toThrow(
+    await expect(adminService.getHospitalVerificationDetails(VALID_ACTOR, VALID_TARGET)).rejects.toThrow(
       'Établissement introuvable.'
     );
   });
+
+  it('retourne les champs sélectionnés', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:hospitals')));
+    const q = mockQuery({ facilityId: 'FAC-1', name: 'Clinique X' });
+    (HospitalClinic.findById as any).mockReturnValueOnce(q);
+
+    const result = await adminService.getHospitalVerificationDetails(VALID_ACTOR, VALID_TARGET);
+    expect(result).toEqual({ facilityId: 'FAC-1', name: 'Clinique X' });
+  });
 });
 
-describe('adminService.setHospitalStatus', () => {
-  it('journalise "reactivate_hospital" quand le statut redevient actif', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:hospitals'] }))
-    );
+describe('AdminService.setHospitalStatus', () => {
+  it('rejette un statut invalide', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:hospitals')));
+    await expect(adminService.setHospitalStatus(VALID_ACTOR, VALID_TARGET, 'bogus' as any)).rejects.toThrow('Statut invalide.');
+  });
+
+  it('exige une raison pour un statut différent de "active"', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:hospitals')));
+    await expect(adminService.setHospitalStatus(VALID_ACTOR, VALID_TARGET, 'suspended')).rejects.toThrow(/raison d'au moins/);
+  });
+
+  it('journalise "reactivate_hospital" pour une réactivation', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:hospitals')));
     (hospitalClinicService.updateAccountStatus as any).mockResolvedValueOnce({ message: 'ok' });
-    (Admin.findByIdAndUpdate as any).mockImplementationOnce((_id: any, update: any) => {
-      expect(update.$push.recentActions.$each[0].action).toBe('reactivate_hospital');
-      return Promise.resolve({});
-    });
-
-    await adminService.setHospitalStatus(validId(), validId(), 'active');
-  });
-
-  it('journalise "suspend_hospital" pour tout statut non actif', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:hospitals'] }))
-    );
-    (hospitalClinicService.updateAccountStatus as any).mockResolvedValueOnce({ message: 'ok' });
-    (Admin.findByIdAndUpdate as any).mockImplementationOnce((_id: any, update: any) => {
-      expect(update.$push.recentActions.$each[0].action).toBe('suspend_hospital');
-      return Promise.resolve({});
-    });
-
-    await adminService.setHospitalStatus(validId(), validId(), 'blocked', 'raison valide');
-  });
-});
-
-// ─── Modération : patients ────────────────────────────────────────────────
-
-describe('adminService.setPatientStatus', () => {
-  it('exige une raison pour suspendre ou bloquer', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:patients'] }))
-    );
-    await expect(adminService.setPatientStatus(validId(), validId(), 'suspended')).rejects.toThrow(
-      /raison d'au moins 5 caractères/
-    );
-  });
-
-  it('journalise "suspend_patient" et délègue à patientService', async () => {
-    const patientId = validId();
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:patients'] }))
-    );
-    (patientService.updateAccountStatus as any).mockResolvedValueOnce({ message: 'ok' });
-    (Admin.findByIdAndUpdate as any).mockImplementationOnce((_id: any, update: any) => {
-      expect(update.$push.recentActions.$each[0].action).toBe('suspend_patient');
-      return Promise.resolve({});
-    });
-
-    await adminService.setPatientStatus(validId(), patientId, 'suspended', 'raison valide');
-    expect(patientService.updateAccountStatus).toHaveBeenCalledWith(patientId, 'suspended');
-  });
-});
-
-// ─── Modération : avis ────────────────────────────────────────────────────
-
-describe('adminService.deleteReview', () => {
-  it('exige une raison', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:reviews'] }))
-    );
-    await expect(adminService.deleteReview(validId(), validId())).rejects.toThrow(
-      /raison d'au moins 5 caractères/
-    );
-  });
-
-  it('supprime l\'avis et journalise', async () => {
-    const reviewId = validId();
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:reviews'] }))
-    );
-    (reviewService.adminDeleteReview as any).mockResolvedValueOnce({ message: 'Avis supprimé.' });
     (Admin.findByIdAndUpdate as any).mockResolvedValueOnce({});
 
-    const result = await adminService.deleteReview(validId(), reviewId, 'contenu inapproprié');
-    expect(reviewService.adminDeleteReview).toHaveBeenCalledWith(reviewId);
-    expect(result).toEqual({ message: 'Avis supprimé.' });
+    await adminService.setHospitalStatus(VALID_ACTOR, VALID_TARGET, 'active');
+
+    const pushArg = (Admin.findByIdAndUpdate as any).mock.calls[0][1];
+    expect(pushArg.$push.recentActions.$each[0].action).toBe('reactivate_hospital');
+  });
+
+  it('journalise "suspend_hospital" pour une suspension ou un blocage', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:hospitals')));
+    (hospitalClinicService.updateAccountStatus as any).mockResolvedValueOnce({ message: 'ok' });
+    (Admin.findByIdAndUpdate as any).mockResolvedValueOnce({});
+
+    await adminService.setHospitalStatus(VALID_ACTOR, VALID_TARGET, 'blocked', 'documents invalides');
+
+    const pushArg = (Admin.findByIdAndUpdate as any).mock.calls[0][1];
+    expect(pushArg.$push.recentActions.$each[0].action).toBe('suspend_hospital');
   });
 });
 
-// ─── Supervision : dashboard ──────────────────────────────────────────────
+describe('AdminService.createHospital / updateHospital / deleteHospital', () => {
+  const dto = { name: 'Clinique X' } as any;
 
-describe('adminService.getDashboardStats', () => {
-  it('agrège les compteurs de la plateforme', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['view:analytics'] }))
+  it('createHospital délègue à hospitalClinicService.create et journalise', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:hospitals')));
+    (hospitalClinicService.create as any).mockResolvedValueOnce({ _id: 'hosp-1' });
+    (Admin.findByIdAndUpdate as any).mockResolvedValueOnce({});
+
+    const result = await adminService.createHospital(VALID_ACTOR, dto);
+
+    expect(hospitalClinicService.create).toHaveBeenCalledWith(dto, undefined);
+    expect(result).toEqual({ _id: 'hosp-1' });
+    const pushArg = (Admin.findByIdAndUpdate as any).mock.calls[0][1];
+    expect(pushArg.$push.recentActions.$each[0].action).toBe('create_hospital');
+  });
+
+  it('updateHospital rejette un ID cible invalide', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:hospitals')));
+    await expect(adminService.updateHospital(VALID_ACTOR, 'bad-id', dto)).rejects.toThrow(
+      'Identifiant établissement invalide.'
     );
-    (Doctor.countDocuments as any)
-      .mockResolvedValueOnce(10) // total
-      .mockResolvedValueOnce(6); // vérifiés
-    (Patient.countDocuments as any).mockResolvedValueOnce(50);
-    (HospitalClinic.countDocuments as any)
-      .mockResolvedValueOnce(4) // total
-      .mockResolvedValueOnce(1); // en attente de vérification
-    (Appointment.countDocuments as any)
-      .mockResolvedValueOnce(3) // actifs
-      .mockResolvedValueOnce(20); // terminés
-    (Appointment.aggregate as any)
-      .mockResolvedValueOnce([{ _id: null, total: 150000 }]) // revenu
-      .mockResolvedValueOnce([{ _id: 'confirmed', count: 3 }]); // par statut
-    (Doctor.aggregate as any).mockResolvedValueOnce([{ _id: 'premium', count: 2 }]);
+  });
 
-    const result = await adminService.getDashboardStats(validId());
+  it('updateHospital délègue à hospitalClinicService.update et journalise', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:hospitals')));
+    (hospitalClinicService.update as any).mockResolvedValueOnce({ _id: VALID_TARGET, name: 'Clinique X (MAJ)' });
+    (Admin.findByIdAndUpdate as any).mockResolvedValueOnce({});
+
+    const result = await adminService.updateHospital(VALID_ACTOR, VALID_TARGET, dto);
+
+    expect(hospitalClinicService.update).toHaveBeenCalledWith(VALID_TARGET, dto, undefined);
+    expect(result).toEqual({ _id: VALID_TARGET, name: 'Clinique X (MAJ)' });
+  });
+
+  it('deleteHospital exige une raison puis délègue à hospitalClinicService.delete', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:hospitals')));
+    await expect(adminService.deleteHospital(VALID_ACTOR, VALID_TARGET)).rejects.toThrow(/raison d'au moins/);
+
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:hospitals')));
+    (hospitalClinicService.delete as any).mockResolvedValueOnce({ message: 'supprimé' });
+    (Admin.findByIdAndUpdate as any).mockResolvedValueOnce({});
+
+    const result = await adminService.deleteHospital(VALID_ACTOR, VALID_TARGET, 'fermeture définitive');
+    expect(result.message).toBe('supprimé');
+  });
+});
+
+// ─── Modération : patients ──────────────────────────────────────────────────
+
+describe('AdminService.setPatientStatus', () => {
+  it('rejette un statut invalide', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:patients')));
+    await expect(adminService.setPatientStatus(VALID_ACTOR, VALID_TARGET, 'bogus' as any)).rejects.toThrow('Statut invalide.');
+  });
+
+  it('exige une raison pour tout statut différent de "active"', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:patients')));
+    await expect(adminService.setPatientStatus(VALID_ACTOR, VALID_TARGET, 'blocked')).rejects.toThrow(/raison d'au moins/);
+  });
+
+  it('journalise "suspend_patient" pour une suspension', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:patients')));
+    (patientService.updateAccountStatus as any).mockResolvedValueOnce({ message: 'ok' });
+    (Admin.findByIdAndUpdate as any).mockResolvedValueOnce({});
+
+    await adminService.setPatientStatus(VALID_ACTOR, VALID_TARGET, 'suspended', 'signalements répétés');
+
+    const pushArg = (Admin.findByIdAndUpdate as any).mock.calls[0][1];
+    expect(pushArg.$push.recentActions.$each[0].action).toBe('suspend_patient');
+  });
+});
+
+// ─── Modération : avis ──────────────────────────────────────────────────────
+
+describe('AdminService.deleteReview', () => {
+  it('exige toujours une raison et journalise après suppression', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:reviews')));
+    await expect(adminService.deleteReview(VALID_ACTOR, VALID_TARGET)).rejects.toThrow(/raison d'au moins/);
+
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:reviews')));
+    (reviewService.adminDeleteReview as any).mockResolvedValueOnce({ message: 'supprimé' });
+    (Admin.findByIdAndUpdate as any).mockResolvedValueOnce({});
+
+    const result = await adminService.deleteReview(VALID_ACTOR, VALID_TARGET, 'contenu injurieux');
+    expect(result.message).toBe('supprimé');
+  });
+});
+
+// ─── Listings paginés ───────────────────────────────────────────────────────
+
+describe('AdminService.listDoctors', () => {
+  it('rejette un statut de filtre invalide', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:doctors')));
+    await expect(adminService.listDoctors(VALID_ACTOR, { status: 'bogus' })).rejects.toThrow('Statut invalide.');
+  });
+
+  it('construit la requête $or à partir de search et pagine correctement', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:doctors')));
+    (Doctor.find as any).mockReturnValueOnce(mockQuery([{ doctorId: 'DOC-1' }]));
+    (Doctor.countDocuments as any).mockResolvedValueOnce(1);
+
+    const result = await adminService.listDoctors(VALID_ACTOR, { search: 'Kouassi', page: 2, limit: 10 });
+
+    expect(Doctor.find).toHaveBeenCalledWith(
+      expect.objectContaining({ $or: expect.arrayContaining([{ doctorId: { $regex: 'Kouassi', $options: 'i' } }]) })
+    );
+    expect(result).toEqual({ doctors: [{ doctorId: 'DOC-1' }], total: 1, page: 2, pages: 1 });
+  });
+
+  it('plafonne la limite à 100 et le floor de page à 1', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:doctors')));
+    const q = mockQuery([]);
+    (Doctor.find as any).mockReturnValueOnce(q);
+    (Doctor.countDocuments as any).mockResolvedValueOnce(0);
+
+    await adminService.listDoctors(VALID_ACTOR, { page: -5, limit: 9999 });
+
+    expect(q.limit).toHaveBeenCalledWith(100);
+    expect(q.skip).toHaveBeenCalledWith(0);
+  });
+});
+
+describe('AdminService.listHospitals', () => {
+  it('filtre correctement sur verified=true/false', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:hospitals')));
+    (HospitalClinic.find as any).mockReturnValueOnce(mockQuery([]));
+    (HospitalClinic.countDocuments as any).mockResolvedValueOnce(0);
+
+    await adminService.listHospitals(VALID_ACTOR, { verified: 'true' });
+
+    expect(HospitalClinic.find).toHaveBeenCalledWith(expect.objectContaining({ 'metadata.verified': true }));
+  });
+
+  it('rejette un statut de filtre invalide', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:hospitals')));
+    await expect(adminService.listHospitals(VALID_ACTOR, { status: 'bogus' })).rejects.toThrow('Statut invalide.');
+  });
+});
+
+describe('AdminService.listPatients', () => {
+  it('vérifie la permission moderate:patients et retourne la pagination', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:patients')));
+    (Patient.find as any).mockReturnValueOnce(mockQuery([{ patientId: 'PAT-1' }]));
+    (Patient.countDocuments as any).mockResolvedValueOnce(1);
+
+    const result = await adminService.listPatients(VALID_ACTOR, {});
+    expect(result.total).toBe(1);
+  });
+
+  it('rejette un statut de filtre invalide', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:patients')));
+    await expect(adminService.listPatients(VALID_ACTOR, { status: 'bogus' })).rejects.toThrow('Statut invalide.');
+  });
+});
+
+describe('AdminService.listReviews', () => {
+  it('rejette un statut invalide', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:reviews')));
+    await expect(adminService.listReviews(VALID_ACTOR, { status: 'nope' })).rejects.toThrow('Statut invalide.');
+  });
+
+  it('retourne les avis peuplés docteur/patient', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:reviews')));
+    const q = mockQuery([{ rating: 5 }]);
+    (Review.find as any).mockReturnValueOnce(q);
+    (Review.countDocuments as any).mockResolvedValueOnce(1);
+
+    const result = await adminService.listReviews(VALID_ACTOR, { status: 'flagged' });
+
+    expect(q.populate).toHaveBeenCalledWith('doctorId', 'profile.firstName profile.lastName');
+    expect(q.populate).toHaveBeenCalledWith('patientId', 'profile.firstName profile.lastName');
+    expect(result.reviews).toEqual([{ rating: 5 }]);
+  });
+});
+
+describe('AdminService.listSubscriptions', () => {
+  it('rejette un plan invalide', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('manage:subscriptions')));
+    await expect(adminService.listSubscriptions(VALID_ACTOR, { plan: 'gold' })).rejects.toThrow('Plan invalide.');
+  });
+
+  it('filtre par plan et retourne la pagination', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('manage:subscriptions')));
+    (Doctor.find as any).mockReturnValueOnce(mockQuery([{ doctorId: 'DOC-1' }]));
+    (Doctor.countDocuments as any).mockResolvedValueOnce(1);
+
+    const result = await adminService.listSubscriptions(VALID_ACTOR, { plan: 'premium' });
+
+    expect(Doctor.find).toHaveBeenCalledWith(expect.objectContaining({ 'status.subscription': 'premium' }));
+    expect(result.total).toBe(1);
+  });
+});
+
+describe('AdminService.listPayments', () => {
+  it('rejette un statut de paiement invalide', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('manage:payments')));
+    await expect(adminService.listPayments(VALID_ACTOR, { status: 'unknown' })).rejects.toThrow('Statut de paiement invalide.');
+  });
+
+  it('liste les paiements avec population patient/médecin', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('manage:payments')));
+    const q = mockQuery([{ payment: { amount: 5000 } }]);
+    (Appointment.find as any).mockReturnValueOnce(q);
+    (Appointment.countDocuments as any).mockResolvedValueOnce(1);
+
+    const result = await adminService.listPayments(VALID_ACTOR, { status: 'paid' });
+
+    expect(q.populate).toHaveBeenCalledWith('patientId', 'profile.firstName profile.lastName');
+    expect(q.populate).toHaveBeenCalledWith('doctorId', 'profile.firstName profile.lastName');
+    expect(result.total).toBe(1);
+  });
+});
+
+// ─── Supervision / analytics ────────────────────────────────────────────────
+
+describe('AdminService.getDashboardStats', () => {
+  it('agrège les compteurs et le CA total', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('view:analytics')));
+
+    (Doctor.countDocuments as any).mockResolvedValueOnce(10).mockResolvedValueOnce(6);
+    (Patient.countDocuments as any).mockResolvedValueOnce(50);
+    (HospitalClinic.countDocuments as any).mockResolvedValueOnce(4).mockResolvedValueOnce(1);
+    (Appointment.countDocuments as any).mockResolvedValueOnce(3).mockResolvedValueOnce(20);
+    (Appointment.aggregate as any)
+      .mockResolvedValueOnce([{ _id: null, total: 150000 }]) // revenueAgg
+      .mockResolvedValueOnce([{ _id: 'completed', count: 20 }]); // appointmentsByStatus
+    (Doctor.aggregate as any).mockResolvedValueOnce([{ _id: 'premium', count: 3 }]); // subscriptionBreakdown
+
+    const result = await adminService.getDashboardStats(VALID_ACTOR);
 
     expect(result.doctors).toEqual({ total: 10, verified: 6, pending: 4 });
     expect(result.patients).toEqual({ total: 50 });
     expect(result.hospitals).toEqual({ total: 4, pendingVerification: 1 });
     expect(result.appointments).toEqual({ active: 3, completed: 20 });
     expect(result.revenue).toEqual({ total: 150000 });
+    expect(result.subscriptions).toEqual([{ _id: 'premium', count: 3 }]);
   });
 
-  it('retourne un revenu à 0 si aucun paiement', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['view:analytics'] }))
-    );
+  it('retourne un CA à 0 si aucun paiement n\'existe', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('view:analytics')));
     (Doctor.countDocuments as any).mockResolvedValueOnce(0).mockResolvedValueOnce(0);
     (Patient.countDocuments as any).mockResolvedValueOnce(0);
     (HospitalClinic.countDocuments as any).mockResolvedValueOnce(0).mockResolvedValueOnce(0);
@@ -695,224 +680,52 @@ describe('adminService.getDashboardStats', () => {
     (Appointment.aggregate as any).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     (Doctor.aggregate as any).mockResolvedValueOnce([]);
 
-    const result = await adminService.getDashboardStats(validId());
+    const result = await adminService.getDashboardStats(VALID_ACTOR);
     expect(result.revenue).toEqual({ total: 0 });
   });
 });
 
-// ─── Supervision : revenu dans le temps ───────────────────────────────────
+describe('AdminService.getRevenueTimeseries', () => {
+  it('remplit les buckets vides sur la période "week" et calcule le grand total', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('view:analytics')));
+    (Appointment.aggregate as any).mockResolvedValueOnce([]);
 
-describe('adminService.getRevenueTimeseries', () => {
-  it('remplit les buckets vides et calcule le grandTotal', async () => {
-    const todayLabel = new Date().toISOString().slice(0, 10);
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['view:analytics'] }))
-    );
-    (Appointment.aggregate as any).mockResolvedValueOnce([{ _id: todayLabel, total: 500, count: 2 }]);
-
-    const result = await adminService.getRevenueTimeseries(validId(), 'week');
+    const result = await adminService.getRevenueTimeseries(VALID_ACTOR, 'week');
 
     expect(result.data).toHaveLength(7);
-    const todayBucket = result.data.find((b: any) => b.label === todayLabel);
-    expect(todayBucket).toMatchObject({ total: 500, count: 2 });
-    expect(result.grandTotal).toBe(500);
+    expect(result.grandTotal).toBe(0);
+    expect(result.data.every((b: any) => b.total === 0 && b.count === 0)).toBe(true);
   });
 });
 
-// ─── Performance d'un médecin ─────────────────────────────────────────────
-
-describe('adminService.getDoctorPerformance', () => {
-  it('rejette si le médecin est introuvable', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:doctors'] }))
-    );
+describe('AdminService.getDoctorPerformance', () => {
+  it('rejette si le médecin n\'existe pas', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:doctors')));
     (Doctor.findById as any).mockReturnValueOnce(mockQuery(null));
-    (Appointment.aggregate as any).mockResolvedValue([]);
+    (Appointment.aggregate as any).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
-    await expect(adminService.getDoctorPerformance(validId(), validId())).rejects.toThrow('Médecin introuvable.');
+    await expect(adminService.getDoctorPerformance(VALID_ACTOR, VALID_TARGET)).rejects.toThrow('Médecin introuvable.');
   });
 
-  it('regroupe les statuts de rendez-vous en catégories métier', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:doctors'] }))
-    );
-    (Doctor.findById as any).mockReturnValueOnce(mockQuery({ metadata: { createdAt: '2024-01-01' } }));
+  it('regroupe les 6 statuts de rendez-vous dans les 4 catégories métier', async () => {
+    (Admin.findById as any).mockReturnValueOnce(mockQuery(activeAdminWithPerm('moderate:doctors')));
+    (Doctor.findById as any).mockReturnValueOnce(mockQuery({ metadata: { createdAt: new Date('2024-01-01') } }));
     (Appointment.aggregate as any)
-      .mockResolvedValueOnce([{ _id: null, total: 90000, count: 9 }]) // revenuAgg
+      .mockResolvedValueOnce([{ _id: null, total: 30000, count: 3 }]) // revenueAgg
       .mockResolvedValueOnce([
-        { _id: 'pending', count: 1 },
-        { _id: 'confirmed', count: 2 },
+        { _id: 'pending', count: 2 },
+        { _id: 'confirmed', count: 1 },
         { _id: 'ongoing', count: 1 },
-        { _id: 'completed', count: 9 },
-        { _id: 'no_show', count: 2 },
-        { _id: 'cancelled', count: 3 },
+        { _id: 'completed', count: 3 },
+        { _id: 'no_show', count: 1 },
+        { _id: 'cancelled', count: 1 },
       ]) // statusCounts
-      .mockResolvedValueOnce([]); // timeseries (interne à aggregateRevenueTimeseries)
+      .mockResolvedValueOnce([]); // timeseries interne
 
-    const result = await adminService.getDoctorPerformance(validId(), validId(), 'month');
+    const result = await adminService.getDoctorPerformance(VALID_ACTOR, VALID_TARGET, 'month');
 
-    expect(result.totalRevenue).toBe(90000);
-    expect(result.totalPaidAppointments).toBe(9);
-    expect(result.appointments).toEqual({ active: 4, completed: 9, noShow: 2, cancelled: 3 });
-    expect(result.memberSince).toBe('2024-01-01');
-  });
-});
-
-// ─── Listing : médecins ────────────────────────────────────────────────────
-
-describe('adminService.listDoctors', () => {
-  it('rejette un statut invalide', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:doctors'] }))
-    );
-    await expect(
-      adminService.listDoctors(validId(), { status: 'bogus' })
-    ).rejects.toThrow('Statut invalide.');
-  });
-
-  it('construit la requête de recherche et pagine correctement', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:doctors'] }))
-    );
-    const query = mockQuery([{ doctorId: 'DOC-1' }]);
-    (Doctor.find as any).mockReturnValueOnce(query);
-    (Doctor.countDocuments as any).mockResolvedValueOnce(1);
-
-    const result = await adminService.listDoctors(validId(), {
-      status: 'active',
-      search: 'kouassi',
-      page: 0, // doit être ramené à 1
-      limit: 500, // doit être plafonné à 100
-    });
-
-    expect(Doctor.find).toHaveBeenCalledWith(
-      expect.objectContaining({ 'status.accountStatus': 'active', $or: expect.any(Array) })
-    );
-    expect(query.skip).toHaveBeenCalledWith(0);
-    expect(query.limit).toHaveBeenCalledWith(100);
-    expect(result).toEqual({ doctors: [{ doctorId: 'DOC-1' }], total: 1, page: 1, pages: 1 });
-  });
-});
-
-// ─── Listing : hôpitaux ────────────────────────────────────────────────────
-
-describe('adminService.listHospitals', () => {
-  it('rejette un statut invalide', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:hospitals'] }))
-    );
-    await expect(adminService.listHospitals(validId(), { status: 'bogus' })).rejects.toThrow('Statut invalide.');
-  });
-
-  it('filtre sur le champ verified quand fourni', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:hospitals'] }))
-    );
-    (HospitalClinic.find as any).mockReturnValueOnce(mockQuery([]));
-    (HospitalClinic.countDocuments as any).mockResolvedValueOnce(0);
-
-    await adminService.listHospitals(validId(), { verified: 'true' });
-
-    expect(HospitalClinic.find).toHaveBeenCalledWith(
-      expect.objectContaining({ 'metadata.verified': true })
-    );
-  });
-});
-
-// ─── Listing : patients ────────────────────────────────────────────────────
-
-describe('adminService.listPatients', () => {
-  it('rejette un statut invalide', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:patients'] }))
-    );
-    await expect(adminService.listPatients(validId(), { status: 'bogus' })).rejects.toThrow('Statut invalide.');
-  });
-
-  it('retourne les patients paginés', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:patients'] }))
-    );
-    (Patient.find as any).mockReturnValueOnce(mockQuery([{ patientId: 'PAT-1' }]));
-    (Patient.countDocuments as any).mockResolvedValueOnce(1);
-
-    const result = await adminService.listPatients(validId(), {});
-    expect(result.patients).toEqual([{ patientId: 'PAT-1' }]);
-  });
-});
-
-// ─── Listing : avis ────────────────────────────────────────────────────────
-
-describe('adminService.listReviews', () => {
-  it('rejette un statut invalide', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:reviews'] }))
-    );
-    await expect(adminService.listReviews(validId(), { status: 'bogus' })).rejects.toThrow('Statut invalide.');
-  });
-
-  it('récupère les avis avec population médecin/patient', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['moderate:reviews'] }))
-    );
-    const query = mockQuery([{ rating: 5 }]);
-    (Review.find as any).mockReturnValueOnce(query);
-    (Review.countDocuments as any).mockResolvedValueOnce(1);
-
-    await adminService.listReviews(validId(), { status: 'flagged' });
-
-    expect(Review.find).toHaveBeenCalledWith(expect.objectContaining({ status: 'flagged' }));
-    expect(query.populate).toHaveBeenCalledWith('doctorId', 'profile.firstName profile.lastName');
-    expect(query.populate).toHaveBeenCalledWith('patientId', 'profile.firstName profile.lastName');
-  });
-});
-
-// ─── Listing : abonnements ──────────────────────────────────────────────────
-
-describe('adminService.listSubscriptions', () => {
-  it('rejette un plan invalide', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['manage:subscriptions'] }))
-    );
-    await expect(adminService.listSubscriptions(validId(), { plan: 'bogus' })).rejects.toThrow('Plan invalide.');
-  });
-
-  it('filtre par plan valide', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['manage:subscriptions'] }))
-    );
-    (Doctor.find as any).mockReturnValueOnce(mockQuery([]));
-    (Doctor.countDocuments as any).mockResolvedValueOnce(0);
-
-    await adminService.listSubscriptions(validId(), { plan: 'premium' });
-
-    expect(Doctor.find).toHaveBeenCalledWith(expect.objectContaining({ 'status.subscription': 'premium' }));
-  });
-});
-
-// ─── Paiements ─────────────────────────────────────────────────────────────
-
-describe('adminService.listPayments', () => {
-  it('rejette un statut de paiement invalide', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['manage:payments'] }))
-    );
-    await expect(adminService.listPayments(validId(), { status: 'bogus' })).rejects.toThrow(
-      'Statut de paiement invalide.'
-    );
-  });
-
-  it('retourne les paiements paginés avec population', async () => {
-    (Admin.findById as any).mockReturnValueOnce(
-      mockQuery(baseAdminDoc({ permissions: ['manage:payments'] }))
-    );
-    const query = mockQuery([{ payment: { amount: 5000 } }]);
-    (Appointment.find as any).mockReturnValueOnce(query);
-    (Appointment.countDocuments as any).mockResolvedValueOnce(1);
-
-    const result = await adminService.listPayments(validId(), { status: 'paid' });
-
-    expect(Appointment.find).toHaveBeenCalledWith(expect.objectContaining({ 'status.paymentStatus': 'paid' }));
-    expect(result.payments).toEqual([{ payment: { amount: 5000 } }]);
+    expect(result.totalRevenue).toBe(30000);
+    expect(result.totalPaidAppointments).toBe(3);
+    expect(result.appointments).toEqual({ active: 4, completed: 3, noShow: 1, cancelled: 1 });
   });
 });

@@ -28,6 +28,7 @@ export type AdminActionType =
   | 'delete_review'
   | 'refund_payment'
   | 'create_admin' | 'update_admin_permissions' | 'suspend_admin' | 'delete_admin'
+  | 'create_hospital' | 'update_hospital' | 'remove_hospital' 
   | 'other';
 
 export interface IAdminActionLog {
