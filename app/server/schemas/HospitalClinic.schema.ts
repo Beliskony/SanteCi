@@ -143,6 +143,26 @@ export const CreateHospitalClinicSchema = HospitalClinicSchema.omit({
   metadata: true,
   facilityId: true,
   status: true,
+}).extend({
+  // Ajouter des valeurs par défaut pour les champs obligatoires
+  staff: StaffSchema.default({
+    doctors: [],
+    nurses: 0,
+    administrators: 0,
+  }),
+  facilities: FacilitiesSchema.default({
+    consultationRooms: 0,
+    emergencyRoom: false,
+    pharmacy: false,
+    laboratory: false,
+    imaging: false,
+    beds: 0,
+  }),
+  partnerships: PartnershipsSchema.default({
+    insuranceCompanies: [],
+    telemedicineEnabled: false,
+    homeVisits: false,
+  }),
 });
 
 /** Mise à jour partielle */

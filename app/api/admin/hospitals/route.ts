@@ -31,6 +31,8 @@ export async function GET(req: NextRequest) {
 }
 
 
+// app/api/admin/hospitals/route.ts
+
 export async function POST(req: NextRequest) {
   try {
     await connectDB();
@@ -56,9 +58,16 @@ export async function POST(req: NextRequest) {
       body = await req.json();
     }
 
+    // ✅ Vérifier que body a les champs requis
+    console.log('Body reçu:', body);
+
     const parsed = CreateHospitalClinicSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ message: parsed.error.issues[0].message }, { status: 400 });
+      console.log('Erreur de validation:', parsed.error.issues);
+      return NextResponse.json(
+        { message: parsed.error.issues[0].message },
+        { status: 400 }
+      );
     }
 
     const facility = await adminService.createHospital(
@@ -69,6 +78,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ data: facility }, { status: 201 });
   } catch (error: any) {
-    return NextResponse.json({ message: error.message }, { status: 400 });
+    console.error('Erreur POST /admin/hospitals:', error);
+    return NextResponse.json(
+      { message: error.message },
+      { status: 400 }
+    );
   }
 }
