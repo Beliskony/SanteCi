@@ -42,7 +42,7 @@ interface Hospital {
     city: string;
     district: string;
     commune?: string;
-    coordinates: { latitude: number; longitude: number };
+    coordinates?: { latitude: number; longitude: number }; // ✅ Rendre optionnel
   };
   contact: {
     phoneNumbers: string[];
@@ -212,7 +212,13 @@ export default function HospitalDetailPage() {
   const { name, type, location, contact, services, staff, facilities,
           partnerships, hours, certification, metadata, imageCover } = hospital;
 
-  const availableServices = services.filter((s) => s.available);
+  const availableServices = services?.filter((s) => s.available) ?? [];
+
+  // ✅ Vérifier si les coordonnées existent
+  const hasCoordinates = location?.coordinates?.latitude && location?.coordinates?.longitude;
+  const mapUrl = hasCoordinates
+    ? `https://www.google.com/maps?q=${location?.coordinates?.latitude},${location?.coordinates?.longitude}`
+    : null;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -224,10 +230,8 @@ export default function HospitalDetailPage() {
         ) : (
           <div className="w-full h-full bg-linear-to-br from-[#1e3a8a] to-blue-400" />
         )}
-        {/* Overlay gradient */}
         <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/20 to-transparent" />
 
-        {/* Bouton retour */}
         <div className="absolute top-5 left-5">
           <button
             onClick={() => router.back()}
@@ -237,16 +241,15 @@ export default function HospitalDetailPage() {
           </button>
         </div>
 
-        {/* Titre sur le hero */}
         <div className="absolute bottom-6 left-6 right-6">
           <div className="flex flex-wrap gap-2 mb-2">
             <Badge color="gray">{TYPE_LABELS[type] ?? type}</Badge>
-            {metadata.verified && (
+            {metadata?.verified && (
               <Badge color="green">
                 <CheckCircle size={11} /> Vérifié
               </Badge>
             )}
-            {hours.emergency24h && (
+            {hours?.emergency24h && (
               <Badge color="blue">
                 <Ambulance size={11} /> Urgences 24h/7
               </Badge>
@@ -255,7 +258,7 @@ export default function HospitalDetailPage() {
           <h1 className="text-2xl md:text-3xl font-bold text-white leading-tight">{name}</h1>
           <div className="flex items-center gap-1.5 mt-1.5 text-white/80 text-sm">
             <MapPin size={14} className="shrink-0" />
-            <span>{location.district}, {location.city}</span>
+            <span>{location?.district}, {location?.city}</span>
           </div>
         </div>
       </div>
@@ -269,26 +272,26 @@ export default function HospitalDetailPage() {
           {/* Note & stats rapides */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-wrap gap-6 items-center">
             <div className="flex flex-col gap-1">
-              <StarRating rating={metadata.rating} />
+              <StarRating rating={metadata?.rating ?? 0} />
               <p className="text-sm text-slate-500">
-                <span className="font-bold text-slate-800">{metadata.rating.toFixed(1)}</span>
-                {" "}/ 5 · {metadata.totalReviews} avis
+                <span className="font-bold text-slate-800">{(metadata?.rating ?? 0).toFixed(1)}</span>
+                {" "}/ 5 · {metadata?.totalReviews ?? 0} avis
               </p>
             </div>
             <div className="h-8 w-px bg-slate-200 shrink-0" />
             <div className="flex items-center gap-2 text-sm text-slate-700">
               <Users size={16} className="text-[#1e3a8a]" />
-              <span><strong>{staff.doctors?.length ?? 0}</strong> médecins</span>
+              <span><strong>{staff?.doctors?.length ?? 0}</strong> médecins</span>
             </div>
             <div className="h-8 w-px bg-slate-200 shrink-0" />
             <div className="flex items-center gap-2 text-sm text-slate-700">
               <Bed size={16} className="text-[#1e3a8a]" />
-              <span><strong>{facilities.beds}</strong> lits</span>
+              <span><strong>{facilities?.beds ?? 0}</strong> lits</span>
             </div>
             <div className="h-8 w-px bg-slate-200 shrink-0" />
             <div className="flex items-center gap-2 text-sm text-slate-700">
               <Stethoscope size={16} className="text-[#1e3a8a]" />
-              <span><strong>{facilities.consultationRooms}</strong> salles de consultation</span>
+              <span><strong>{facilities?.consultationRooms ?? 0}</strong> salles de consultation</span>
             </div>
           </div>
 
@@ -323,17 +326,17 @@ export default function HospitalDetailPage() {
               <Building2 size={16} className="text-[#1e3a8a]" /> Équipements
             </h2>
             <div className="flex flex-wrap gap-2">
-              <FacilityChip available={facilities.emergencyRoom} label="Salle d'urgence" icon={<Ambulance size={13} />} />
-              <FacilityChip available={facilities.pharmacy}     label="Pharmacie"        icon={<FlaskConical size={13} />} />
-              <FacilityChip available={facilities.laboratory}   label="Laboratoire"      icon={<FlaskConical size={13} />} />
-              <FacilityChip available={facilities.imaging}      label="Imagerie médicale" icon={<Camera size={13} />} />
-              <FacilityChip available={partnerships.telemedicineEnabled} label="Téléconsultation" icon={<Video size={13} />} />
-              <FacilityChip available={partnerships.homeVisits} label="Visites à domicile" icon={<Home size={13} />} />
+              <FacilityChip available={facilities?.emergencyRoom ?? false} label="Salle d'urgence" icon={<Ambulance size={13} />} />
+              <FacilityChip available={facilities?.pharmacy ?? false}     label="Pharmacie"        icon={<FlaskConical size={13} />} />
+              <FacilityChip available={facilities?.laboratory ?? false}   label="Laboratoire"      icon={<FlaskConical size={13} />} />
+              <FacilityChip available={facilities?.imaging ?? false}      label="Imagerie médicale" icon={<Camera size={13} />} />
+              <FacilityChip available={partnerships?.telemedicineEnabled ?? false} label="Téléconsultation" icon={<Video size={13} />} />
+              <FacilityChip available={partnerships?.homeVisits ?? false} label="Visites à domicile" icon={<Home size={13} />} />
             </div>
           </div>
 
           {/* Médecins */}
-          {staff.doctors?.length > 0 && (
+          {staff?.doctors?.length > 0 && (
             <div className="bg-white rounded-2xl border border-slate-200 p-5">
               <h2 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
                 <Users size={16} className="text-[#1e3a8a]" /> Médecins de l'établissement
@@ -350,7 +353,7 @@ export default function HospitalDetailPage() {
                       <img src={doc.profile.photo} alt="" className="w-10 h-10 rounded-xl object-cover shrink-0" />
                     ) : (
                       <div className="w-10 h-10 rounded-xl bg-[#1e3a8a]/10 flex items-center justify-center text-[#1e3a8a] font-bold text-sm shrink-0">
-                        {doc.profile.firstName[0]}{doc.profile.lastName[0]}
+                        {doc.profile.firstName?.[0]}{doc.profile.lastName?.[0]}
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
@@ -372,7 +375,7 @@ export default function HospitalDetailPage() {
           )}
 
           {/* Assurances partenaires */}
-          {partnerships.insuranceCompanies.length > 0 && (
+          {partnerships?.insuranceCompanies?.length > 0 && (
             <div className="bg-white rounded-2xl border border-slate-200 p-5">
               <h2 className="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
                 <Shield size={16} className="text-[#1e3a8a]" /> Assurances acceptées
@@ -391,24 +394,23 @@ export default function HospitalDetailPage() {
         {/* ── Colonne latérale ── */}
         <div className="flex flex-col gap-5">
 
-
           {/* Contact */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col gap-3">
             <h2 className="text-sm font-bold text-slate-900">Contact</h2>
-            {contact.phoneNumbers.map((p, i) => (
+            {contact?.phoneNumbers?.map((p, i) => (
               <a key={i} href={`tel:${p}`} className="flex items-center gap-2.5 text-sm text-[#1e3a8a] font-medium hover:underline">
                 <Phone size={14} className="shrink-0" /> {p}
               </a>
             ))}
-            {contact.emergencyNumber && (
+            {contact?.emergencyNumber && (
               <a href={`tel:${contact.emergencyNumber}`} className="flex items-center gap-2.5 text-sm text-red-500 font-medium hover:underline">
                 <Ambulance size={14} className="shrink-0" /> {contact.emergencyNumber} (urgences)
               </a>
             )}
-            <a href={`mailto:${contact.email}`} className="flex items-center gap-2.5 text-sm text-slate-600 hover:text-[#1e3a8a] transition-colors">
-              <Mail size={14} className="shrink-0" /> {contact.email}
+            <a href={`mailto:${contact?.email}`} className="flex items-center gap-2.5 text-sm text-slate-600 hover:text-[#1e3a8a] transition-colors">
+              <Mail size={14} className="shrink-0" /> {contact?.email}
             </a>
-            {contact.website && (
+            {contact?.website && (
               <a href={contact.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-sm text-slate-600 hover:text-[#1e3a8a] transition-colors">
                 <Globe size={14} className="shrink-0" /> Site web
               </a>
@@ -420,10 +422,10 @@ export default function HospitalDetailPage() {
             <h2 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
               <Clock size={14} className="text-[#1e3a8a]" /> Horaires d'ouverture
             </h2>
-            <HoursRow day="Lun – Ven" hours={hours.weekdays} />
-            <HoursRow day="Samedi"    hours={hours.saturday} />
-            <HoursRow day="Dimanche"  hours={hours.sunday} />
-            {hours.emergency24h && (
+            <HoursRow day="Lun – Ven" hours={hours?.weekdays ?? { open: '08:00', close: '18:00' }} />
+            <HoursRow day="Samedi"    hours={hours?.saturday ?? { open: '08:00', close: '13:00' }} />
+            <HoursRow day="Dimanche"  hours={hours?.sunday ?? { open: '08:00', close: '13:00' }} />
+            {hours?.emergency24h && (
               <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-red-50 rounded-xl border border-red-100">
                 <Ambulance size={13} className="text-red-500 shrink-0" />
                 <span className="text-xs text-red-600 font-semibold">Urgences ouvertes 24h/24, 7j/7</span>
@@ -436,16 +438,18 @@ export default function HospitalDetailPage() {
             <h2 className="text-sm font-bold text-slate-900">Adresse</h2>
             <div className="flex items-start gap-2.5 text-sm text-slate-600">
               <MapPin size={14} className="text-[#1e3a8a] shrink-0 mt-0.5" />
-              <span>{location.address}, {location.district}, {location.city}</span>
+              <span>{location?.address}, {location?.district}, {location?.city}</span>
             </div>
-            <a
-              href={`https://www.google.com/maps?q=${location.coordinates.latitude},${location.coordinates.longitude}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-            >
-              <MapPin size={13} /> Voir sur la carte
-            </a>
+            {mapUrl && (
+              <a
+                href={mapUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                <MapPin size={13} /> Voir sur la carte
+              </a>
+            )}
           </div>
 
           {/* Certification */}
@@ -453,8 +457,8 @@ export default function HospitalDetailPage() {
             <h2 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
               <Shield size={14} className="text-[#1e3a8a]" /> Certification
             </h2>
-            <InfoCard icon={<Shield size={14} />} label="Numéro de licence" value={certification.licenseNumber} />
-            {certification.accreditation.length > 0 && (
+            <InfoCard icon={<Shield size={14} />} label="Numéro de licence" value={certification?.licenseNumber ?? 'Non renseigné'} />
+            {certification?.accreditation?.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {certification.accreditation.map((a, i) => (
                   <span key={i} className="px-2.5 py-1 bg-[#1e3a8a]/10 text-[#1e3a8a] text-xs font-semibold rounded-lg">{a}</span>
