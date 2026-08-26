@@ -101,7 +101,7 @@ const SidebarContent = ({
   };
 
   return (
-    <div className="flex flex-col h-full px-4 py-6">
+    <div className="flex flex-col h-full py-6">
 
       {/* ── Logo ── */}
       <div className="flex items-center gap-2 px-2 mb-8">
