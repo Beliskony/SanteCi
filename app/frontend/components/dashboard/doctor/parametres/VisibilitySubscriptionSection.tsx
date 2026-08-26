@@ -128,7 +128,7 @@ export function SubscriptionSection() {
         <h2 className="text-base font-bold text-slate-900">Abonnement</h2>
         <p className="text-xs text-slate-400 mt-0.5">
           Plan actuel : <span className="font-semibold text-[#1e3a8a] capitalize">{plan}</span>
-          {user?.status?.subscriptionExpiry
+          {plan !== 'free' && user?.status?.subscriptionExpiry
             ? ` • Expire le ${new Date(user.status.subscriptionExpiry).toLocaleDateString('fr-FR')}`
             : ''}
         </p>
