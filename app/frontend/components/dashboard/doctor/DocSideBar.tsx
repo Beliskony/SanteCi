@@ -105,8 +105,8 @@ const SidebarContent = ({
 
       {/* ── Logo ── */}
       <div className="flex items-center gap-2 px-2 mb-8">
-        <Link href="/" className="flex items-center justify-center gap-2.5 shrink-0">
-          <div className="w-30 h-30 rounded-xl">
+        <Link href="/" className="flex items-center justify-center">
+          <div className="w-20 h-20 rounded-xl">
             <img src={'/icon/favicon.svg'} className="w-full h-full object-cover" />
           </div>
         </Link>
