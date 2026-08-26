@@ -131,7 +131,7 @@ const SidebarContent = ({
             <button
               key={key}
               onClick={() => handleNav(key)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors duration-150 w-full text-left ${
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors duration-150 w-full text-left cursor-pointer ${
                 isActive
                   ? "bg-blue-50 text-[#1e3a8a]"
                   : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
@@ -154,7 +154,7 @@ const SidebarContent = ({
       <div className="flex flex-col gap-1 pt-4 border-t border-gray-100">
         <button
           onClick={() => handleNav("parametres")}
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors duration-150 w-full text-left ${
+          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors duration-150 w-full text-left cursor-pointer ${
             active === "parametres"
               ? "bg-blue-50 text-[#1e3a8a]"
               : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
@@ -170,7 +170,7 @@ const SidebarContent = ({
 
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors duration-150 w-full text-left"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors duration-150 w-full text-left cursor-pointer"
         >
           <LogOut size={18} className="text-gray-400" strokeWidth={1.8} />
           Déconnexion

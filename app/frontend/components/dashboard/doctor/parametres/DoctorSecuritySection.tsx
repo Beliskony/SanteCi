@@ -185,7 +185,7 @@ export default function DoctorSecuritySection() {
           <button
             onClick={handleChangePassword}
             disabled={pwdLoading}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-[#1e3a8a] text-white text-sm font-semibold rounded-xl hover:bg-[#2d4fa8] disabled:opacity-60 transition-colors w-fit"
+            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-[#1e3a8a] text-white text-sm font-semibold rounded-xl hover:bg-[#2d4fa8] disabled:opacity-60 transition-colors w-fit cursor-pointer"
           >
             {pwdLoading ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
             {pwdLoading ? "Mise à jour..." : "Mettre à jour"}

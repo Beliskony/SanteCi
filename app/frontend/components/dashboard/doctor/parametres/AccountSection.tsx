@@ -73,7 +73,7 @@ export function AccountSection() {
         <div className="flex items-center gap-4">
           <div className="relative shrink-0">
             {profile?.photo ? (
-              <img src={profile.photo} alt="avatar" className="w-16 h-16 rounded-full object-cover border-2 border-white shadow" />
+              <img src={profile.photo} alt="avatar" className="w-16 h-16 rounded-full object-cover border-2 border-white shadow cursor-pointer" />
             ) : (
               <div className="w-16 h-16 rounded-full bg-[#1e3a8a]/10 flex items-center justify-center text-lg font-extrabold text-[#1e3a8a]">
                 {initials}
@@ -155,7 +155,7 @@ export function AccountSection() {
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="flex items-center gap-2 px-5 py-2.5 bg-[#1e3a8a] text-white text-sm font-bold rounded-xl hover:bg-blue-800 transition-colors disabled:opacity-60"
+            className="flex items-center gap-2 px-5 py-2.5 bg-[#1e3a8a] text-white text-sm font-bold rounded-xl hover:bg-blue-800 transition-colors disabled:opacity-60 cursor-pointer"
           >
             {isSaving ? <Loader2 size={14} className="animate-spin" /> : null}
             {saved ? "Enregistré" : "Enregistrer les modifications"}

@@ -264,7 +264,7 @@ export function VisibilitySection() {
       <button
         onClick={handleSave}
         disabled={isSaving}
-        className="self-start flex items-center gap-2 px-5 py-2.5 bg-[#1e3a8a] text-white text-sm font-bold rounded-xl hover:bg-blue-800 transition-colors disabled:opacity-60"
+        className="self-start flex items-center gap-2 px-5 py-2.5 bg-[#1e3a8a] text-white text-sm font-bold rounded-xl hover:bg-blue-800 transition-colors disabled:opacity-60 cursor-pointer"
       >
         {isSaving && <Loader2 size={14} className="animate-spin" />}
         {saved ? 'Enregistré' : 'Enregistrer'}

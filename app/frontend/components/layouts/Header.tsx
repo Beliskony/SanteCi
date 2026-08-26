@@ -1,6 +1,6 @@
 "use client";
 
-import { Phone, Bell, Menu, X, Video, LayoutDashboard, Settings, LogOut, ChevronDown, User } from "lucide-react";
+import { Phone, Bell, Menu, X, Video, LayoutDashboard, LogOut, ChevronDown, User } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useRef, useState, useMemo } from "react";
@@ -276,14 +276,6 @@ const isAuthenticated = hasHydrated && !!role && !!firstName;
                       <LayoutDashboard size={16} className="text-[#1e3a8a]" />
                       Dashboard
                     </Link>
-                    <Link
-                      href={settingsHref}
-                      onClick={() => setUserDropdown(false)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                      <Settings size={16} className="text-[#1e3a8a]" />
-                      Paramètres
-                    </Link>
                     <div className="h-px bg-gray-100 my-1" />
                     <button
                       onClick={handleLogout}
@@ -372,14 +364,6 @@ const isAuthenticated = hasHydrated && !!role && !!firstName;
                 >
                   <LayoutDashboard size={16} className="text-[#1e3a8a]" />
                   Dashboard
-                </Link>
-                <Link
-                  href={settingsHref}
-                  onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50 border border-gray-100 transition-colors"
-                >
-                  <Settings size={16} className="text-[#1e3a8a]" />
-                  Paramètres
                 </Link>
                 <Link
                   href="/notifications"

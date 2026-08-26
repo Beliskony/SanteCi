@@ -47,7 +47,7 @@ export default function SettingsPage() {
                 <button
                   key={key}
                   onClick={() => setActive(key)}
-                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors w-full text-left ${
+                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors w-full text-left cursor-pointer ${
                     active === key
                       ? "bg-[#1e3a8a]/10 text-[#1e3a8a]"
                       : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
