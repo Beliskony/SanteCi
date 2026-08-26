@@ -110,9 +110,6 @@ const SidebarContent = ({
             <img src={'/icon/favicon.svg'} className="w-full h-full object-cover" />
           </div>
         </Link>
-        <span className="text-[10px] font-bold text-[#1e3a8a] bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full tracking-wide ml-1">
-          DOCTOR
-        </span>
         {onClose && (
           <button
             onClick={onClose}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, Globe, Lock, Loader2 } from "lucide-react";
+import { Bell, Globe, Lock } from "lucide-react";
 import { useAuthStore, isPatient } from "@/app/frontend/store/useAuthStore";
 import { usePatientStore } from "@/app/frontend/store/patientStore";
 import { SectionLabel, SaveButton } from "./ProfileSection";
@@ -11,7 +11,6 @@ export function PreferencesSection() {
   const patient = user && isPatient(user) ? user : null;
   const prefs   = patient?.preferences;
   const error      = usePatientStore((s) => s.error);
-  const clearError = usePatientStore((s) => s.clearError);
   const fetchProfile = usePatientStore((s) => s.fetchProfile);
 
   const updatePreferences = usePatientStore((s) => s.updatePreferences);
@@ -52,7 +51,7 @@ export function PreferencesSection() {
       <div className="flex flex-col gap-4">
         <SectionLabel icon={<Globe size={14} />} label="Langue" />
         <div className="flex gap-3">
-          {([{ v: "fr", l: "Français 🇫🇷" }, { v: "en", l: "English 🇬🇧" }] as const).map(({ v, l }) => (
+          {([{ v: "fr", l: "Français 🇫🇷" }] as const).map(({ v, l }) => (
             <button
               key={v}
               onClick={() => setLanguage(v)}

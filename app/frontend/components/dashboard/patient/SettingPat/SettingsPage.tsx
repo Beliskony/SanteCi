@@ -89,7 +89,7 @@ export default function SettingsPage() {
                 <button
                   key={section.key}
                   onClick={() => setActive(section.key)}
-                  className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-all ${
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-all cursor-pointer ${
                     i > 0 ? "border-t border-slate-100" : ""
                   } ${
                     active === section.key

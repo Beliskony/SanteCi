@@ -103,7 +103,7 @@ export function ProfileSection() {
       <div className="flex items-center gap-5 p-5 bg-linear-to-r from-[#1e3a8a]/5 to-blue-50 rounded-2xl border border-blue-100">
         <div className="relative shrink-0">
           {photo ? (
-            <img src={photo} alt="Photo" className="w-20 h-20 rounded-2xl object-cover border-2 border-white shadow-md" />
+            <img src={photo} alt="Photo" className="w-20 h-20 rounded-2xl object-cover border-2 border-white shadow-md cursor-pointer" />
           ) : (
             <div className="w-20 h-20 rounded-2xl bg-linear-to-br from-[#1e3a8a] to-blue-400 flex items-center justify-center text-white text-2xl font-bold shadow-md">
               {initials || <User size={28} />}
