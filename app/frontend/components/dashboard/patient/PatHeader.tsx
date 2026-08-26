@@ -10,7 +10,6 @@ const PatHeader = () => {
 
   return (
     <header className="flex items-center justify-between bg-white border-b border-gray-100 px-4 sm:px-6 py-4">
-      <h1 className="text-3xl font-bold text-gray-900">{user?.role}</h1>
 
       <div className="flex items-center gap-3">
 

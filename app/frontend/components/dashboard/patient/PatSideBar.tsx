@@ -86,14 +86,19 @@ const SidebarContent = ({
   };
 
   return (
-    <div className="flex flex-col h-full py-6">
+    <div className="flex flex-col h-full px-4 py-6">
 
       {/* Logo */}
       <div className="flex items-center gap-3 px-2 mb-8">
-        <Link href="/" className="flex items-center justify-center">
+        <Link href="/" className="flex items-center gap-3 px-2 mb-8">
+        <div className="flex items-center gap-3 shrink-0">
           <div className="w-20 h-20 rounded-xl">
             <img src={'/icon/favicon.svg'} className="w-full h-full object-cover" />
           </div>
+        <span className="text-[10px] font-bold text-[#1e3a8a] bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full tracking-wide ml-1">
+          E-SANTECI
+        </span>
+        </div>
       </Link>
         {onClose && (
           <button
