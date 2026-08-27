@@ -10,7 +10,6 @@ import {
   FolderHeart,
   Settings,
   LogOut,
-  Heart,
   Menu,
   X,
 } from "lucide-react";
@@ -28,7 +27,7 @@ import  SettingsPage  from "./SettingPat/SettingsPage";
 
 type ActivePage = "dashboard" | "medecins" | "rdv" | "messages" | "dossier" | "parametres";
 
-const NAV_ITEMS: { label: string; key: ActivePage; icon: any }[] = [
+const NAV_ITEMS: { label: string; key: ActivePage; icon: React.ElementType }[] = [
   { label: "Tableau de bord",    key: "dashboard",  icon: LayoutDashboard },
   { label: "Trouver un médecin", key: "medecins",   icon: Search },
   { label: "Mes rendez-vous",    key: "rdv",        icon: CalendarDays },
@@ -52,9 +51,15 @@ const renderPage = (active: ActivePage) => {
   }
 };
 
-// ─── Petite pastille réutilisable (présence de nouveauté, pas de compteur) ────
+// ─── Pastille de nouveauté : signale une info fraîche, jamais un compteur ──
+// Émeraude plutôt que bleu de marque, pour ne jamais se confondre avec l'état "actif" d'un lien.
 function NavBadge() {
-  return <span className="ml-auto w-2 h-2 rounded-full bg-[#1e3a8a] shrink-0" />;
+  return (
+    <span className="ml-auto relative flex h-2 w-2 shrink-0">
+      <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-emerald-400 opacity-75" />
+      <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+    </span>
+  );
 }
 
 // ─── Contenu partagé (desktop + drawer mobile) ────────────────
@@ -71,13 +76,11 @@ const SidebarContent = ({
   hasAppointmentToday: boolean;
   hasUnreadMessages: boolean;
 }) => {
-  const router = useAuthStore(); // garde ton import existant
-
   const handleLogout = () => {
     authService.logout();
     onClose?.();
-    //redirection vers acceuil
-    window.location.href = "/"; // redirige vers la page d'accueil
+    // redirection vers l'accueil
+    window.location.href = "/";
   };
 
   const handleNav = (key: ActivePage) => {
@@ -86,24 +89,23 @@ const SidebarContent = ({
   };
 
   return (
-    <div className="flex flex-col h-full px-4 py-6">
+    <div className="flex flex-col h-full px-3 py-6">
 
       {/* Logo */}
-      <div className="flex items-center gap-3 px-2 mb-8">
-        <Link href="/" className="flex items-center gap-3 px-2 mb-8">
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="w-20 h-20 rounded-xl">
-            <img src={'/icon/favicon.svg'} className="w-full h-full object-cover" />
+      <div className="flex items-center gap-2 px-3 mb-8">
+        <Link href="/" className="flex items-center gap-2.5 shrink-0">
+          <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0">
+            <img src="/icon/favicon.svg" alt="E-SanteCI" className="w-full h-full object-cover" />
           </div>
-        <span className="text-[10px] font-bold text-[#1e3a8a] bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full tracking-wide ml-1">
+        </Link>
+        <span className="text-[10px] font-bold text-[#1e3a8a] bg-blue-50 border border-blue-100/80 px-2 py-0.5 rounded-full tracking-wide">
           E-SANTECI
         </span>
-        </div>
-      </Link>
         {onClose && (
           <button
             onClick={onClose}
-            className="ml-auto p-1 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+            aria-label="Fermer le menu"
+            className="ml-auto p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1e3a8a]/30"
           >
             <X size={18} />
           </button>
@@ -111,22 +113,25 @@ const SidebarContent = ({
       </div>
 
       {/* Navigation */}
-      <nav className="flex flex-col gap-1 flex-1">
+      <nav className="flex flex-col gap-0.5 flex-1">
         {NAV_ITEMS.map(({ label, key, icon: Icon }) => {
           const isActive = active === key;
           return (
             <button
               key={key}
               onClick={() => handleNav(key)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors duration-150 w-full text-left cursor-pointer ${
+              aria-current={isActive ? "page" : undefined}
+              className={`group relative flex items-center gap-3 pr-3 py-2.5 rounded-r-xl text-sm transition-colors duration-150 w-full text-left cursor-pointer border-l-[3px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1e3a8a]/30 focus-visible:ring-offset-1 ${
                 isActive
-                  ? "bg-blue-50 text-[#1e3a8a]"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  ? "bg-blue-50/80 text-[#1e3a8a] font-semibold border-[#1e3a8a] pl-2.25"
+                  : "font-medium text-gray-600 border-transparent hover:bg-gray-50 hover:text-gray-900 hover:border-gray-200 pl-3"
               }`}
             >
               <Icon
                 size={18}
-                className={isActive ? "text-[#1e3a8a]" : "text-gray-400"}
+                className={`shrink-0 transition-transform duration-150 group-hover:translate-x-0.5 ${
+                  isActive ? "text-[#1e3a8a]" : "text-gray-400"
+                }`}
                 strokeWidth={isActive ? 2.2 : 1.8}
               />
               {label}
@@ -138,18 +143,21 @@ const SidebarContent = ({
       </nav>
 
       {/* Bas */}
-      <div className="flex flex-col gap-1 pt-4 border-t border-gray-100">
+      <div className="flex flex-col gap-0.5 pt-4 mt-2 border-t border-gray-100">
         <button
           onClick={() => handleNav("parametres")}
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors duration-150 w-full text-left cursor-pointer ${
+          aria-current={active === "parametres" ? "page" : undefined}
+          className={`group relative flex items-center gap-3 pr-3 py-2.5 rounded-r-xl text-sm transition-colors duration-150 w-full text-left cursor-pointer border-l-[3px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1e3a8a]/30 ${
             active === "parametres"
-              ? "bg-blue-50 text-[#1e3a8a]"
-              : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              ? "bg-blue-50/80 text-[#1e3a8a] font-semibold border-[#1e3a8a] pl-2.25"
+              : "font-medium text-gray-600 border-transparent hover:bg-gray-50 hover:text-gray-900 hover:border-gray-200 pl-3"
           }`}
         >
           <Settings
             size={18}
-            className={active === "parametres" ? "text-[#1e3a8a]" : "text-gray-400"}
+            className={`shrink-0 transition-transform duration-150 group-hover:translate-x-0.5 ${
+              active === "parametres" ? "text-[#1e3a8a]" : "text-gray-400"
+            }`}
             strokeWidth={1.8}
           />
           Paramètres
@@ -157,9 +165,9 @@ const SidebarContent = ({
 
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors duration-150 w-full text-left cursor-pointer"
+          className="flex items-center gap-3 pl-3 pr-3 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-red-50/70 hover:text-red-600 transition-colors duration-150 w-full text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
         >
-          <LogOut size={18} className="text-gray-400" strokeWidth={1.8} />
+          <LogOut size={18} className="text-gray-400 shrink-0" strokeWidth={1.8} />
           Déconnexion
         </button>
       </div>
@@ -227,7 +235,8 @@ const PatSideBar = () => {
       {/* Hamburger — mobile */}
       <button
         onClick={() => setIsOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-xl shadow-md border border-gray-100 text-gray-700 hover:bg-gray-50 transition-colors"
+        aria-label="Ouvrir le menu"
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-xl shadow-md border border-gray-100 text-gray-700 hover:bg-gray-50 active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1e3a8a]/30"
       >
         <Menu size={20} />
       </button>
@@ -243,8 +252,8 @@ const PatSideBar = () => {
       {/* Drawer — mobile */}
       <aside
         className={`
-          lg:hidden fixed top-0 left-0 z-50 h-full w-72 bg-white shadow-xl
-          transform transition-transform duration-300 ease-in-out
+          lg:hidden fixed top-0 left-0 z-50 h-full w-72 bg-white shadow-2xl
+          transform transition-transform duration-300 ease-out
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
