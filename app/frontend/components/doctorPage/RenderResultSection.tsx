@@ -8,10 +8,44 @@ import CheckBoxSectionSide from "./CheckBoxSectionSide";
 import type { DoctorUser } from "@/app/frontend/types";
 import { getDoctorTier } from "@/app/frontend/lib/doctorBadge";
 
-// ── Créneaux fictifs pour la démo (à remplacer par les vraies dispo) ──
-const MOCK_SLOTS = [
-  "Auj. 14:30", "Auj. 16:00", "Demain 09:00", "Demain 10:30", "Jeu 11:00",
+// ── Prochains créneaux réels à partir de doctor.telemedicine.availability ──
+type AvailabilitySlot = { start: string; end: string; isBooked: boolean };
+type AvailabilityDay = {
+  day: "lundi" | "mardi" | "mercredi" | "jeudi" | "vendredi" | "samedi" | "dimanche";
+  slots: AvailabilitySlot[];
+};
+
+const JOURS_ORDRE: AvailabilityDay["day"][] = [
+  "dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi",
 ];
+
+function getNextAvailableSlots(
+  availability: AvailabilityDay[] | undefined,
+  max = 5
+): string[] {
+  if (!availability || availability.length === 0) return [];
+
+  const todayIndex = new Date().getDay(); // 0 = dimanche
+  const upcoming: { offset: number; time: string }[] = [];
+
+  availability.forEach((day) => {
+    const dayIndex = JOURS_ORDRE.indexOf(day.day);
+    if (dayIndex === -1) return;
+    const offset = (dayIndex - todayIndex + 7) % 7;
+    day.slots.forEach((slot) => {
+      if (!slot.isBooked) upcoming.push({ offset, time: slot.start });
+    });
+  });
+
+  upcoming.sort((a, b) => a.offset - b.offset || a.time.localeCompare(b.time));
+
+  return upcoming.slice(0, max).map(({ offset, time }) => {
+    if (offset === 0) return `Auj. ${time}`;
+    if (offset === 1) return `Demain ${time}`;
+    const nom = JOURS_ORDRE[(todayIndex + offset) % 7];
+    return `${nom.charAt(0).toUpperCase()}${nom.slice(1, 3)} ${time}`;
+  });
+}
 
 const RenderResultSection = () => {
   const { doctors, isLoading, error, pagination, fetchDoctors } = useDoctorStore();
@@ -54,8 +88,8 @@ const RenderResultSection = () => {
 
         {/* Skeleton loader */}
         {isLoading && (
-          <div className="flex flex-col gap-4">
-            {[1, 2, 3].map((i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[1, 2, 3, 4].map((i) => (
               <div key={i} className="bg-white rounded-2xl p-5 animate-pulse">
                 <div className="flex gap-4">
                   <div className="w-16 h-16 rounded-full bg-gray-200 shrink-0" />
@@ -77,22 +111,95 @@ const RenderResultSection = () => {
           </div>
         )}
 
-        {/* Liste des médecins */}
-        {!isLoading && doctors.map((doctor) => (
-          <DoctorCard key={String(doctor._id)} doctor={doctor} />
-        ))}
+        {/* Liste des médecins — 2 par ligne à partir de md */}
+        {!isLoading && doctors.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {doctors.map((doctor) => (
+              <DoctorCard key={String(doctor._id)} doctor={doctor} />
+            ))}
+          </div>
+        )}
 
-        {/* Bouton charger plus */}
-        {!isLoading && doctors.length > 0 && pagination.page < pagination.pages && (
-          <button
-            onClick={() => fetchDoctors({ page: pagination.page + 1, limit: 10 })}
-            className="mx-auto mt-2 px-8 py-2.5 border border-gray-200 bg-white hover:bg-gray-50 text-sm font-medium text-gray-700 rounded-xl transition-colors"
-          >
-            Afficher plus de résultats
-          </button>
+        {/* Pagination réelle — nécessaire dès que le volume de médecins grandit */}
+        {!isLoading && doctors.length > 0 && pagination.pages > 1 && (
+          <Pagination
+            pagination={pagination}
+            onPageChange={(page) => {
+              fetchDoctors({ page, limit: 10 });
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+          />
         )}
 
       </div>
+    </div>
+  );
+};
+
+// ── Pagination ────────────────────────────────────────────────
+
+const Pagination = ({
+  pagination,
+  onPageChange,
+}: {
+  pagination: { page: number; pages: number; total: number };
+  onPageChange: (page: number) => void;
+}) => {
+  const { page, pages } = pagination;
+
+  // Fenêtre glissante autour de la page courante + première/dernière page,
+  // pour rester lisible même avec des dizaines de pages (ex. 400 médecins).
+  const getPageNumbers = (): (number | "...")[] => {
+    const delta = 1;
+    const left = Math.max(2, page - delta);
+    const right = Math.min(pages - 1, page + delta);
+    const range: (number | "...")[] = [1];
+
+    if (left > 2) range.push("...");
+    for (let i = left; i <= right; i++) range.push(i);
+    if (right < pages - 1) range.push("...");
+    if (pages > 1) range.push(pages);
+
+    return range;
+  };
+
+  return (
+    <div className="flex items-center justify-center gap-1.5 mt-2 flex-wrap">
+      <button
+        onClick={() => onPageChange(page - 1)}
+        disabled={page <= 1}
+        className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+      >
+        Précédent
+      </button>
+
+      {getPageNumbers().map((p, i) =>
+        p === "..." ? (
+          <span key={`ellipsis-${i}`} className="px-2 text-sm text-gray-400">
+            …
+          </span>
+        ) : (
+          <button
+            key={p}
+            onClick={() => onPageChange(p)}
+            className={`min-w-9 px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${
+              p === page
+                ? "bg-[#1e3a8a] text-white"
+                : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
+            }`}
+          >
+            {p}
+          </button>
+        )
+      )}
+
+      <button
+        onClick={() => onPageChange(page + 1)}
+        disabled={page >= pages}
+        className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+      >
+        Suivant
+      </button>
     </div>
   );
 };
@@ -103,6 +210,9 @@ const DoctorCard = ({ doctor }: { doctor: Partial<DoctorUser> }) => {
   const fees = doctor.telemedicine?.consultationFees;
   const types = doctor.telemedicine?.consultationTypes ?? [];
   const tier  = getDoctorTier(doctor.status);
+  const nextSlots = getNextAvailableSlots(
+    doctor.telemedicine?.availability as AvailabilityDay[] | undefined
+  );
 
   return (
     <Link
@@ -209,23 +319,27 @@ const DoctorCard = ({ doctor }: { doctor: Partial<DoctorUser> }) => {
       {/* ── Prochaines disponibilités ── */}
       <div className="flex flex-col gap-2 pt-1 border-t border-gray-100">
         <p className="text-xs text-gray-500 font-medium">Prochaines disponibilités</p>
-        <div className="flex items-center gap-2 flex-wrap">
-          {MOCK_SLOTS.slice(0, 5).map((slot, i) => (
-            <span
-              key={slot}
-              className={`text-xs font-semibold px-3 py-1.5 rounded-lg ${
-                i === 0
-                  ? "bg-[#1e3a8a] text-white"
-                  : "bg-gray-100 text-gray-700"
-              }`}
-            >
-              {slot}
+        {nextSlots.length > 0 ? (
+          <div className="flex items-center gap-2 flex-wrap">
+            {nextSlots.map((slot, i) => (
+              <span
+                key={`${slot}-${i}`}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-lg ${
+                  i === 0
+                    ? "bg-[#1e3a8a] text-white"
+                    : "bg-gray-100 text-gray-700"
+                }`}
+              >
+                {slot}
+              </span>
+            ))}
+            <span className="text-xs text-[#1e3a8a] font-medium">
+              Plus d&apos;horaires
             </span>
-          ))}
-          <span className="text-xs text-[#1e3a8a] font-medium">
-            Plus d&apos;horaires
-          </span>
-        </div>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-400">Aucun créneau disponible pour le moment</p>
+        )}
       </div>
     </Link>
   );
