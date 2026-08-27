@@ -21,6 +21,7 @@ interface SocketState {
   // ── Actions ───────────────────────────────────────────────
   connect:    () => Promise<void>;
   disconnect: () => void;
+   emit: (event: string, data: any) => boolean;
 
   // ── Appel : émettre via socket ────────────────────────────
   initiateCall: (params: {
@@ -55,7 +56,10 @@ export const useSocketStore = create<SocketState>()(
         await fetch("/api/socket");
 
         const user = useAuthStore.getState().user;
-        if (!user) return;
+          if (!user) {
+            console.warn('[Socket] Pas d\'utilisateur');
+            return;
+          }
 
         const raw      = user._id;
         const userId   = typeof raw === "string" ? raw : raw;
@@ -74,6 +78,7 @@ export const useSocketStore = create<SocketState>()(
           set({ isConnected: true, error: null });
 
           // S'enregistrer auprès du serveur
+          console.log(`[Socket] 📝 Envoi user:register pour ${userId}`);
           socket.emit("user:register", { userId, userType });
         });
 
@@ -176,6 +181,17 @@ export const useSocketStore = create<SocketState>()(
       disconnect: () => {
         get().socket?.disconnect();
         set({ socket: null, isConnected: false });
+      },
+
+      emit: (event: string, data: any) => {
+        const { socket, isConnected } = get();
+        if (socket && isConnected) {
+          socket.emit(event, data);
+          console.log(`📤 Socket emit: ${event}`, data);
+          return true;
+        }
+        console.warn(`⚠️ Socket non connecté, emit ${event} ignoré`);
+        return false;
       },
 
       // ── initiateCall ──────────────────────────────────────────────────────

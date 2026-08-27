@@ -18,7 +18,7 @@ type PaymentStatus = 'pending' | 'paid' | 'refunded' | 'failed';
 type Priority = 'low' | 'medium' | 'high' | 'emergency';
 type Currency = 'XOF' | 'EUR' | 'USD';
 type PaymentMethod = 'mobile_money' | 'card' | 'wallet' | 'Assurance';
-type PaymentProvider = 'orange_money' | 'mtn_money' | 'wave';
+type PaymentProvider = 'orange_money' | 'mtn_money' | 'wave' | 'simulation';
 type CancelledBy = 'patient' | 'doctor' | 'system';
 
 interface CreateAppointmentDTO {

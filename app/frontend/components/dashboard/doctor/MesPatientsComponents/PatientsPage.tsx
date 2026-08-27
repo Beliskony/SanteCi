@@ -53,16 +53,7 @@ export default function PatientsPage() {
               Retrouvez l&apos;historique, les traitements et les prochains rendez-vous de vos patients.
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
-              <Filter size={14} />
-              Filtrer
-            </button>
-            <button className="flex items-center gap-2 px-4 py-2 bg-[#1e3a8a] text-white text-sm font-bold rounded-xl hover:bg-blue-800 transition-colors">
-              <Download size={14} />
-              Exporter
-            </button>
-          </div>
+
         </div>
 
         <PatientsStatsCards activePatients={patients.length} />

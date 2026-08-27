@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
     await Appointment.findByIdAndUpdate(appointmentId, {
       $set: {
         'status.paymentStatus': newStatus,
+        'status.current': outcome === 'success' ? 'confirmed' : 'pending',
         ...(outcome === 'success' ? { 'payment.paidAt': new Date() } : {}),
         'metadata.updatedAt': new Date(),
       },

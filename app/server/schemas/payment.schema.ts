@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 const CurrencyEnum = z.enum(['XOF', 'EUR', 'USD']);
 const MethodEnum   = z.enum(['mobile_money', 'card', 'wallet', 'Assurance']);
-const ProviderEnum = z.enum(['orange_money', 'mtn_money', 'wave']);
+const ProviderEnum = z.enum(['orange_money', 'mtn_money', 'wave', 'simulation']);
 
 // ─── Initier un paiement ──────────────────────────────────────────────────────
 
@@ -14,15 +14,9 @@ export const InitiatePaymentSchema = z.object({
     .string()
     .min(1, 'appointmentId requis')
     .regex(/^[a-f\d]{24}$/i, 'appointmentId doit être un ObjectId valide'),
-
-  amount: z
-    .number({ error: 'Le montant doit être un nombre' })
-    .positive('Le montant doit être positif')
-    .int('Le montant doit être un entier (XOF sans décimales)'),
+  channel: z.string(),
 
   currency: CurrencyEnum,
-  method:   MethodEnum,
-  provider: ProviderEnum.optional(),
 });
 
 // ─── Simuler un paiement ──────────────────────────────────────────────────────

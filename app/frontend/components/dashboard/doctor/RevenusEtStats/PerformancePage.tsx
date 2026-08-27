@@ -30,19 +30,7 @@ export default function PerformancePage() {
               Suivez vos revenus, votre satisfaction patient et la performance de vos consultations.
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {performance && (
-              <span className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-full ${
-                isUp ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"
-              }`}>
-                {isUp ? "Mois en hausse" : "Mois en baisse"}
-              </span>
-            )}
-            <button className="flex items-center gap-2 px-4 py-2 bg-[#1e3a8a] text-white text-sm font-bold rounded-xl hover:bg-blue-800 transition-colors">
-              <Download size={14} />
-              Exporter
-            </button>
-          </div>
+
         </div>
 
         <PerformanceStatsCards

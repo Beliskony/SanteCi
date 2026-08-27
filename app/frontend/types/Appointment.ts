@@ -25,7 +25,7 @@ export type Currency = "XOF" | "EUR" | "USD";
 
 export type PaymentMethod = "mobile_money" | "card" | "wallet" | "Assurance";
 
-export type PaymentProvider = "orange_money" | "mtn_money" | "wave" | "stripe";
+export type PaymentProvider = "orange_money" | "mtn_money" | "wave" | "stripe" | "simulation";
 
 export type CancelledBy = "patient" | "doctor" | "system";
 

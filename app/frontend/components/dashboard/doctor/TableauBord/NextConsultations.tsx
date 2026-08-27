@@ -20,12 +20,10 @@ function ConsultationCard({
   appointment,
   isFirst,
   onStart,
-  onViewDossier,
 }: {
   appointment:  Appointment;
   isFirst:      boolean;
   onStart:      (id: string) => void;
-  onViewDossier:(id: string) => void;
 }) {
   const { details, status, doctorId, _id } = appointment;
   const patient  = isPopulatedPatient(appointment.patientId) ? appointment.patientId : null;
@@ -118,12 +116,7 @@ function ConsultationCard({
               <Video size={13} />
               {isOngoing ? "Reprendre la consultation" : "Démarrer la consultation"}
             </button>
-            <button
-              onClick={() => onViewDossier(_id)}
-              className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-            >
-              Voir le dossier
-            </button>
+
           </div>
         )}
       </div>
@@ -136,10 +129,9 @@ function ConsultationCard({
 interface NextConsultationsProps {
   onViewAgenda:  () => void;
   onStart:       (id: string) => void;
-  onViewDossier: (id: string) => void;
 }
 
-export function NextConsultations({ onViewAgenda, onStart, onViewDossier }: NextConsultationsProps) {
+export function NextConsultations({ onViewAgenda, onStart }: NextConsultationsProps) {
   const appointments = useAppointmentStore((s) => s.appointments);
   const isLoading    = useAppointmentStore((s) => s.isLoading);
 
@@ -183,7 +175,6 @@ export function NextConsultations({ onViewAgenda, onStart, onViewDossier }: Next
               appointment={appt}
               isFirst={i === 0}
               onStart={onStart}
-              onViewDossier={onViewDossier}
             />
           ))}
         </div>

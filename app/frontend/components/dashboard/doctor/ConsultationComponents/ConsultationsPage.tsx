@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { Plus } from "lucide-react";
-import { useAuthStore, isDoctor }  from "@/app/frontend/store/useAuthStore";
-import { useAppointmentStore }     from "@/app/frontend/store/appoitmentStore";
-import { ConsultationTabs }        from "./ConsultationTabs";
-import { ConsultationCard }        from "./ConsultationCard";
-import type { ConsultTab }         from "./ConsultationTabs";
-import type { Appointment }        from "@/app/frontend/types/Appointment";
+import { useAuthStore, isDoctor } from "@/app/frontend/store/useAuthStore";
+import { useAppointmentStore } from "@/app/frontend/store/appoitmentStore";
+import { useChatStore } from "@/app/frontend/store/chatStore"; // ← AJOUT
+import { ConsultationTabs } from "./ConsultationTabs";
+import { ConsultationCard } from "./ConsultationCard";
+import type { ConsultTab } from "./ConsultationTabs";
+import type { Appointment } from "@/app/frontend/types/Appointment";
 
 // ── Mapping tab → statuts ─────────────────────────────────────────────────────
 
@@ -31,13 +32,18 @@ function isToday(dateStr: string | Date): boolean {
   );
 }
 
+interface ConsultationPageProps {
+  onNavigate?: (page: string, patientId?: string, patientName?: string) => void; // ← MODIFIER
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function ConsultationsPage() {
+export default function ConsultationsPage({ onNavigate }: ConsultationPageProps) {
   const user      = useAuthStore((s) => s.user);
   const appts     = useAppointmentStore((s) => s.appointments);
   const isLoading = useAppointmentStore((s) => s.isLoading);
   const fetchList = useAppointmentStore((s) => s.fetchList);
+  const { fetchConversations, conversations } = useChatStore(); // ← AJOUT
 
   const [activeTab,    setActiveTab]    = useState<ConsultTab>("today");
   const [expandedId,   setExpandedId]   = useState<string | null>(null);
@@ -53,7 +59,8 @@ export default function ConsultationsPage() {
   useEffect(() => {
     if (!doctorId) return;
     fetchList({ doctorId, limit: 100 });
-  }, [doctorId, fetchList]);
+    fetchConversations(); // ← AJOUT : charger les conversations
+  }, [doctorId, fetchList, fetchConversations]);
 
   // Auto-expand le premier RDV ongoing/confirmed du jour
   useEffect(() => {
@@ -94,19 +101,40 @@ export default function ConsultationsPage() {
   }, []);
 
   const handleMarkAbsent = useCallback((_id: string) => {
-    // Le markNoShow est appelé dans ConsultationCard directement
     setExpandedId(null);
   }, []);
 
+  // ✅ MODIFIER : Passer le patientId et son nom
   const handleMessage = useCallback((patientId: string) => {
-    console.log("Message →", patientId);
-    // TODO : ouvrir MessagerieLayout avec ce patient
-  }, []);
+    // Trouver le patient dans les rendez-vous pour avoir son nom
+    const appointment = appts.find(a => {
+      if (typeof a.patientId === 'object' && a.patientId !== null) {
+        return a.patientId._id === patientId;
+      }
+      return a.patientId === patientId;
+    });
+    
+    // Récupérer le nom du patient
+    let patientName = 'Patient';
+    if (appointment && typeof appointment.patientId === 'object' && appointment.patientId !== null) {
+      const p = appointment.patientId;
+      if ('profile' in p && p.profile) {
+        patientName = `${p.profile.firstName || ''} ${p.profile.lastName || ''}`.trim() || 'Patient';
+      }
+    }
+    
+    // Naviguer vers la messagerie avec le patientId
+    if (onNavigate) {
+      onNavigate('messagerie', patientId, patientName);
+    }
+  }, [appts, onNavigate]);
 
+  // ✅ MODIFIER : Ouvrir le dossier patient
   const handleDossier = useCallback((patientId: string) => {
-    console.log("Dossier →", patientId);
-    // TODO : ouvrir dossier patient
-  }, []);
+    if (onNavigate) {
+      onNavigate('dossier', patientId);
+    }
+  }, [onNavigate]);
 
   return (
     <div className="min-h-screen bg-[#f4f6fb]">

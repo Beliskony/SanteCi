@@ -59,7 +59,7 @@ const renderPage = (active: ActivePage, setActive: (key: ActivePage) => void) =>
   switch (active) {
     case "dashboard":     return <DocDash onNavigate={(page) => setActive(page as ActivePage)} />     // <DocDash />
     case "agenda":        return <AgendaPage />;                // <DocAgenda />
-    case "consultations": return <COnsultationsPage />;         // <DocConsult />
+    case "consultations": return <COnsultationsPage onNavigate={(page) => setActive(page as ActivePage)} />;         // <DocConsult />
     case "patients":      return <PatientsPage />;          // <DocPatients />
     case "messagerie":    return <MessagerieLayoutDoc />;            // <DocMessagerie />
     case "stats":         return <PerformancePage />;       // <DocStats />

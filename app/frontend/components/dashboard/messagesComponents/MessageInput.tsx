@@ -4,6 +4,7 @@ import { useRef, useState, useCallback } from "react";
 import { Paperclip, Smile, Send, Mic, MicOff, X } from "lucide-react";
 import { useChatStore } from "@/app/frontend/store/chatStore";
 import { useAuthStore } from "@/app/frontend/store/useAuthStore";
+import { useSocketStore } from "@/app/frontend/store/soketStore"; // ← AJOUT
 
 interface Props {
   roomId:        string;
@@ -30,6 +31,10 @@ export default function MessageInput({ roomId, receiverId, appointmentId }: Prop
   const recordingDurationRef = useRef<number>(0);
 
   const { sendText, sendMedia, sendAudio, isSending } = useChatStore();
+  
+  // ← AJOUT : Récupérer les valeurs du socket store
+  const { emit, isConnected } = useSocketStore();
+  const currentUserId = useAuthStore((s) => s.user?._id ?? "");
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
@@ -37,13 +42,45 @@ export default function MessageInput({ roomId, receiverId, appointmentId }: Prop
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
   };
 
+  // ─── handleSendText modifié ──────────────────────────────────────────────
   const handleSendText = useCallback(async () => {
     const trimmed = text.trim();
     if (!trimmed || isSending) return;
+    
     setText("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
-    await sendText(roomId, { receiverId, content: trimmed, appointmentId });
-  }, [text, isSending, sendText, roomId, receiverId, appointmentId]);
+
+     // 1. Sauvegarder en base via API
+  let savedMessage: any = null;
+  try {
+    savedMessage = await sendText(roomId, { 
+      receiverId, 
+      content: trimmed, 
+      appointmentId 
+    });
+  } catch (error) {
+    console.error('Erreur lors de l\'envoi du message:', error);
+  }
+
+    // 2. Émettre via Socket pour le temps réel
+    if (isConnected) {
+      const messageData = {
+        roomId,
+        senderId: currentUserId,
+        receiverId,
+        content: trimmed,
+        messageType: 'text',
+        appointmentId,
+        timestamp: new Date().toISOString(),
+        _id: savedMessage?._id || `temp-${Date.now()}`,
+      };
+      
+      console.log('📤 Émission sendMessage:', messageData);
+      emit('sendMessage', messageData);
+    } else {
+      console.warn('⚠️ Socket non connecté, message non émis en temps réel');
+    }
+  }, [text, isSending, sendText, roomId, receiverId, appointmentId, isConnected, emit, currentUserId]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendText(); }
@@ -119,7 +156,6 @@ export default function MessageInput({ roomId, receiverId, appointmentId }: Prop
 
         setUploading(true);
         try {
-          // Convertir le blob en base64 pour l'envoyer au backend (pas de formidable nécessaire)
           const audioBase64 = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onload  = () => resolve((reader.result as string).split(",")[1]);

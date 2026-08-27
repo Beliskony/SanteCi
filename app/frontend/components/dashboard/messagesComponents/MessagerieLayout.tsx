@@ -114,7 +114,7 @@ export default function MessagerieLayout() {
       />
 
       {activeChatRoomId && activeInterlocutor ? (
-        <div className="flex flex-col flex-1 min-w-0 w-full h-screen">
+        <div className="flex flex-col flex-1 min-w-0 w-full">
           {callError && (
             <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border-b border-amber-100 text-xs text-amber-700">
               <AlertCircle size={14} className="shrink-0" />

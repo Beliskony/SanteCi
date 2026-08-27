@@ -1,6 +1,6 @@
 "use client";
 
-import { TrendingUp, TrendingDown, CalendarDays, Users, Plus } from "lucide-react";
+import { TrendingUp, TrendingDown, Plus } from "lucide-react";
 import { useDoctorDashStore, useDoctorAnalytics } from "@/app/frontend/store/doctorStore";
 
 interface StatCardProps {

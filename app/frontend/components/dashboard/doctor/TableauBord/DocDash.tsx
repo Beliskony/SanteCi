@@ -46,10 +46,6 @@ export default function DocDash({ onNavigate }: DocDashProps) {
     await startAppt(id);
   }, [startAppt]);
 
-  const handleViewDossier = useCallback((id: string) => {
-    // Navigation vers le dossier du patient lié à ce rdv
-    console.log("Voir dossier:", id);
-  }, []);
 
   const handleOpenSlots = useCallback(() => {
     onNavigate?.("agenda");
@@ -90,7 +86,6 @@ export default function DocDash({ onNavigate }: DocDashProps) {
           <NextConsultations
             onViewAgenda={handleViewAgenda}
             onStart={handleStart}
-            onViewDossier={handleViewDossier}
           />
           <UnreadMessages
             onViewAll={handleViewMessages}

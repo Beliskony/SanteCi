@@ -20,43 +20,40 @@ import { isPopulatedDoctor } from "@/app/frontend/types/Appointment";
 const PatDash = () => {
   const router = useRouter();
 
-  //  FIX #1 — Sélecteurs atomiques au lieu de `const { user } = useAuthStore()`
-  // Chaque sélecteur ne re-render que si SA valeur change, pas à chaque update du store
   const user      = useAuthStore((s) => s.user);
   const firstName = useAuthStore((s) => s.user?.profile?.firstName ?? "—");
   const health    = useAuthStore((s) =>
     s.user && isPatient(s.user) ? s.user.health : null
   );
 
-  //  FIX #2 — Sélecteurs atomiques pour le store appointments
   const appointments = useAppointmentStore((s) => s.appointments);
   const isLoading    = useAppointmentStore((s) => s.isLoading);
   const fetchList    = useAppointmentStore((s) => s.fetchList);
   const getByStatus  = useAppointmentStore((s) => s.getByStatus);
 
-  //  FIX #3 — Lecture sécurisée de _id : après rehydration depuis localStorage,
-  // _id peut être une string ou un ObjectId. On normalise proprement.
   const patientId = useMemo(() => {
     if (!user || !isPatient(user)) return undefined;
     const raw = user._id;
     if (!raw) return undefined;
-    // Après rehydration, _id est une string ; en runtime c'est un ObjectId
     if (typeof raw === "string") return raw;
     if (typeof raw === "object" && "toString" in raw) return raw;
     return undefined;
   }, [user]);
 
+  // ─── Récupérer TOUS les rendez-vous ──────────────────────────────────────
   useEffect(() => {
     if (!patientId) return;
-    fetchList({ patientId, status: "confirmed", limit: 5 });
-    // fetchList est stable (référence Zustand), patientId est une string primitive → pas de boucle
+    // Supprimer le filtre status pour avoir tous les rendez-vous
+    fetchList({ patientId, limit: 10 });
   }, [patientId, fetchList]);
 
-  //  FIX #4 — getByStatus mémorisé pour éviter des re-renders en cascade
-  // si ces tableaux sont passés comme props ou utilisés comme dépendances ailleurs
-  const ongoing   = useMemo(() => getByStatus("ongoing"),   [appointments, getByStatus]);
+  // ─── Filtrer par statut ──────────────────────────────────────────────────
+  const pending   = useMemo(() => getByStatus("pending"), [appointments, getByStatus]);
+  const ongoing   = useMemo(() => getByStatus("ongoing"), [appointments, getByStatus]);
   const confirmed = useMemo(() => getByStatus("confirmed"), [appointments, getByStatus]);
-  const nextAppt  = ongoing[0] ?? confirmed[0] ?? null;
+
+  // Priorité : ongoing > confirmed > pending
+  const nextAppt = ongoing[0] ?? confirmed[0] ?? pending[0] ?? null;
 
   // Données de santé
   const weight = health?.weight ?? null;
@@ -67,7 +64,6 @@ const PatDash = () => {
       : null);
   const treatment = health?.currentMedications?.[0] ?? null;
 
-  // Médecin peuplé ou non
   const doctor = nextAppt && isPopulatedDoctor(nextAppt.doctorId)
     ? nextAppt.doctorId
     : null;
@@ -92,10 +88,36 @@ const PatDash = () => {
     in_person: "En cabinet",
   };
 
+  // ─── Affichage du badge de statut ──────────────────────────────────────
+  const getStatusBadge = (status: string) => {
+    switch(status) {
+      case "confirmed":
+        return "bg-green-400/20 text-green-300";
+      case "ongoing":
+        return "bg-blue-400/20 text-blue-200";
+      case "pending":
+        return "bg-yellow-400/20 text-yellow-300";
+      default:
+        return "bg-gray-400/20 text-gray-300";
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch(status) {
+      case "confirmed":
+        return "Confirmé";
+      case "ongoing":
+        return "En cours";
+      case "pending":
+        return "En attente";
+      default:
+        return status;
+    }
+  };
+
   return (
     <div className="flex flex-col flex-1 min-h-screen bg-[#f4f6fb]">
 
-      {/* ── Corps ── */}
       <main className="flex flex-col gap-6 p-4 sm:p-6 max-w-5xl w-full mx-auto">
 
         {/* Bienvenue */}
@@ -131,12 +153,8 @@ const PatDash = () => {
                 <span className="text-xs font-semibold bg-white/20 px-3 py-1 rounded-full">
                   Prochain rendez-vous
                 </span>
-                <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
-                  nextAppt.status.current === "confirmed"
-                    ? "bg-green-400/20 text-green-300"
-                    : "bg-blue-400/20 text-blue-200"
-                }`}>
-                  {nextAppt.status.current === "confirmed" ? "Confirmé" : "En cours"}
+                <span className={`text-xs font-semibold px-3 py-1 rounded-full ${getStatusBadge(nextAppt.status.current)}`}>
+                  {getStatusLabel(nextAppt.status.current)}
                 </span>
               </div>
 

@@ -74,7 +74,7 @@ export default function MessageBubble({ message, isMine, onDelete, senderAvatar 
 
   return (
     <div className={`flex items-end gap-2 group ${isMine ? "flex-row-reverse" : "flex-row"}`}>
-      {/* Avatar interlocuteur */}
+      {/* Avatar interlocuteur 
       {!isMine && (
         <div className="shrink-0 mb-1">
           {senderAvatar ? (
@@ -85,7 +85,7 @@ export default function MessageBubble({ message, isMine, onDelete, senderAvatar 
             </div>
           )}
         </div>
-      )}
+      )} */}
 
       {/* Bulle */}
       <div className="relative max-w-[65%]">

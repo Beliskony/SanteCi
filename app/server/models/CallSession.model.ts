@@ -1,4 +1,4 @@
-import { Schema, model } from 'mongoose';
+import { Schema, model, models } from 'mongoose';
 import { ICallSession } from '../interfaces/callSession.interface';
 
 const CallSessionSchema = new Schema<ICallSession>(
@@ -62,4 +62,4 @@ CallSessionSchema.index({ receiverId: 1, 'timing.initiatedAt': -1 });
 CallSessionSchema.index({ appointmentId: 1 });
 CallSessionSchema.index({ 'agora.channelName': 1 }, { unique: true });
 
-export const CallSession = model<ICallSession>('CallSession', CallSessionSchema);
+export const CallSession = models.CallSession || model<ICallSession>('CallSession', CallSessionSchema);

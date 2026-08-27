@@ -111,8 +111,8 @@ interface ChatState {
   receiveMessage:       (message: IChatMessage) => void;
   setInterlocutorOnline:(interlocutorId: string, isOnline: boolean) => void;
   markMessageDeliveredLocally:  (messageId: string) => void;
-markMessageReadLocally:       (messageId: string) => void;
-markRoomMessagesReadLocally:  (chatRoomId: string) => void;
+  markMessageReadLocally:       (messageId: string) => void;
+  markRoomMessagesReadLocally:  (chatRoomId: string) => void;
 
   // ── Utilitaires ───────────────────────────────────────────
   clearError: () => void;
@@ -371,6 +371,68 @@ export const useChatStore = create<ChatState>()(
             state.activeInterlocutor?._id === interlocutorId
               ? { ...state.activeInterlocutor, isOnline }
               : state.activeInterlocutor,
+        }));
+      },
+
+      // ── markMessageDeliveredLocally ──────────────────────
+      markMessageDeliveredLocally: (messageId: string) => {
+        console.log('markMessageDeliveredLocally:', messageId);
+        set((state) => ({
+          messages: state.messages.map((msg) =>
+            msg._id === messageId
+              ? { 
+                  ...msg, 
+                  status: { 
+                    ...msg.status, 
+                    delivered: true,
+                    deliveredAt: new Date(),
+                  } 
+                }
+              : msg
+          ),
+        }));
+      },
+
+      // ── markRoomMessagesReadLocally ──────────────────────
+      markRoomMessagesReadLocally: (chatRoomId: string) => {
+        console.log('📩 markRoomMessagesReadLocally:', chatRoomId);
+        set((state) => ({
+          messages: state.messages.map((msg) =>
+            msg.chatRoomId === chatRoomId
+              ? { 
+                  ...msg, 
+                  status: { 
+                    ...msg.status, 
+                    read: true,
+                    readAt: new Date(),
+                  } 
+                }
+              : msg
+          ),
+          conversations: state.conversations.map((conv) =>
+            conv.chatRoomId === chatRoomId
+              ? { ...conv, unreadCount: 0 }
+              : conv
+          ),
+        }));
+      },
+
+      // ── markMessageReadLocally ──────────────────────────
+      markMessageReadLocally: (messageId: string) => {
+        console.log(' markMessageReadLocally:', messageId);
+        set((state) => ({
+          messages: state.messages.map((msg) =>
+            msg._id === messageId
+              ? { 
+                  ...msg, 
+                  status: { 
+                    ...msg.status, 
+                    read: true,
+                    readAt: new Date(),
+                  } 
+                }
+              : msg
+          ),
         }));
       },
 

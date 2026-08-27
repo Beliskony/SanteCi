@@ -1,3 +1,4 @@
+// ConversationBody.tsx
 "use client";
 
 import { useEffect, useRef, useCallback } from "react";
@@ -79,8 +80,6 @@ export default function ConversationBody({ roomId }: Props) {
     if (el.scrollTop < 80) loadMoreMessages();
   }, [hasMore, isLoading, loadMoreMessages]);
 
-  // Regrouper les messages par date pour les séparateurs
-  // messages est trié du plus récent (index 0) au plus ancien — on inverse pour l'affichage
   const sorted = [...messages].reverse();
 
   const handleDelete = (messageId: string, scope: "me" | "everyone") => {
@@ -89,7 +88,7 @@ export default function ConversationBody({ roomId }: Props) {
 
   if (isLoading && messages.length === 0) {
     return (
-      <div className="flex-1 flex flex-col gap-3 px-5 py-4 overflow-y-auto">
+      <div className="h-full flex flex-col gap-3 px-5 py-4 overflow-y-auto">
         {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className={`flex gap-2 ${i % 2 === 0 ? "" : "flex-row-reverse"}`}>
             <div className="w-7 h-7 rounded-full bg-gray-200 animate-pulse shrink-0" />
@@ -107,7 +106,7 @@ export default function ConversationBody({ roomId }: Props) {
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-1"
+      className="h-full overflow-y-auto px-5 py-4 flex flex-col gap-1" // ← h-full + overflow-y-auto
     >
       {/* Loader infinite scroll */}
       {hasMore && isLoading && (

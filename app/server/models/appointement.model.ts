@@ -62,7 +62,7 @@ const AppointmentSchema: Schema = new Schema({
     },
     provider: {
       type: String,
-      enum: ['orange_money', 'mtn_money', 'wave']
+      enum: ['orange_money', 'mtn_money', 'wave', 'simulation']
     },
     transactionId: { type: String },
     paidAt: { type: Date }

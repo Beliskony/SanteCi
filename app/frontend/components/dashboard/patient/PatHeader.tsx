@@ -9,7 +9,7 @@ const PatHeader = () => {
   const initials = `${profile?.firstName?.[0] ?? ""}${profile?.lastName?.[0] ?? ""}`;
 
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-end bg-white/90 backdrop-blur-sm border-b border-gray-100 px-4 sm:px-6 py-3.5">
+    <header className="top-0 flex items-center justify-end bg-white/90 backdrop-blur-sm border-b border-gray-100 px-4 sm:px-6 py-3.5">
 
       {/* Profil */}
       <div className="flex items-center gap-3">
