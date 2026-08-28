@@ -1,3 +1,4 @@
+// app/server/schemas/notification.schema.ts
 import { z } from 'zod';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -10,6 +11,12 @@ const DataSchema = z.object({
   doctorId:       objectId.optional(),
   patientId:      objectId.optional(),
   url:            z.string().url().optional(),
+  // 🆕 Ajouter pour les appels
+  callSessionId:  objectId.optional(),
+  callerName:     z.string().optional(),
+  callType:       z.enum(['audio', 'video']).optional(),
+  duration:       z.number().optional(),
+  otherUserName:  z.string().optional(),
 });
 
 const ChannelsSchema = z.object({
@@ -38,23 +45,21 @@ const MetadataSchema = z.object({
 export const NotificationSchema = z.object({
   userId:   objectId,
   userType: z.enum(['patient', 'doctor']),
-  type:     z.enum(['appointment', 'prescription', 'message', 'reminder', 'payment', 'system', 'emergency']),
+  type:     z.enum(['appointment', 'prescription', 'message', 'reminder', 'payment', 'system', 'emergency', 'call']), // ← AJOUT 'call'
   title:    z.string().min(1),
   body:     z.string().min(1),
   data:     DataSchema.optional(),
-    channels: ChannelsSchema.default(() => ({
+  channels: ChannelsSchema.default(() => ({
     push:  true,
     email: false,
     sms:   false,
     inApp: true,
   })),
-
   statut: StatutSchema.default(() => ({
     sent:      false,
     delivered: false,
     read:      false,
   })),
-
   metadata: MetadataSchema.default(() => ({
     createdAt: new Date(),
     priority:  'normal' as const,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Building2, ArrowDown } from "lucide-react";
 import { useHospitalStore } from "../../store/hopitalStore";
 import HopitalBox from "../HopitalBox";

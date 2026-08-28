@@ -16,7 +16,8 @@ export type NotificationType =
   | "reminder"
   | "payment"
   | "system"
-  | "emergency";
+  | "emergency"
+  | "call";
 
 export type NotificationUserType = "patient" | "doctor";
 export type NotificationPriority = "low" | "normal" | "high";
@@ -27,6 +28,12 @@ export interface NotificationData {
   doctorId?: string;
   patientId?: string;
   url?: string;
+
+  callSessionId?: string;
+  callerName?: string;
+  callType?: 'audio' | 'video';
+  duration?: number;
+  otherUserName?: string;
 }
 
 export interface NotificationChannels {

@@ -431,113 +431,155 @@ class AuthService {
     return { message: 'OTP envoyé. Vérifiez votre email.' };
   }
 
-  // ── Verify OTP ─────────────────────────────────────────────────────────────
+// app/server/services/auth.service.ts
 
-  async verifyOtp(email: string, otp: string, role: Role): Promise<{ message: string }> {
-    if (role === 'doctor') {
-      const doctor = await Doctor.findOne({ 'contact.email': email });
-      if (!doctor) throw new Error('Compte introuvable.');
+// ─── Nouvelle méthode : vérifier l'OTP sans le supprimer ──────────────────
 
-      // ── Vérification réelle du code OTP (manquait totalement) ──────────
-      if (!doctor.status.verificationCode || doctor.status.verificationCode !== otp) {
-        throw new Error('Code OTP invalide.');
-      }
+async verifyOtp(email: string, otp: string, role: Role): Promise<{ message: string }> {
+  if (role === 'doctor') {
+    const doctor = await Doctor.findOne({ 'contact.email': email });
+    if (!doctor) throw new Error('Compte introuvable.');
 
-      if (!doctor.status.verificationExpires || doctor.status.verificationExpires < new Date()) {
-        throw new Error('Code OTP expiré. Demandez-en un nouveau.');
-      }
+    if (!doctor.status.verificationCode || doctor.status.verificationCode !== otp) {
+      throw new Error('Code OTP invalide.');
+    }
 
-      // ── L'OTP confirme seulement que l'email appartient au médecin ─────
-      // isVerified/accountStatus restent gérés par la vérification manuelle
-      // des documents professionnels (diplôme, licence) — pas par l'OTP.
-      await Doctor.findByIdAndUpdate(doctor._id, {
-        'contact.emailVerified': true,
+    if (!doctor.status.verificationExpires || doctor.status.verificationExpires < new Date()) {
+      throw new Error('Code OTP expiré. Demandez-en un nouveau.');
+    }
+
+    // ✅ NE PAS SUPPRIMER L'OTP ICI
+    return { message: 'OTP valide.' };
+
+  } else {
+    const patient = await Patient.findOne({ 'contact.email': email });
+    if (!patient) throw new Error('Compte introuvable.');
+
+    if (!patient.status.verificationCode || patient.status.verificationCode !== otp) {
+      throw new Error('Code OTP invalide.');
+    }
+
+    if (!patient.status.verificationExpires || patient.status.verificationExpires < new Date()) {
+      throw new Error('Code OTP expiré. Demandez-en un nouveau.');
+    }
+
+    // ✅ NE PAS SUPPRIMER L'OTP ICI
+    return { message: 'OTP valide.' };
+  }
+}
+
+// ─── Verify OTP (conserver pour la vérification email, avec suppression) ──
+/*
+async verifyOtp(email: string, otp: string, role: Role): Promise<{ message: string }> {
+  if (role === 'doctor') {
+    const doctor = await Doctor.findOne({ 'contact.email': email });
+    if (!doctor) throw new Error('Compte introuvable.');
+
+    if (!doctor.status.verificationCode || doctor.status.verificationCode !== otp) {
+      throw new Error('Code OTP invalide.');
+    }
+
+    if (!doctor.status.verificationExpires || doctor.status.verificationExpires < new Date()) {
+      throw new Error('Code OTP expiré. Demandez-en un nouveau.');
+    }
+
+    // ✅ Garder la suppression pour la vérification email classique
+    await Doctor.findByIdAndUpdate(doctor._id, {
+      'contact.emailVerified': true,
+      'status.verificationCode': null,
+      'status.verificationExpires': null,
+    });
+
+    await mailService.sendWelcome(email, doctor.profile.firstName, 'doctor');
+
+  } else {
+    const patient = await Patient.findOne({ 'contact.email': email });
+    if (!patient) throw new Error('Compte introuvable.');
+
+    if (!patient.status.verificationCode || patient.status.verificationCode !== otp) {
+      throw new Error('Code OTP invalide.');
+    }
+
+    if (!patient.status.verificationExpires || patient.status.verificationExpires < new Date()) {
+      throw new Error('Code OTP expiré. Demandez-en un nouveau.');
+    }
+
+    await Patient.findByIdAndUpdate(patient._id, {
+      'contact.emailVerified': true,
+      'status.isVerified': true,
+      'status.verificationCode': null,
+      'status.verificationExpires': null,
+    });
+
+    await mailService.sendWelcome(email, patient.profile.firstName, 'patient');
+  }
+
+  return { message: 'Email vérifié avec succès.' };
+} */
+
+// ─── Reset Password (réinitialisation après vérification OTP) ──────────────
+
+async resetPassword(
+  email: string,
+  otp: string,
+  newPassword: string,
+  role: Role
+): Promise<{ message: string }> {
+  // ✅ Utiliser verifyOtpOnly (ne supprime pas l'OTP)
+  await this.verifyOtp(email, otp, role);
+
+  const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+  if (role === 'doctor') {
+    await Doctor.findOneAndUpdate(
+      { 'contact.email': email },
+      {
+        'security.password': hashedPassword,
         'status.verificationCode': null,
         'status.verificationExpires': null,
-      });
-
-      await mailService.sendWelcome(email, doctor.profile.firstName, 'doctor');
-
-    } else {
-      const patient = await Patient.findOne({ 'contact.email': email });
-      if (!patient) throw new Error('Compte introuvable.');
-
-      if (!patient.status.verificationCode || patient.status.verificationCode !== otp) {
-        throw new Error('Code OTP invalide.');
       }
-
-      if (!patient.status.verificationExpires || patient.status.verificationExpires < new Date()) {
-        throw new Error('Code OTP expiré. Demandez-en un nouveau.');
-      }
-
-      await Patient.findByIdAndUpdate(patient._id, {
-        'contact.emailVerified': true,
-        'status.isVerified': true,
+    );
+  } else {
+    await Patient.findOneAndUpdate(
+      { 'contact.email': email },
+      {
+        'security.password': hashedPassword,
         'status.verificationCode': null,
         'status.verificationExpires': null,
-      });
-
-      await mailService.sendWelcome(email, patient.profile.firstName, 'patient');
-    }
-
-    return { message: 'Email vérifié avec succès.' };
+      }
+    );
   }
 
-  // ── Forgot Password (envoie OTP reset) ────────────────────────────────────
+  return { message: 'Mot de passe réinitialisé avec succès.' };
+}
 
-  async forgotPassword(email: string, role: Role): Promise<{ message: string }> {
-    const otp = generateOtp();
-    const expires = otpExpiry();
+// ─── Forgot Password (envoie OTP reset) ────────────────────────────────────
 
-    if (role === 'doctor') {
-      const doctor = await Doctor.findOne({ 'contact.email': email });
-      if (!doctor) throw new Error('Aucun compte médecin trouvé avec cet email.');
+async forgotPassword(email: string, role: Role): Promise<{ message: string }> {
+  const otp = generateOtp();
+  const expires = otpExpiry();
 
-      await Doctor.findByIdAndUpdate(doctor._id, {
-        'status.verificationCode': otp,
-        'status.verificationExpires': expires,
-      });
-    } else {
-      const patient = await Patient.findOne({ 'contact.email': email });
-      if (!patient) throw new Error('Aucun compte patient trouvé avec cet email.');
+  if (role === 'doctor') {
+    const doctor = await Doctor.findOne({ 'contact.email': email });
+    if (!doctor) throw new Error('Aucun compte médecin trouvé avec cet email.');
 
-      await Patient.findByIdAndUpdate(patient._id, {
-        'status.verificationCode': otp,
-        'status.verificationExpires': expires,
-      });
-    }
+    await Doctor.findByIdAndUpdate(doctor._id, {
+      'status.verificationCode': otp,
+      'status.verificationExpires': expires,
+    });
+  } else {
+    const patient = await Patient.findOne({ 'contact.email': email });
+    if (!patient) throw new Error('Aucun compte patient trouvé avec cet email.');
 
-    await mailService.sendOtp(email, otp, role);
-    return { message: 'Code de réinitialisation envoyé sur votre email.' };
+    await Patient.findByIdAndUpdate(patient._id, {
+      'status.verificationCode': otp,
+      'status.verificationExpires': expires,
+    });
   }
 
-  // ── Reset Password (après vérification OTP) ────────────────────────────────
-
-  async resetPassword(
-    email: string,
-    otp: string,
-    newPassword: string,
-    role: Role
-  ): Promise<{ message: string }> {
-    // Vérifier l'OTP d'abord
-    await this.verifyOtp(email, otp, role); // throws si invalide
-
-    const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
-
-    if (role === 'doctor') {
-      await Doctor.findOneAndUpdate(
-        { 'contact.email': email },
-        { 'security.password': hashedPassword }
-      );
-    } else {
-      await Patient.findOneAndUpdate(
-        { 'contact.email': email },
-        { 'security.password': hashedPassword }
-      );
-    }
-
-    return { message: 'Mot de passe réinitialisé avec succès.' };
-  }
+  await mailService.sendOtp(email, otp, role);
+  return { message: 'Code de réinitialisation envoyé sur votre email.' };
+}
 
   // ── Change Password (utilisateur connecté) ────────────────────────────────
 

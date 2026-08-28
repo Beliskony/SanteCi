@@ -20,12 +20,12 @@ export class ChatGateway {
             await Doctor.findByIdAndUpdate(data.userId, {
               $set: { 'status.isOnline': true, 'status.lastActive': new Date() }
             });
-            console.log(`[ChatGateway] ✅ Médecin ${data.userId} marqué en ligne`);
+            console.log(`[ChatGateway]  Médecin ${data.userId} marqué en ligne`);
           } else {
             await Patient.findByIdAndUpdate(data.userId, {
               $set: { 'status.isOnline': true }
             });
-            console.log(`[ChatGateway] ✅ Patient ${data.userId} marqué en ligne`);
+            console.log(`[ChatGateway]  Patient ${data.userId} marqué en ligne`);
           }
         } catch (err) {
           console.error('[ChatGateway] Erreur mise à jour isOnline:', err);

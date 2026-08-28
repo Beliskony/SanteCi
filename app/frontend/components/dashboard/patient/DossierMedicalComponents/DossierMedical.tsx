@@ -16,6 +16,8 @@ export default function DossierPage() {
   //  FIX #1 — Sélecteurs atomiques au lieu de usePatientStore() entier
   const fetchHealth        = usePatientStore((s) => s.fetchHealth);
   const fetchPrescriptions = usePatientStore((s) => s.fetchPrescriptions);
+  const prescriptions      = usePatientStore((s) => s.prescriptions);
+  const isLoadingPrescriptions = usePatientStore((s) => s.isLoading);
 
   //  FIX #1 — Sélecteurs atomiques depuis useAuthStore
   const user = useAuthStore((s) => s.user);
@@ -73,8 +75,8 @@ export default function DossierPage() {
       <DossierHeader
         patientName={patientName}
         lastUpdated={lastUpdated}
-        onExport={() => console.log("export PDF")}
-        onShare={() => console.log("partager")}
+        //onExport={() => console.log("export PDF")}
+        //onShare={() => console.log("partager")}
       />
 
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3.5">
@@ -88,7 +90,8 @@ export default function DossierPage() {
           <AntecedentsCard health={health} />
           <TraitementsCard onRenew={handleRenewPrescription} />
           <DocumentsCard
-            onDownload={handleDownloadDocument}
+            prescriptions={prescriptions}
+            isLoading={isLoadingPrescriptions}
             onViewAll={() => console.log("Voir tous les documents")}
           />
         </div>

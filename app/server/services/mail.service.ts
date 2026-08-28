@@ -160,7 +160,7 @@ class MailService {
   private async getTransporter(): Promise<Transporter> {
     if (this.transporter) return this.transporter;
 
-    // ✅ Ethereal : compte de test auto-généré
+    //  Ethereal : compte de test auto-généré
     const testAccount = await nodemailer.createTestAccount();
 
     this.transporter = nodemailer.createTransport({
@@ -188,7 +188,7 @@ class MailService {
       ...options,
     });
 
-    // ✅ Lien de prévisualisation dans le terminal
+    //  Lien de prévisualisation dans le terminal
     const preview = nodemailer.getTestMessageUrl(info);
     console.log(`📨 Email envoyé → ${options.subject}`);
     console.log(`   Preview : ${preview}\n`);
@@ -245,7 +245,7 @@ class MailService {
           Merci de vous être inscrit sur <strong>E-SantéCI</strong>. 
           Cliquez sur le bouton ci-dessous pour confirmer votre adresse email et activer votre compte.
         </p>
-        ${ctaButton(verificationLink, '✅ Vérifier mon email')}
+        ${ctaButton(verificationLink, ' Vérifier mon email')}
         <p style="color:${COLORS.textMuted}; font-size:13px; text-align:center; margin:0;">
           Ce lien expire dans <strong>24 heures</strong>. 
           Si vous n'avez pas créé de compte, ignorez cet email.
@@ -359,7 +359,7 @@ class MailService {
           text-align: center;
           margin-bottom: 24px;
         ">
-          <div style="font-size:36px; margin-bottom:8px;">✅</div>
+          <div style="font-size:36px; margin-bottom:8px;"></div>
           <h2 style="margin:0; color:${COLORS.success}; font-size:20px; font-weight:700;">
             Rendez-vous confirmé !
           </h2>

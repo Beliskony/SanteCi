@@ -43,29 +43,33 @@ const TYPE_CONFIG: Record<string, {
   },
 };
 
+//  Configuration des badges de statut avec couleurs et labels
 const STATUS_BADGE: Record<string, string> = {
-  confirmed: "bg-slate-100 text-slate-600",
-  ongoing:   "bg-red-500 text-white",
-  pending:   "bg-amber-100 text-amber-700",
-  completed: "bg-green-100 text-green-700",
+  confirmed: "bg-green-100 text-green-700 border border-green-200",
+  ongoing:   "bg-red-500 text-white animate-pulse",
+  pending:   "bg-amber-100 text-amber-700 border border-amber-200",
+  completed: "bg-blue-100 text-blue-700 border border-blue-200",
+  cancelled: "bg-red-100 text-red-700 border border-red-200",
+  no_show:   "bg-gray-100 text-gray-500 border border-gray-200",
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  confirmed: "Suivi",
-  ongoing:   "EN COURS",
-  pending:   "Nouveau",
+  confirmed: "Confirmé",
+  ongoing:   "En cours",
+  pending:   "En attente",
   completed: "Terminé",
+  cancelled: "Annulé",
+  no_show:   "Absent",
 };
 
 // ── Calcul de position sur la timeline ───────────────────────────────────────
-// HOUR_HEIGHT = hauteur en px d'une heure sur la timeline
 export const HOUR_HEIGHT = 64;
 export const DAY_START   = 7; // 07:00
 
 export function getBlockStyle(scheduledFor: Date, duration: number): React.CSSProperties {
   const hours   = scheduledFor.getHours() + scheduledFor.getMinutes() / 60;
   const top     = (hours - DAY_START) * HOUR_HEIGHT;
-  const height  = Math.max((duration / 60) * HOUR_HEIGHT, 32); // min 32px
+  const height  = Math.max((duration / 60) * HOUR_HEIGHT, 32);
   return { position: "absolute", top, height, left: 52, right: 8 };
 }
 
@@ -91,12 +95,21 @@ export function AgendaAppointmentBlock({ appointment, onClick }: AgendaAppointme
   })}`;
 
   const isOngoing   = status.current === "ongoing";
+  const isPending   = status.current === "pending";
+  const isConfirmed = status.current === "confirmed";
+  const isCompleted = status.current === "completed";
+  const isCancelled = status.current === "cancelled" || status.current === "no_show";
+  
   const blockStyle  = getBlockStyle(scheduledFor, details.duration);
   const isShort     = (blockStyle.height as number) < 48;
 
   const patientName = patient
     ? `${patient.profile.firstName} ${patient.profile.lastName}`
     : "Patient";
+
+  //  Badge de statut avec style adapté
+  const statusBadgeClass = STATUS_BADGE[status.current] || STATUS_BADGE.confirmed;
+  const statusLabel = STATUS_LABEL[status.current] || status.current;
 
   return (
     <div
@@ -105,23 +118,28 @@ export function AgendaAppointmentBlock({ appointment, onClick }: AgendaAppointme
       className={`rounded-lg border-l-4 ${cfg.bg} ${cfg.border} px-2 py-1.5 cursor-pointer
         hover:brightness-95 transition-all overflow-hidden group
         ${isOngoing ? "ring-1 ring-red-400" : ""}
+        ${isPending ? "ring-1 ring-amber-300" : ""}
+        ${isCancelled ? "opacity-60" : ""}
       `}
     >
       {/* Ligne 1 : heure + badges */}
       <div className="flex items-center justify-between gap-1">
         <span className="text-[10px] font-bold text-slate-500 shrink-0">{timeStr}</span>
         <div className="flex items-center gap-1 shrink-0">
+          {/*  Badge EN COURS spécifique */}
           {isOngoing && (
             <span className="flex items-center gap-0.5 text-[9px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full">
               <Zap size={8} className="fill-white" />
               EN COURS
             </span>
           )}
-          <span className={`flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${
-            isOngoing ? "" : STATUS_BADGE[status.current] ?? STATUS_BADGE.confirmed
-          }`}>
-            {!isOngoing && STATUS_LABEL[status.current]}
+
+          {/*  Badge de statut générique */}
+          <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${statusBadgeClass}`}>
+            {statusLabel}
           </span>
+
+          {/* Badge type */}
           <span className={`flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${cfg.badge}`}>
             {cfg.icon}
             {cfg.badgeText}
@@ -144,10 +162,18 @@ export function AgendaAppointmentBlock({ appointment, onClick }: AgendaAppointme
                 {patient?.profile.firstName?.[0]}{patient?.profile.lastName?.[0]}
               </div>
             )}
-            <span className="text-xs font-bold text-slate-800 truncate">{patientName}</span>
+            <span className={`text-xs font-bold truncate ${
+              isCancelled ? "text-slate-400 line-through" : "text-slate-800"
+            }`}>
+              {patientName}
+            </span>
           </div>
           {details.reason && (
-            <p className="text-[10px] text-slate-500 mt-0.5 truncate">{details.reason}</p>
+            <p className={`text-[10px] truncate ${
+              isCancelled ? "text-slate-400" : "text-slate-500"
+            }`}>
+              {details.reason}
+            </p>
           )}
         </>
       )}

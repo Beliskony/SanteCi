@@ -1,6 +1,6 @@
 "use client";
 
-import { Star, Video, MessageSquare, Phone, MapPin, Clock, Calendar } from "lucide-react";
+import { Star, Video, MessageSquare, Phone, MapPin, Clock } from "lucide-react";
 import type { DoctorUser } from "@/app/frontend/store/useAuthStore";
 import { useRouter } from "next/navigation";
 

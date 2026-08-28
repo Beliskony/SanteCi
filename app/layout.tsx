@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import AppShell from "./frontend/components/layouts/AppShell";
+import { CallCleanupManager } from "./frontend/components/dashboard/callComponents/CallCleanupManager";
+import { CallGlobalListener } from "./frontend/components/dashboard/callComponents/CallGlocalListener";
 
 export const metadata: Metadata = {
   title: "SanteMedCI - Votre santé, notre priorité",
@@ -34,7 +36,9 @@ export default function RootLayout({
     <html lang="en" className="h-full" >
       <body className="min-h-full flex flex-col">
         <AppShell>
+          <CallCleanupManager />
           {children}
+          <CallGlobalListener />
         </AppShell>
       </body>
     </html>

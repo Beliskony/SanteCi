@@ -131,29 +131,29 @@ export function FilterDocumentsModal({
 
           {/* Période */}
           <div>
-            <label className="text-xs font-medium text-gray-500 mb-2 block">Période</label>
+            <label className="text-xs font-medium text-gray-800 mb-2 block">Période</label>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[10px] text-gray-400 mb-1 block">Du</label>
+                <label className="text-[10px] text-gray-800 mb-1 block">Du</label>
                 <div className="relative">
                   <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                   <input
                     type="date"
                     value={dateFrom}
                     onChange={(e) => setDateFrom(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-gray-700"
                   />
                 </div>
               </div>
               <div>
-                <label className="text-[10px] text-gray-400 mb-1 block">Au</label>
+                <label className="text-[10px] text-gray-800 mb-1 block">Au</label>
                 <div className="relative">
                   <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                   <input
                     type="date"
                     value={dateTo}
                     onChange={(e) => setDateTo(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-gray-700"
                   />
                 </div>
               </div>
@@ -162,7 +162,7 @@ export function FilterDocumentsModal({
 
           {/* Médecin */}
           <div>
-            <label className="text-xs font-medium text-gray-500 mb-1 block">Médecin</label>
+            <label className="text-xs font-medium text-gray-800 mb-1 block">Médecin</label>
             <div className="relative">
               <Stethoscope className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
@@ -170,7 +170,7 @@ export function FilterDocumentsModal({
                 value={doctorName}
                 onChange={(e) => setDoctorName(e.target.value)}
                 placeholder="Nom du médecin"
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 placeholder:text-gray-700"
               />
             </div>
           </div>

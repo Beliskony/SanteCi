@@ -1,11 +1,10 @@
 "use client";
 
-import { Video, MessageSquare, Phone, MapPin, Play, FolderOpen, FileText } from "lucide-react";
+import { Video, MessageSquare, Phone, MapPin, FolderOpen, FileText } from "lucide-react";
 import type { Appointment } from "@/app/frontend/types/Appointment";
 import { isPopulatedPatient } from "@/app/frontend/types/Appointment";
 import { useAppointmentStore } from "@/app/frontend/store/appoitmentStore";
-import { useSocketStore }      from "@/app/frontend/store/soketStore";
-import { useAuthStore, isDoctor } from "@/app/frontend/store/useAuthStore";
+
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -49,14 +48,10 @@ export function ConsultationCard({
   onViewDetail,
   onMarkAbsent,
   onMessage,
-  onDossier,
 }: ConsultationCardProps) {
   const { details, status, payment, patientId, _id } = appointment;
 
-  const markNoShow    = useAppointmentStore((s) => s.markNoShow);
-  const startAppt     = useAppointmentStore((s) => s.start);
-  const initiateCall  = useSocketStore((s) => s.initiateCall);
-  const user          = useAuthStore((s) => s.user);
+  const markNoShow = useAppointmentStore((s) => s.markNoShow);
 
   const patient    = isPopulatedPatient(patientId) ? patientId : null;
   const typeCfg    = TYPE_CONFIG[details.type]    ?? TYPE_CONFIG.in_person;
@@ -75,22 +70,6 @@ export function ConsultationCard({
 
   // Étiquette patient (nouveau/suivi)
   const patientTag = getPatientTag(0); // à remplacer par totalConsultations réel
-
-  // Démarrer la consultation
-  const handleStart = async () => {
-    await startAppt(_id);
-    if (!user || !isDoctor(user) || !patient) return;
-    const doctorId = typeof user._id === "string" ? user._id : user._id;
-    if (details.type === "video" || details.type === "audio") {
-      initiateCall({
-        callerId:      doctorId,
-        callerType:    "doctor",
-        receiverId:    patient._id,
-        appointmentId: _id,
-        callType:      details.type as "video" | "audio",
-      });
-    }
-  };
 
   return (
     <div className={`bg-white border rounded-2xl overflow-hidden transition-all ${
@@ -143,20 +122,8 @@ export function ConsultationCard({
             {/* Actions selon le mode */}
             {isExpanded ? (
               <div className="flex flex-col gap-1.5 shrink-0">
-                <button
-                  onClick={handleStart}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-[#1e3a8a] text-white text-xs font-bold rounded-xl hover:bg-blue-800 transition-colors"
-                >
-                  <Play size={12} className="fill-white" />
-                  {isOngoing ? "Reprendre" : "Démarrer"}
-                </button>
-                <button
-                  onClick={() => onDossier(patient?._id ?? "")}
-                  className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 text-slate-600 text-xs font-semibold rounded-xl hover:bg-slate-50 transition-colors"
-                >
-                  <FolderOpen size={12} />
-                  Voir le dossier
-                </button>
+
+                {/* Bouton Message */}
                 <button
                   onClick={() => onMessage(patient?._id ?? "")}
                   className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 text-slate-600 text-xs font-semibold rounded-xl hover:bg-slate-50 transition-colors"
@@ -164,6 +131,15 @@ export function ConsultationCard({
                   <MessageSquare size={12} />
                   Envoyer un message
                 </button>
+                {/* Marquer Absent (si confirmé ou en cours) */}
+                {(isConfirmed || isOngoing) && (
+                  <button
+                    onClick={() => { markNoShow(_id); onMarkAbsent(_id); }}
+                    className="flex items-center gap-1.5 px-4 py-2 border border-orange-200 text-orange-500 text-xs font-semibold rounded-xl hover:bg-orange-50 transition-colors"
+                  >
+                    Marquer absent
+                  </button>
+                )}
               </div>
             ) : (
               <div className="flex items-center gap-2 shrink-0">

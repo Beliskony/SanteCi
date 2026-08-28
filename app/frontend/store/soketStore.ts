@@ -133,8 +133,13 @@ export const useSocketStore = create<SocketState>()(
 
         // Erreur technique
         socket.on("call:failed", (payload: any) => {
-          console.error("[Socket] call:failed", payload);
-          callStore.onCallFailed(payload);
+          //  Si le serveur renvoie un payload vide/malformé (ancien build,
+          // erreur non standard...), on ne perd plus l'info : au minimum on
+          // sait QUEL flux a échoué (via le state courant) au lieu d'un {}
+          // muet dans la console.
+          const message = payload?.message || "Le serveur n'a fourni aucun détail sur l'erreur (payload vide) — vérifie les logs backend.";
+          console.error("[Socket] call:failed —", message, payload);
+          callStore.onCallFailed({ message });
         });
 
         // Tokens Agora rafraîchis

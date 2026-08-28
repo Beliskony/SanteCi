@@ -42,7 +42,7 @@ interface Hospital {
     city: string;
     district: string;
     commune?: string;
-    coordinates?: { latitude: number; longitude: number }; // ✅ Rendre optionnel
+    coordinates?: { latitude: number; longitude: number }; //  Rendre optionnel
   };
   contact: {
     phoneNumbers: string[];
@@ -214,7 +214,7 @@ export default function HospitalDetailPage() {
 
   const availableServices = services?.filter((s) => s.available) ?? [];
 
-  // ✅ Vérifier si les coordonnées existent
+  //  Vérifier si les coordonnées existent
   const hasCoordinates = location?.coordinates?.latitude && location?.coordinates?.longitude;
   const mapUrl = hasCoordinates
     ? `https://www.google.com/maps?q=${location?.coordinates?.latitude},${location?.coordinates?.longitude}`

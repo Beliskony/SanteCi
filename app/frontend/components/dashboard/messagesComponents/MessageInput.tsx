@@ -12,7 +12,7 @@ interface Props {
   appointmentId?: string;
 }
 
-const EMOJI_LIST = ["😊", "👍", "🙏", "❤️", "😢", "😮", "👋", "✅", "🔥", "💊"];
+const EMOJI_LIST = ["😊", "👍", "🙏", "❤️", "😢", "😮", "👋", "", "🔥", "💊"];
 
 export default function MessageInput({ roomId, receiverId, appointmentId }: Props) {
   const [text, setText]                   = useState("");
@@ -156,17 +156,15 @@ export default function MessageInput({ roomId, receiverId, appointmentId }: Prop
 
         setUploading(true);
         try {
-          const audioBase64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload  = () => resolve((reader.result as string).split(",")[1]);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
+          const arrayBuffer = await blob.arrayBuffer();
+          const audioBase64 = btoa(
+            new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+          );
 
           const apiRes  = await fetch("/api/upload-audio", {
             method:  "POST",
             headers: { "Content-Type": "application/json" },
-            body:    JSON.stringify({ audioBase64, fileName: file.name }),
+            body:    JSON.stringify({ audioBase64, fileName: file.name, format: 'mp3', }),
           });
           const apiData = await apiRes.json();
 
@@ -185,6 +183,9 @@ export default function MessageInput({ roomId, receiverId, appointmentId }: Prop
             durationSeconds: duration,
             appointmentId,
           });
+
+          console.log(' Audio uploadé avec succès:', apiData.secure_url);
+          
         } catch (err) {
           console.error("Audio send error:", err);
           alert("Erreur lors de l'envoi du message vocal.");

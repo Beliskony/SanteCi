@@ -307,6 +307,8 @@ class NotificationService {
     };
   }
 
+  
+
   // ── Marquer comme lue ──────────────────────────────────────────────────────
 
   async markAsRead(
@@ -405,6 +407,120 @@ class NotificationService {
 
     return { deleted: result.deletedCount };
   }
+
+
+/**
+ * Notification d'appel entrant
+ * Utilisé par CallService quand un médecin appelle un patient
+ */
+async notifyIncomingCall(
+  receiverId: string,
+  receiverType: UserType,
+  callerName: string,
+  callType: 'audio' | 'video',
+  callSessionId: string,
+  appointmentId?: string
+): Promise<INotification> {
+  const callLabel = callType === 'video' ? 'Appel vidéo' : 'Appel audio';
+  const body = `${callerName} vous appelle en ${callType === 'video' ? 'visio' : 'audio'}. Décrochez dès que possible.`;
+  
+  return this.create({
+    userId: receiverId,
+    userType: receiverType,
+    type: 'call',
+    title: `${callLabel} entrant`,
+    body,
+    data: {
+      callSessionId: new Types.ObjectId(callSessionId) as any,
+      appointmentId: appointmentId ? new Types.ObjectId(appointmentId) as any : undefined,
+      callerName,
+      callType,
+    },
+    priority: 'high',
+    channels: {
+      push: true,
+      inApp: true,
+      email: false,
+      sms: false,
+    },
+  });
+}
+
+/**
+ * Notification d'appel manqué
+ * Utilisé par CallService quand un appel n'est pas répondue
+ */
+async notifyMissedCall(
+  receiverId: string,
+  receiverType: UserType,
+  callerName: string,
+  callType: 'audio' | 'video',
+  callSessionId: string,
+  appointmentId?: string
+): Promise<INotification> {
+  const callLabel = callType === 'video' ? 'Appel vidéo' : 'Appel audio';
+  const body = `Vous avez manqué un appel ${callType === 'video' ? 'vidéo' : 'audio'} de ${callerName}.`;
+  
+  return this.create({
+    userId: receiverId,
+    userType: receiverType,
+    type: 'call',
+    title: `Appel manqué`,
+    body,
+    data: {
+      callSessionId: new Types.ObjectId(callSessionId) as any,
+      appointmentId: appointmentId ? new Types.ObjectId(appointmentId) as any : undefined,
+      callerName,
+      callType,
+    },
+    priority: 'normal',
+    channels: {
+      push: true,
+      inApp: true,
+      email: false,
+      sms: false,
+    },
+  });
+}
+
+/**
+ * Notification d'appel terminé (résumé)
+ */
+async notifyCallEnded(
+  userId: string,
+  userType: UserType,
+  otherUserName: string,
+  duration: number,
+  callType: 'audio' | 'video',
+  callSessionId: string
+): Promise<INotification> {
+  const minutes = Math.floor(duration / 60);
+  const seconds = duration % 60;
+  const durationStr = minutes > 0 
+    ? `${minutes}m${seconds}s` 
+    : `${seconds}s`;
+  
+  return this.create({
+    userId,
+    userType,
+    type: 'call',
+    title: `Appel terminé`,
+    body: `Votre ${callType === 'video' ? 'visio' : 'appel audio'} avec ${otherUserName} a duré ${durationStr}.`,
+    data: {
+      callSessionId: new Types.ObjectId(callSessionId) as any,
+      duration,
+      callType,
+      otherUserName,
+    },
+    priority: 'low',
+    channels: {
+      push: true,
+      inApp: true,
+      email: false,
+      sms: false,
+    },
+  });
+}
 
   // ── Compter les non lues ───────────────────────────────────────────────────
 

@@ -13,6 +13,7 @@ import type {
   InitiatedCallPayload,
   AgoraTokens,
 } from "@/app/frontend/services/call.service";
+import { useSocketStore } from "./soketStore";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -87,6 +88,9 @@ interface CallState {
   historyLoading: boolean;
   historyTotal:   number;
 
+  // ── Paramètres de l'appel sortant en cours (avant réception des tokens) ───
+  pendingCallParams: StartCallParams | null;
+
   // ── Actions flux d'appel ──────────────────────────────────
   startCall:          (params: StartCallParams)          => void;
   onCallInitiated:    (payload: InitiatedCallPayload)    => void;
@@ -106,6 +110,24 @@ interface CallState {
   toggleCamera:  () => void;
   toggleSpeaker: () => void;
 
+    // ── Notification d'appel entrant ──────────────────────────
+  incomingCallNotification: {
+    callSessionId: string;
+    callerName: string;
+    callType: 'audio' | 'video';
+    appointmentId?: string;
+  } | null;
+  isIncomingVisible: boolean;
+
+  setIncomingCall: (payload: {
+    callSessionId: string;
+    callerName: string;
+    callType: 'audio' | 'video';
+    appointmentId?: string;
+  }) => void;
+  showIncomingCall: (show: boolean) => void;
+  hideIncomingCall: () => void;
+
   // ── Historique ────────────────────────────────────────────
   fetchHistory:       (page?: number)          => Promise<void>;
   fetchByAppointment: (appointmentId: string)  => Promise<CallSession[]>;
@@ -118,6 +140,7 @@ interface CallState {
   _startDurationTimer:   ()                     => void;
   _clearTimers:          ()                     => void;
   _scheduleTokenRefresh: (callSessionId: string) => void;
+
 }
 
 // ─── État idle réutilisable ───────────────────────────────────────────────────
@@ -133,6 +156,9 @@ const IDLE_STATE = {
   isSpeakerOn:     true,
   elapsedSeconds:  0,
   error:           null,
+  incomingCallNotification: null,
+  isIncomingVisible: false,
+  pendingCallParams: null,
 };
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
@@ -154,63 +180,115 @@ export const useCallStore = create<CallState>()(
       history:           [],
       historyLoading:    false,
       historyTotal:      0,
+      pendingCallParams: null,
 
       // ── startCall ─────────────────────────────────────────────────────────
       // Met à jour la phase — l'émission socket se fait dans le composant
-      startCall: (_params: StartCallParams) => {
-        set({ phase: "calling", error: null });
+      startCall: (params: StartCallParams) => {
+        set({ phase: "calling", error: null, pendingCallParams: params });
       },
 
-      // ── onCallInitiated ───────────────────────────────────────────────────
-      // Reçu par le CALLER via socket call:initiated
-      onCallInitiated: (payload: InitiatedCallPayload) => {
-        set({
-          phase: "calling",
-          agoraTokens: {
-            channelName:   payload.channelName,
-            callerToken:   payload.token,
-            receiverToken: "",
-            callerUid:     payload.uid,
-            receiverUid:   0,
-            appId:         payload.appId,
-          },
-          myUid: payload.uid,
-          error: null,
-        });
-        get()._scheduleTokenRefresh(payload.callSessionId);
-      },
 
-      // ── onIncomingCall ────────────────────────────────────────────────────
-      // Reçu par le RECEIVER via socket call:incoming
-      onIncomingCall: (payload: IncomingCallPayload) => {
-        set({
-          phase:           "ringing",
-          incomingPayload: payload,
-          agoraTokens: {
-            channelName:   payload.channelName,
-            callerToken:   "",
-            receiverToken: payload.token,
-            callerUid:     0,
-            receiverUid:   payload.uid,
-            appId:         payload.appId,
-          },
-          myUid: payload.uid,
-          error: null,
-        });
-      },
+// ── onCallInitiated ────────────────────────────────────────────────────
+// Reçu par le CALLER juste après call:initiate : contient les tokens Agora.
+// ⚠️ Manquait entièrement dans l'implémentation (déclarée dans l'interface
+// seulement) — c'est ce qui provoquait le crash "onCallInitiated is not a function".
+onCallInitiated: (payload: InitiatedCallPayload) => {
+  console.log('[CallStore] 📤 onCallInitiated:', payload);
+  const { pendingCallParams } = get();
 
-      // ── acceptCall ────────────────────────────────────────────────────────
-      acceptCall: async () => {
-        const { incomingPayload } = get();
-        if (!incomingPayload) return;
-        try {
-          set({ phase: "connecting" });
-          const session = await callService.accept(incomingPayload.callSessionId);
-          set({ session });
-        } catch (err) {
-          set({ error: toMessage(err), phase: "failed" });
-        }
+  set({
+    phase: "calling",
+    agoraTokens: {
+      channelName:   payload.channelName,
+      callerToken:   payload.token,
+      receiverToken: "",
+      callerUid:     payload.uid,
+      receiverUid:   0,
+      appId:         payload.appId,
+    },
+    myUid: payload.uid,
+    error: null,
+    //  Session minimale : indispensable pour que endCall() (côté caller)
+    // sache appeler l'API + le socket au lieu de juste réinitialiser l'UI
+    // locale en laissant l'appel "ouvert" côté serveur.
+    session: pendingCallParams ? ({
+      _id:           payload.callSessionId,
+      callerId:      pendingCallParams.callerId,
+      callerType:    pendingCallParams.callerType,
+      receiverId:    pendingCallParams.receiverId,
+      receiverType:  pendingCallParams.callerType === "doctor" ? "patient" : "doctor",
+      appointmentId: pendingCallParams.appointmentId,
+      callType:      pendingCallParams.callType,
+      status:        "initiated",
+      agora: {
+        channelName:   payload.channelName,
+        callerToken:   payload.token,
+        receiverToken: "",
+        callerUid:     payload.uid,
+        receiverUid:   0,
+        appId:         payload.appId,
       },
+      timing: { initiatedAt: new Date().toISOString() },
+      metadata: { createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    } as CallSession) : null,
+  });
+},
+
+// ── onIncomingCall ────────────────────────────────────────────────────
+onIncomingCall: (payload: IncomingCallPayload) => {
+  console.log('[CallStore] 📞 onIncomingCall:', payload);
+  
+  set({
+    phase: "ringing",
+    incomingPayload: payload,
+    agoraTokens: {
+      channelName:   payload.channelName,
+      callerToken:   "",
+      receiverToken: payload.token,
+      callerUid:     0,
+      receiverUid:   payload.uid,
+      appId:         payload.appId,
+    },
+    myUid: payload.uid,
+    error: null,
+    // Ajouter la notification ici directement
+    incomingCallNotification: {
+      callSessionId: payload.callSessionId,
+      callerName: payload.callerName || 'Appelant',
+      callType: payload.callType,
+      appointmentId: payload.appointmentId,
+    },
+    isIncomingVisible: true,
+  });
+},
+
+// ── setIncomingCall ──────────────────────────────────────────────────
+setIncomingCall: (payload) => {
+  console.log('[CallStore] 📞 setIncomingCall:', payload);
+  set({ 
+    incomingCallNotification: payload,
+    isIncomingVisible: true,
+    //  Ne pas dupliquer phase ici
+  });
+},
+
+// ── acceptCall ────────────────────────────────────────────────────────
+acceptCall: async () => {
+  const { incomingPayload } = get();
+  if (!incomingPayload) return;
+  try {
+    set({ phase: "connecting" });
+    const session = await callService.accept(incomingPayload.callSessionId);
+    set({ 
+      session,
+      isIncomingVisible: false,
+      incomingCallNotification: null,
+    });
+  } catch (err) {
+    set({ error: toMessage(err), phase: "failed" });
+  }
+},
 
       // ── declineCall ───────────────────────────────────────────────────────
       declineCall: async (reason?: string) => {
@@ -243,19 +321,50 @@ export const useCallStore = create<CallState>()(
       },
 
       // ── endCall ───────────────────────────────────────────────────────────
-      endCall: async () => {
-        const { session, phase } = get();
-        get()._clearTimers();
-        if (!session) { set({ ...IDLE_STATE }); return; }
-        const endedBy = phase === "calling" ? "caller" : "receiver";
-        try {
-          await callService.end(session._id, endedBy);
-        } catch {
-          // silencieux
-        } finally {
-          set({ ...IDLE_STATE });
-        }
-      },
+// useCallStore.ts
+endCall: async () => {
+  const { session, phase } = get();
+  get()._clearTimers();
+  
+  if (!session) { 
+    set({ ...IDLE_STATE }); 
+    return; 
+  }
+  
+  const endedBy = phase === "calling" ? "caller" : "receiver";
+  
+  try {
+    // 1. Appel API
+    await callService.end(session._id, endedBy);
+    
+    // 2. Émettre via Socket
+    useSocketStore.getState().endCall(session._id, session.callerId, endedBy);
+    
+    // 3. Mettre à jour le state
+    set({ ...IDLE_STATE, phase: "ended", elapsedSeconds: get().elapsedSeconds });
+    
+    setTimeout(() => set({ phase: "idle", elapsedSeconds: 0 }), 4000);
+  } catch (err) {
+    set({ error: toMessage(err), phase: "failed" });
+  }
+},
+
+// ── Gestion notification d'appel entrant ──────────────────────────────────
+
+showIncomingCall: (show) => {
+  console.log('[CallStore]  showIncomingCall:', show);
+  set({ isIncomingVisible: show });
+},
+
+hideIncomingCall: () => {
+  console.log('[CallStore]  hideIncomingCall appelé');
+  const currentPhase = get().phase;
+  set({ 
+    isIncomingVisible: false,
+    incomingCallNotification: null,
+    phase: currentPhase === 'ringing' ? 'idle' : currentPhase,
+  });
+},
 
       // ── onCallEnded ───────────────────────────────────────────────────────
       onCallEnded: (payload: CallEndedPayload) => {
@@ -352,6 +461,7 @@ export const useCallStore = create<CallState>()(
         }, 50 * 60 * 1000); // 50 minutes
         set({ tokenRefreshTimer: timer });
       },
+
     }),
     { name: "CallStore" }
   )

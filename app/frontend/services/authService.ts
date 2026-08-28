@@ -423,12 +423,11 @@ export const authService = {
     newPassword: string,
     role: "doctor" | "patient"
   ): Promise<{ message: string }> {
-    // 1. Vérifier l'OTP
-    await authService.verifyOtp(email, otp, role);
+
     // 2. Changer le mot de passe
     const res = await api.post<{ message: string }>(
       "/password/change-password",
-      { email, newPassword, role },
+      { email, otp, newPassword, role },
       false
     );
     return res;

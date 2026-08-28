@@ -233,10 +233,10 @@ async updateMyProfile(data: Partial<DoctorProfile>): Promise<DoctorUser> {
 
   const updatedDoctor = res.data;
   
-  // ✅ Mettre à jour le store
+  //  Mettre à jour le store
   useAuthStore.getState().updateDoctorProfile(updatedDoctor.profile);
   
-  // ✅ Vérifier que le store est bien mis à jour
+  //  Vérifier que le store est bien mis à jour
   const updatedUser = useAuthStore.getState().user;
   console.log("👤 Store après mise à jour:", updatedUser?.profile);
   

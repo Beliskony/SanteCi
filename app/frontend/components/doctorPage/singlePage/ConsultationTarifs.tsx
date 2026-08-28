@@ -1,4 +1,4 @@
-import { Video, UserRound } from "lucide-react"
+import { Video } from "lucide-react"
 import type { DoctorUser } from "@/app/frontend/store/useAuthStore"
 
 interface ConsultationTarifsProps {

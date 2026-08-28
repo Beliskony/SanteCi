@@ -194,6 +194,8 @@ async uploadPhoto(file: File): Promise<{ photoUrl: string }> {
     return res.data;
   },
 
+
+
   // ── deleteAccount ─────────────────────────────────────────────────────────
   async deleteAccount(): Promise<{ message: string }> {
     const res = await api.del<ApiResponse<{ message: string }>>(

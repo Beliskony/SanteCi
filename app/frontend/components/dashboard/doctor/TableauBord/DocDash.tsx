@@ -8,7 +8,7 @@ import { useNotificationStore }   from "@/app/frontend/store/otherStore";
 import { DoctorStatsCards }       from "./DoctorStatsCards";
 import { NextConsultations }      from "./NextConsultations";
 import { UnreadMessages }         from "./UnreadMessages";
-import { OpenSlotsModal } from "../../../modals/OpenSlotsModal";
+
 
 interface DocDashProps {
   onNavigate?: (page: string) => void; // pour changer de section dans DocSideBar

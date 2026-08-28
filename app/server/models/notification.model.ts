@@ -4,7 +4,7 @@ import { INotification } from '../interfaces/notification.interface';
 const NotificationSchema: Schema = new Schema({
   userId: { type: Schema.Types.ObjectId, required: true, refPath: 'userType' },
   userType: { type: String, enum: ['patient', 'doctor'], required: true },
-  type: { type: String, enum: ['appointment', 'prescription', 'message', 'reminder', 'payment', 'system', 'emergency'], required: true },
+  type: { type: String, enum: ['appointment', 'prescription', 'message', 'reminder', 'payment', 'system', 'emergency', 'call'], required: true },
   title: { type: String, required: true },
   body: { type: String, required: true },
   data: {
@@ -13,6 +13,12 @@ const NotificationSchema: Schema = new Schema({
     doctorId: { type: Schema.Types.ObjectId, ref: 'Doctor' },
     patientId: { type: Schema.Types.ObjectId, ref: 'Patient' },
     url: { type: String },
+
+    callSessionId: { type: Schema.Types.ObjectId, ref: 'CallSession' },
+    callerName: { type: String },
+    callType: { type: String, enum: ['audio', 'video'] },
+    duration: { type: Number },
+    otherUserName: { type: String },
   },
   channels: {
     push: { type: Boolean, default: true },

@@ -350,10 +350,10 @@ async getMyPrescriptions(
   patientId: string,
   params: { page?: number; limit?: number }
 ): Promise<{
-  prescriptions: IPrescription[];
+  data: IPrescription[];
   total: number;
   page: number;
-  pages: number;
+  totalPages: number;
 }> {
   const { page = 1, limit = 10 } = params;
   const skip = (page - 1) * limit;
@@ -361,15 +361,15 @@ async getMyPrescriptions(
   const query = { patientId: new Types.ObjectId(patientId) };
   const total = await Prescription.countDocuments(query);
 
-  const prescriptions = await Prescription.find(query)
-    .populate('doctorId',     'profile.firstName profile.lastName profile.title profile.specialty')
-    .populate('appointmentId','details.scheduledFor details.type details.reason')
+  const data = await Prescription.find(query)
+    .populate('doctorId', 'profile.firstName profile.lastName profile.title profile.specialty')
+    .populate('appointmentId', 'details.scheduledFor details.type details.reason')
     .sort({ 'metadata.createdAt': -1 })
     .skip(skip)
     .limit(limit)
     .lean();
 
-  return { prescriptions, total, page, pages: Math.ceil(total / limit) };
+  return { data, total, page, totalPages: Math.ceil(total / limit) };
 }
 
 // ── Get prescription by ID ─────────────────────────────────────────────────────

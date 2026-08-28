@@ -274,6 +274,11 @@ interface AuthState {
   logout: () => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
+    // ── Mot de passe oublié ──────────────────────────────────
+  forgotPassword: (email: string, role: "doctor" | "patient") => Promise<void>;
+  verifyOtp: (email: string, otp: string, role: "doctor" | "patient") => Promise<void>;
+  resetPassword: (email: string, otp: string, newPassword: string, role: "doctor" | "patient") => Promise<void>;
+  resendOtp: (email: string, role: "doctor" | "patient") => Promise<void>;
 }
 
 // ─────────────────────────────────────────────
@@ -323,6 +328,73 @@ export const useAuthStore = create<AuthState>()(
           if (!user || !isDoctor(user)) return;
           set({ user: { ...user, status: { ...user.status, isOnline } } });
         },
+
+                // ── Mot de passe oublié ──────────────────────────────────────────────
+
+        /**
+         * Envoie un OTP pour la réinitialisation du mot de passe
+         */
+        forgotPassword: async (email: string, role: "doctor" | "patient") => {
+          set({ isLoading: true, error: null });
+          try {
+            const { authService } = await import("@/app/frontend/services/authService");
+            await authService.sendOtp(email, role);
+            set({ isLoading: false });
+          } catch (err) {
+            const message = err instanceof Error ? err.message : "Erreur lors de l'envoi du code";
+            set({ error: message, isLoading: false });
+            throw err;
+          }
+        },
+
+        /**
+         * Vérifie l'OTP reçu par email
+         */
+        verifyOtp: async (email: string, otp: string, role: "doctor" | "patient") => {
+          set({ isLoading: true, error: null });
+          try {
+            const { authService } = await import("@/app/frontend/services/authService");
+            await authService.verifyOtp(email, otp, role);
+            set({ isLoading: false });
+          } catch (err) {
+            const message = err instanceof Error ? err.message : "Code OTP invalide ou expiré";
+            set({ error: message, isLoading: false });
+            throw err;
+          }
+        },
+
+        /**
+         * Réinitialise le mot de passe après vérification OTP
+         */
+        resetPassword: async (email: string, otp: string, newPassword: string, role: "doctor" | "patient") => {
+          set({ isLoading: true, error: null });
+          try {
+            const { authService } = await import("@/app/frontend/services/authService");
+            await authService.resetPassword(email, otp, newPassword, role);
+            set({ isLoading: false });
+          } catch (err) {
+            const message = err instanceof Error ? err.message : "Erreur lors de la réinitialisation";
+            set({ error: message, isLoading: false });
+            throw err;
+          }
+        },
+
+        /**
+         * Renvoie un nouvel OTP
+         */
+        resendOtp: async (email: string, role: "doctor" | "patient") => {
+          set({ isLoading: true, error: null });
+          try {
+            const { authService } = await import("@/app/frontend/services/authService");
+            await authService.sendOtp(email, role);
+            set({ isLoading: false });
+          } catch (err) {
+            const message = err instanceof Error ? err.message : "Erreur lors du renvoi du code";
+            set({ error: message, isLoading: false });
+            throw err;
+          }
+        },
+        
 
         updateTelemedicine: (data) => {
           const { user } = get();

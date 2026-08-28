@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { Download } from "lucide-react";
 import { useDoctorPerformanceStore } from "@/app/frontend/store/useDoctorPatientsStore";
 import { PerformanceStatsCards } from "./PerformanceStatsCards";
 import { MonthlyEvolutionChart } from "./MonthlyEvolutionChart";

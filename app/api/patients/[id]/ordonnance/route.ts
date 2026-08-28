@@ -35,7 +35,13 @@ export async function GET(
 
     const result = await patientService.getMyPrescriptions(id, { page, limit });
 
-    return NextResponse.json({ success: true, ...result });
+    return NextResponse.json({
+      success: true,
+      data: result.data,
+      total: result.total,
+      page: result.page,
+      totalPages: result.totalPages,
+    });
 
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur serveur.';

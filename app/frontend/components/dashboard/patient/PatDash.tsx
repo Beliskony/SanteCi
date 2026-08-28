@@ -1,3 +1,4 @@
+// app/frontend/components/dashboard/patient/PatDash.tsx
 "use client";
 
 import { useEffect, useMemo } from "react";
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 import { useAuthStore, isPatient } from "@/app/frontend/store/useAuthStore";
 import { useAppointmentStore } from "@/app/frontend/store/appoitmentStore";
+import { usePatientStore } from "@/app/frontend/store/patientStore";
 import { isPopulatedDoctor } from "@/app/frontend/types/Appointment";
 
 // ─── PatDash ──────────────────────────────────────────────────
@@ -31,6 +33,12 @@ const PatDash = () => {
   const fetchList    = useAppointmentStore((s) => s.fetchList);
   const getByStatus  = useAppointmentStore((s) => s.getByStatus);
 
+  //  Store des patients
+  const prescriptions = usePatientStore((s) => s.prescriptions);
+  const isLoadingPrescriptions = usePatientStore((s) => s.isLoading);
+  const fetchPrescriptions = usePatientStore((s) => s.fetchPrescriptions);
+  const fetchStats = usePatientStore((s) => s.fetchStats);
+
   const patientId = useMemo(() => {
     if (!user || !isPatient(user)) return undefined;
     const raw = user._id;
@@ -43,9 +51,12 @@ const PatDash = () => {
   // ─── Récupérer TOUS les rendez-vous ──────────────────────────────────────
   useEffect(() => {
     if (!patientId) return;
-    // Supprimer le filtre status pour avoir tous les rendez-vous
     fetchList({ patientId, limit: 10 });
-  }, [patientId, fetchList]);
+    //  Récupérer les prescriptions
+    fetchPrescriptions(patientId, 1, 10);
+    //  Récupérer les stats
+    fetchStats();
+  }, [patientId, fetchList, fetchPrescriptions, fetchStats]);
 
   // ─── Filtrer par statut ──────────────────────────────────────────────────
   const pending   = useMemo(() => getByStatus("pending"), [appointments, getByStatus]);
@@ -205,12 +216,6 @@ const PatDash = () => {
                 )}
               </div>
 
-              <button
-                onClick={() => router.push(`/patient/rdv`)}
-                className="w-full bg-white/20 hover:bg-white/30 text-white text-sm font-medium py-2 rounded-xl transition-colors"
-              >
-                Voir les détails
-              </button>
             </div>
           </div>
         ) : (
@@ -226,6 +231,13 @@ const PatDash = () => {
             </button>
           </div>
         )}
+
+        {/*  Documents & Ordonnances - avec le store 
+        <DocumentsCard 
+          appointments={appointments}
+          prescriptions={prescriptions}
+          isLoading={isLoading || isLoadingPrescriptions}
+        /> */}
 
         {/* Cards santé */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

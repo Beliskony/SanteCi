@@ -1,19 +1,19 @@
 "use client";
 
-import { Download, Share2, Clock } from "lucide-react";
+import { Clock } from "lucide-react";
 
 interface DossierHeaderProps {
   patientName: string;
   lastUpdated: string; // ex: "12 Octobre 2023"
-  onExport?: () => void;
-  onShare?: () => void;
+  //onExport?: () => void;
+  //onShare?: () => void;
 }
 
 export function DossierHeader({
   patientName,
   lastUpdated,
-  onExport,
-  onShare,
+  //onExport,
+  //onShare,
 }: DossierHeaderProps) {
   return (
     <div className="flex items-start justify-between flex-wrap gap-3 mb-6">
@@ -27,22 +27,6 @@ export function DossierHeader({
         </div>
       </div>
 
-      <div className="flex gap-2">
-        <button
-          onClick={onExport}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          <Download className="w-3.5 h-3.5" />
-          Exporter (PDF)
-        </button>
-        <button
-          onClick={onShare}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Share2 className="w-3.5 h-3.5" />
-          Partager
-        </button>
-      </div>
     </div>
   );
 }

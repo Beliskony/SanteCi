@@ -1,21 +1,28 @@
 "use client";
 
-import { useState } from "react";
-import { Folder, Filter, Upload, Download, FileText, Activity, File } from "lucide-react";
-import { useAppointmentStore } from "@/app/frontend/store/appoitmentStore";
+import { useState, useMemo } from "react";
+import { Folder, Filter, Upload, Eye, X, FileText, Activity, File, FileBadge } from "lucide-react";
 import {
   isPopulatedDoctor,
   type Appointment,
 } from "@/app/frontend/types/Appointment";
 import { FilterDocumentsModal, type DocumentFilters } from "../../../modals/FilterDocumentsModal";
 import { UploadDocumentModal } from "../../../modals/UploadDocumentModal";
+import type { Prescription } from "@/app/frontend/services/prescriptionService";
 
 interface DocumentsCardProps {
-  onDownload?: (appointment: Appointment) => void;
+  appointments?: Appointment[];
+  prescriptions?: Prescription[];
+  isLoading?: boolean;
   onViewAll?: () => void;
 }
 
 type DocType = "Ordonnance" | "Analyse" | "Certificat";
+
+type ViewingItem =
+  | { kind: "prescription"; data: Prescription }
+  | { kind: "appointment"; data: Appointment }
+  | null;
 
 function getDocType(a: Appointment): DocType {
   const text = [a.details.reason, a.consultation.diagnosis ?? "", a.consultation.notes ?? ""]
@@ -40,6 +47,7 @@ function DocIcon({ type }: { type: DocType }) {
 }
 
 function formatDate(dateStr: string | Date): string {
+  if (!dateStr) return "—";
   return new Date(dateStr).toLocaleDateString("fr-FR", {
     day: "2-digit",
     month: "short",
@@ -60,36 +68,195 @@ function doctorLabel(a: Appointment): string {
   return `Dr. #${String(a.doctorId).slice(-4)}`;
 }
 
-export function DocumentsCard({ onDownload, onViewAll }: DocumentsCardProps) {
+//  Le doctorId de la prescription est déjà peuplé par le backend
+function prescriptionDoctorLabel(p: Prescription): string {
+  if (typeof p.doctorId === "object" && p.doctorId !== null) {
+    const d = p.doctorId.profile;
+    return `${d.title ?? "Dr."} ${d.firstName, d.lastName}`;
+  }
+  return `Dr. #${String(p.doctorId).slice(-6)}`;
+}
+
+// ─── Contenu du modal — ordonnance ─────────────────────────────────────────
+
+function PrescriptionView({
+  prescription: p,
+  onClose,
+}: {
+  prescription: Prescription;
+  onClose: () => void;
+}) {
+  const doctorName = prescriptionDoctorLabel(p);
+
+  return (
+    <div>
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <p className="text-xs text-amber-600 font-semibold mb-1">Ordonnance</p>
+          <h3 className="text-lg font-bold text-gray-900">Ordonnance du {formatDate(p.date)}</h3>
+          <p className="text-xs text-gray-400 mt-0.5">{doctorName}</p>
+        </div>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      <div className="mb-4">
+        <p className="text-xs text-gray-400 mb-1">Diagnostic</p>
+        <p className="text-sm text-gray-800">{p.diagnosis}</p>
+      </div>
+
+      <div className="mb-4">
+        <p className="text-xs text-gray-400 mb-2">Médicaments</p>
+        <div className="flex flex-col gap-2">
+          {p.medications.map((m, i) => (
+            <div key={i} className="bg-gray-50 rounded-lg p-3">
+              <p className="text-sm font-semibold text-gray-800">{m.name} — {m.dosage}</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {m.frequency} · {m.duration} · {m.quantity} {m.unit}
+              </p>
+              {m.instructions && (
+                <p className="text-xs text-gray-500 mt-0.5">{m.instructions}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {p.testsRequested && p.testsRequested.length > 0 && (
+        <div className="mb-4">
+          <p className="text-xs text-gray-400 mb-2">Examens demandés</p>
+          <div className="flex flex-col gap-2">
+            {p.testsRequested.map((t, i) => (
+              <div key={i} className="bg-gray-50 rounded-lg p-3">
+                <p className="text-sm font-semibold text-gray-800">{t.type}</p>
+                {t.laboratory && <p className="text-xs text-gray-500">{t.laboratory}</p>}
+                {t.instructions && <p className="text-xs text-gray-500">{t.instructions}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {p.notes && (
+        <div className="mb-4">
+          <p className="text-xs text-gray-400 mb-1">Notes</p>
+          <p className="text-sm text-gray-700">{p.notes}</p>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 pt-3 border-t border-gray-100 text-xs text-gray-400">
+        <span>Validité : {p.validityDays} jours</span>
+        <span>·</span>
+        <span className="capitalize">{p.status}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Contenu du modal — document de rendez-vous ────────────────────────────
+
+function AppointmentDocView({
+  appointment: a,
+  onClose,
+}: {
+  appointment: Appointment;
+  onClose: () => void;
+}) {
+  const type = getDocType(a);
+
+  return (
+    <div>
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <p className={`text-xs font-semibold mb-1 ${TYPE_STYLE[type].split(" ")[1]}`}>{type}</p>
+          <h3 className="text-lg font-bold text-gray-900">{a.details.reason}</h3>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {doctorLabel(a)} · {formatDate(a.details.scheduledFor)}
+          </p>
+        </div>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      {a.consultation.diagnosis && (
+        <div className="mb-4">
+          <p className="text-xs text-gray-400 mb-1">Diagnostic</p>
+          <p className="text-sm text-gray-800">{a.consultation.diagnosis}</p>
+        </div>
+      )}
+
+      {a.consultation.notes && (
+        <div className="mb-4">
+          <p className="text-xs text-gray-400 mb-1">Notes de consultation</p>
+          <p className="text-sm text-gray-700">{a.consultation.notes}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Composant principal ────────────────────────────────────────────────────
+
+export function DocumentsCard({
+  appointments = [],
+  prescriptions = [],
+  isLoading = false,
+  onViewAll
+}: DocumentsCardProps) {
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [filters, setFilters] = useState<DocumentFilters>({ types: [] });
+  const [viewingItem, setViewingItem] = useState<ViewingItem>(null);
 
-  const isLoading = useAppointmentStore((s) => s.isLoading);
-  const appointments = useAppointmentStore((s) => s.appointments);
-
-  let withDocs = appointments.filter(
-    (a) =>
-      a.status.current === "completed" &&
-      (a.consultation.prescriptionId || a.communication.sharedDocuments.length > 0)
-  );
-
-  if (filters.types.length > 0) {
-    withDocs = withDocs.filter((a) => filters.types.includes(getDocType(a)));
-  }
-  if (filters.dateFrom) {
-    withDocs = withDocs.filter((a) => new Date(a.details.scheduledFor) >= filters.dateFrom!);
-  }
-  if (filters.dateTo) {
-    withDocs = withDocs.filter((a) => new Date(a.details.scheduledFor) <= filters.dateTo!);
-  }
-  if (filters.doctorName) {
-    withDocs = withDocs.filter((a) =>
-      doctorLabel(a).toLowerCase().includes(filters.doctorName!.toLowerCase())
+  const appointmentsWithDocs = useMemo(() => {
+    return appointments.filter(
+      (a) =>
+        a.status.current === "completed" &&
+        (a.consultation.prescriptionId || a.communication.sharedDocuments.length > 0)
     );
-  }
+  }, [appointments]);
 
-  const preview = withDocs.slice(0, 3);
+  const filteredAppointments = useMemo(() => {
+    let result = appointmentsWithDocs;
+    if (filters.types.length > 0) {
+      result = result.filter((a) => filters.types.includes(getDocType(a)));
+    }
+    if (filters.dateFrom) {
+      result = result.filter((a) => new Date(a.details.scheduledFor) >= filters.dateFrom!);
+    }
+    if (filters.dateTo) {
+      result = result.filter((a) => new Date(a.details.scheduledFor) <= filters.dateTo!);
+    }
+    if (filters.doctorName) {
+      result = result.filter((a) =>
+        doctorLabel(a).toLowerCase().includes(filters.doctorName!.toLowerCase())
+      );
+    }
+    return result;
+  }, [appointmentsWithDocs, filters]);
+
+  const filteredPrescriptions = useMemo(() => {
+    let result = prescriptions;
+    if (filters.dateFrom) {
+      result = result.filter((p) => new Date(p.date) >= filters.dateFrom!);
+    }
+    if (filters.dateTo) {
+      result = result.filter((p) => new Date(p.date) <= filters.dateTo!);
+    }
+    if (filters.doctorName) {
+      result = result.filter((p) =>
+        prescriptionDoctorLabel(p).toLowerCase().includes(filters.doctorName!.toLowerCase())
+      );
+    }
+    return result;
+  }, [prescriptions, filters]);
+
+  const previewAppointments = filteredAppointments.slice(0, 3);
+  const previewPrescriptions = filteredPrescriptions.slice(0, 3);
+  const hasDocuments = filteredAppointments.length > 0 || filteredPrescriptions.length > 0;
+  const totalDocuments = filteredAppointments.length + filteredPrescriptions.length;
 
   const handleUpload = async (file: File, type: string, date: Date, notes?: string) => {
     console.log("Upload document:", { file, type, date, notes });
@@ -102,6 +269,11 @@ export function DocumentsCard({ onDownload, onViewAll }: DocumentsCardProps) {
           <div className="flex items-center gap-2">
             <Folder className="w-4 h-4 text-gray-400" />
             <span className="text-sm font-medium text-gray-800">Documents & Ordonnances</span>
+            {prescriptions.length > 0 && (
+              <span className="text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded-full">
+                {prescriptions.length}
+              </span>
+            )}
           </div>
           <div className="flex gap-2">
             <button
@@ -128,7 +300,7 @@ export function DocumentsCard({ onDownload, onViewAll }: DocumentsCardProps) {
 
         {isLoading ? (
           <p className="text-xs text-gray-400">Chargement…</p>
-        ) : preview.length === 0 ? (
+        ) : !hasDocuments ? (
           <p className="text-xs text-gray-400">Aucun document disponible</p>
         ) : (
           <table className="w-full text-xs">
@@ -142,7 +314,42 @@ export function DocumentsCard({ onDownload, onViewAll }: DocumentsCardProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {preview.map((a) => {
+              {previewPrescriptions.map((p) => {
+                const doctorName = prescriptionDoctorLabel(p);
+                return (
+                  <tr key={p._id}>
+                    <td className="py-2.5 pr-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileBadge className="w-3.5 h-3.5 text-amber-500" />
+                        <span className="truncate text-gray-700 max-w-30">
+                          Ordonnance du {formatDate(p.date)}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-2.5 pr-2">
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700">
+                        Ordonnance
+                      </span>
+                    </td>
+                    <td className="py-2.5 pr-2 text-gray-500 whitespace-nowrap">
+                      {formatDate(p.date)}
+                    </td>
+                    <td className="py-2.5 pr-2 text-gray-500 truncate max-w-20">
+                      {doctorName}
+                    </td>
+                    <td className="py-2.5">
+                      <button
+                        onClick={() => setViewingItem({ kind: "prescription", data: p })}
+                        className="text-gray-400 hover:text-blue-600 transition-colors"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {previewAppointments.map((a) => {
                 const type = getDocType(a);
                 return (
                   <tr key={a._id}>
@@ -165,10 +372,10 @@ export function DocumentsCard({ onDownload, onViewAll }: DocumentsCardProps) {
                     </td>
                     <td className="py-2.5">
                       <button
-                        onClick={() => onDownload?.(a)}
+                        onClick={() => setViewingItem({ kind: "appointment", data: a })}
                         className="text-gray-400 hover:text-blue-600 transition-colors"
                       >
-                        <Download className="w-4 h-4" />
+                        <Eye className="w-4 h-4" />
                       </button>
                     </td>
                   </tr>
@@ -178,13 +385,13 @@ export function DocumentsCard({ onDownload, onViewAll }: DocumentsCardProps) {
           </table>
         )}
 
-        {withDocs.length > 3 && (
+        {totalDocuments > 6 && (
           <div className="mt-4 text-center border-t border-gray-100 pt-3">
             <button
               onClick={onViewAll}
               className="text-xs text-blue-600 hover:text-blue-800 transition-colors"
             >
-              Voir tous les documents ({withDocs.length})
+              Voir tous les documents ({totalDocuments})
             </button>
           </div>
         )}
@@ -202,6 +409,30 @@ export function DocumentsCard({ onDownload, onViewAll }: DocumentsCardProps) {
         onClose={() => setIsUploadModalOpen(false)}
         onUpload={handleUpload}
       />
+
+      {viewingItem && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setViewingItem(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {viewingItem.kind === "prescription" ? (
+              <PrescriptionView
+                prescription={viewingItem.data}
+                onClose={() => setViewingItem(null)}
+              />
+            ) : (
+              <AppointmentDocView
+                appointment={viewingItem.data}
+                onClose={() => setViewingItem(null)}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }

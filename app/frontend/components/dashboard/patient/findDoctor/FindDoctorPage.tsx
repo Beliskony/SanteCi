@@ -60,7 +60,7 @@ export default function FindDoctorPage() {
   const [activeSpecialty, setActiveSpecialty] = useState("");
 
   useEffect(() => {
-    fetchDoctors({ city: "Abidjan", limit: 9, page: 1 });
+    fetchDoctors({ city: "", limit: 9, page: 1 });
   }, [fetchDoctors]);
 
   const handleSearch = useCallback((filters: DoctorFilters) => {

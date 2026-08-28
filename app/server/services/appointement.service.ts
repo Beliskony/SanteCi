@@ -361,7 +361,7 @@ class AppointmentService {
     const appointment = await Appointment.findById(appointmentId);
     if (!appointment) throw new Error('Rendez-vous introuvable.');
 
-    const cancellableStatuses: AppointmentStatus[] = ['pending', 'confirmed'];
+    const cancellableStatuses: AppointmentStatus[] = ['pending', 'confirmed', 'no_show'];
     if (!cancellableStatuses.includes(appointment.status.current)) {
       throw new Error(`Impossible d'annuler un rendez-vous en statut "${appointment.status.current}".`);
     }
@@ -468,16 +468,29 @@ class AppointmentService {
       paidAt?: Date;
     }
   ): Promise<IAppointment> {
+    //  On lit d'abord le RDV pour connaître son statut actuel — indispensable
+    // pour décider si status.current doit avancer suite au paiement.
+    const existing = await Appointment.findById(appointmentId).select('status.current');
+    if (!existing) throw new Error('Rendez-vous introuvable.');
+
+    const setFields: Record<string, unknown> = {
+      'status.paymentStatus': data.paymentStatus,
+      ...(data.transactionId && { 'payment.transactionId': data.transactionId }),
+      ...(data.paidAt && { 'payment.paidAt': data.paidAt }),
+      'metadata.updatedAt': new Date(),
+    };
+
+    //  Même correctif que PaymentService.confirm()/simulateDev() : un
+    // paiement qui passe à "paid" fait avancer automatiquement le RDV de
+    // "pending" à "confirmed", plutôt que de laisser paymentStatus et
+    // status.current désynchronisés.
+    if (data.paymentStatus === 'paid' && existing.status.current === 'pending') {
+      setFields['status.current'] = 'confirmed';
+    }
+
     const appointment = await Appointment.findByIdAndUpdate(
       appointmentId,
-      {
-        $set: {
-          'status.paymentStatus': data.paymentStatus,
-          ...(data.transactionId && { 'payment.transactionId': data.transactionId }),
-          ...(data.paidAt && { 'payment.paidAt': data.paidAt }),
-          'metadata.updatedAt': new Date(),
-        },
-      },
+      { $set: setFields },
       { new: true }
     );
 

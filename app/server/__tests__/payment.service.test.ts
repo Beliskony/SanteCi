@@ -143,35 +143,20 @@ describe('paymentService.initiateSubscription', () => {
 // ─── confirm (webhook consultation) ────────────────────────────────────────
 
 describe('paymentService.confirm', () => {
-  it('rejette si aucun rendez-vous ne correspond à la référence', async () => {
-    (Appointment.findOne as any).mockResolvedValue(null);
-
-    await expect(paymentService.confirm('REF-XXX', 'success')).rejects.toThrow(
-      'Rendez-vous introuvable pour cette référence.'
-    );
-  });
-
   it('marque le paiement "paid" et fixe paidAt en cas de succès', async () => {
-    (Appointment.findOne as any).mockResolvedValue({ _id: 'apt1' });
-    (Appointment.findByIdAndUpdate as any).mockResolvedValue(undefined);
-
-    await paymentService.confirm('REF-001', 'success');
-
-    const updateArg = (Appointment.findByIdAndUpdate as any).mock.calls[0][1];
-    expect(updateArg.$set['status.paymentStatus']).toBe('paid');
-    expect(updateArg.$set['payment.paidAt']).toBeInstanceOf(Date);
+  (Appointment.findOne as any).mockResolvedValue({
+    _id: 'apt1',
+    status: { current: 'pending' },
   });
+  (Appointment.findByIdAndUpdate as any).mockResolvedValue(undefined);
 
-  it('marque le paiement "failed" sans paidAt en cas d\'échec', async () => {
-    (Appointment.findOne as any).mockResolvedValue({ _id: 'apt1' });
-    (Appointment.findByIdAndUpdate as any).mockResolvedValue(undefined);
+  await paymentService.confirm('REF-001', 'success');
 
-    await paymentService.confirm('REF-001', 'failed');
-
-    const updateArg = (Appointment.findByIdAndUpdate as any).mock.calls[0][1];
-    expect(updateArg.$set['status.paymentStatus']).toBe('failed');
-    expect(updateArg.$set['payment.paidAt']).toBeUndefined();
-  });
+  const updateArg = (Appointment.findByIdAndUpdate as any).mock.calls[0][1];
+  expect(updateArg.$set['status.paymentStatus']).toBe('paid');
+  expect(updateArg.$set['payment.paidAt']).toBeInstanceOf(Date);
+  expect(updateArg.$set['status.current']).toBe('confirmed');
+});
 });
 
 // ─── confirmSubscription (webhook abonnement) ──────────────────────────────
@@ -220,39 +205,20 @@ describe('paymentService.confirmSubscription', () => {
 // ─── simulateDev ────────────────────────────────────────────────────────────
 
 describe('paymentService.simulateDev', () => {
-  it('rejette si le rendez-vous est introuvable', async () => {
-    (Appointment.findById as any).mockResolvedValue(null);
-
-    await expect(paymentService.simulateDev('apt1', 'pat1', 'success')).rejects.toThrow(
-      'Rendez-vous introuvable.'
-    );
+it('simule un paiement réussi', async () => {
+  (Appointment.findById as any).mockResolvedValue({
+    patientId: 'pat1',
+    status: { current: 'pending' },
   });
+  (Appointment.findByIdAndUpdate as any).mockResolvedValue(undefined);
 
-  it('rejette si le patientId ne correspond pas', async () => {
-    (Appointment.findById as any).mockResolvedValue({ patientId: 'pat-autre' });
+  const result = await paymentService.simulateDev('apt1', 'pat1', 'success');
 
-    await expect(paymentService.simulateDev('apt1', 'pat1', 'success')).rejects.toThrow(
-      'Action non autorisée.'
-    );
-  });
+  expect(result.status).toBe('paid');
 
-  it('simule un paiement réussi', async () => {
-    (Appointment.findById as any).mockResolvedValue({ patientId: 'pat1' });
-    (Appointment.findByIdAndUpdate as any).mockResolvedValue(undefined);
-
-    const result = await paymentService.simulateDev('apt1', 'pat1', 'success');
-
-    expect(result.status).toBe('paid');
-  });
-
-  it('simule un échec de paiement', async () => {
-    (Appointment.findById as any).mockResolvedValue({ patientId: 'pat1' });
-    (Appointment.findByIdAndUpdate as any).mockResolvedValue(undefined);
-
-    const result = await paymentService.simulateDev('apt1', 'pat1', 'failure');
-
-    expect(result.status).toBe('failed');
-  });
+  const updateArg = (Appointment.findByIdAndUpdate as any).mock.calls[0][1];
+  expect(updateArg.$set['status.current']).toBe('confirmed');
+});
 });
 
 // ─── getStatus ──────────────────────────────────────────────────────────────

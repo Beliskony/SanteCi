@@ -104,7 +104,7 @@ export default function ConsultationsPage({ onNavigate }: ConsultationPageProps)
     setExpandedId(null);
   }, []);
 
-  // ✅ MODIFIER : Passer le patientId et son nom
+  // MODIFIER : Passer le patientId et son nom
   const handleMessage = useCallback((patientId: string) => {
     // Trouver le patient dans les rendez-vous pour avoir son nom
     const appointment = appts.find(a => {
@@ -129,7 +129,7 @@ export default function ConsultationsPage({ onNavigate }: ConsultationPageProps)
     }
   }, [appts, onNavigate]);
 
-  // ✅ MODIFIER : Ouvrir le dossier patient
+  // MODIFIER : Ouvrir le dossier patient
   const handleDossier = useCallback((patientId: string) => {
     if (onNavigate) {
       onNavigate('dossier', patientId);

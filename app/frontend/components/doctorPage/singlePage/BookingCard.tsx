@@ -70,7 +70,8 @@ export default function BookingCard({ telemedicine, location, doctor }: BookingC
 
     router.push(`/payment?${params.toString()}`)
   }, [selectedSlot, doctor, selectedType, feeMap, user, router])
-
+ console.log('📊 BookingCard - availability reçue:', availability);
+  console.log('📊 BookingCard - availability longueur:', availability?.length);
   return (
     <div className="flex flex-col gap-4">
       {/* Carte principale RDV */}

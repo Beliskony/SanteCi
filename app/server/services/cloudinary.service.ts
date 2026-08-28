@@ -240,7 +240,7 @@ class CloudinaryService {
     }
   }
 
-    // ── ✅ NOUVEAU : Upload message vocal ──────────────────────────────────────
+    // ──  NOUVEAU : Upload message vocal ──────────────────────────────────────
   async uploadAudio(buffer: Buffer, publicId?: string): Promise<CloudinaryUploadResult> {
     const result = await new Promise<UploadApiResponse>((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(

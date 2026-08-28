@@ -252,46 +252,31 @@ describe('[intégration] authService.login — patient (verrouillage)', () => {
 // ─── verifyOtp ───────────────────────────────────────────────────────────────
 
 describe('[intégration] authService.verifyOtp', () => {
-  it('valide l\'OTP et marque emailVerified=true en DB', async () => {
-    await authService.registerPatient(patientDto);
+it("valide l'OTP sans modifier la DB (l'OTP reste actif pour resetPassword)", async () => {
+  await authService.registerPatient(patientDto);
 
-    const patient = await Patient.findOne({ 'contact.email': patientDto.email });
-    const otp = patient!.status.verificationCode!;
+  const patient = await Patient.findOne({ 'contact.email': patientDto.email });
+  const otp = patient!.status.verificationCode!;
 
-    await authService.verifyOtp(patientDto.email, otp, 'patient');
+  const result = await authService.verifyOtp(patientDto.email, otp, 'patient');
+  expect(result.message).toBe('OTP valide.');
 
-    const updated = await Patient.findOne({ 'contact.email': patientDto.email });
-    expect(updated!.status.isVerified).toBe(true);
-    expect(updated!.contact.emailVerified).toBe(true);
-    // Le code OTP doit être effacé après validation
-    expect(updated!.status.verificationCode).toBeNull();
-  });
+  const updated = await Patient.findOne({ 'contact.email': patientDto.email });
+  // ✅ Nouveau comportement : rien n'est modifié en DB par verifyOtp seul
+  expect(updated!.status.isVerified).toBe(false);
+  expect(updated!.contact.emailVerified).toBe(false);
+  expect(updated!.status.verificationCode).toBe(otp);
+});
 
-  it('envoie l\'email de bienvenue après vérification réussie', async () => {
-    await authService.registerPatient(patientDto);
-    const patient = await Patient.findOne({ 'contact.email': patientDto.email });
-    const otp = patient!.status.verificationCode!;
+it("n'envoie pas d'email de bienvenue lors d'un simple verifyOtp", async () => {
+  await authService.registerPatient(patientDto);
+  const patient = await Patient.findOne({ 'contact.email': patientDto.email });
+  const otp = patient!.status.verificationCode!;
 
-    await authService.verifyOtp(patientDto.email, otp, 'patient');
+  await authService.verifyOtp(patientDto.email, otp, 'patient');
 
-    expect(mailService.sendWelcome).toHaveBeenCalledWith(
-      patientDto.email,
-      patientDto.firstName,
-      'patient'
-    );
-  });
-
-  it('rejette un OTP incorrect sans modifier la DB', async () => {
-    await authService.registerPatient(patientDto);
-
-    await expect(
-      authService.verifyOtp(patientDto.email, '000000', 'patient')
-    ).rejects.toThrow('Code OTP invalide.');
-
-    // Le code doit être toujours présent en DB
-    const patient = await Patient.findOne({ 'contact.email': patientDto.email });
-    expect(patient!.status.verificationCode).not.toBeNull();
-  });
+  expect(mailService.sendWelcome).not.toHaveBeenCalled();
+});
 });
 
 // ─── changePassword ───────────────────────────────────────────────────────────

@@ -114,13 +114,24 @@ async initiateSubscription(dto: InitiateSubscriptionDTO): Promise<PaymentResult>
     });
     if (!appointment) throw new Error('Rendez-vous introuvable pour cette référence.');
 
-    await Appointment.findByIdAndUpdate(String(appointment._id), {
-      $set: {
-        'status.paymentStatus': status === 'success' ? 'paid' : 'failed',
-        ...(status === 'success' ? { 'payment.paidAt': new Date() } : {}),
-        'metadata.updatedAt': new Date(),
-      },
-    });
+    const update: Record<string, unknown> = {
+      'status.paymentStatus': status === 'success' ? 'paid' : 'failed',
+      'metadata.updatedAt':   new Date(),
+    };
+
+    if (status === 'success') {
+      update['payment.paidAt'] = new Date();
+
+      //  Un paiement confirmé fait avancer automatiquement le RDV de
+      // "pending" à "confirmed" — avant ce correctif, seul paymentStatus
+      // changeait et le RDV restait bloqué en pending jusqu'à une action
+      // manuelle du médecin, même une fois payé.
+      if (appointment.status.current === 'pending') {
+        update['status.current'] = 'confirmed';
+      }
+    }
+
+    await Appointment.findByIdAndUpdate(String(appointment._id), { $set: update });
   }
 
 // ── Confirmer abonnement (webhook) ────────────────────────────────────────
@@ -175,13 +186,23 @@ async confirmSubscription(referenceNumber: string, status: 'success' | 'failed')
     if (String(appointment.patientId) !== patientId) throw new Error('Action non autorisée.');
 
     const newStatus = outcome === 'success' ? 'paid' : 'failed';
-    await Appointment.findByIdAndUpdate(appointmentId, {
-      $set: {
-        'status.paymentStatus': newStatus,
-        ...(outcome === 'success' ? { 'payment.paidAt': new Date() } : {}),
-        'metadata.updatedAt': new Date(),
-      },
-    });
+    const update: Record<string, unknown> = {
+      'status.paymentStatus': newStatus,
+      'metadata.updatedAt':   new Date(),
+    };
+
+    if (outcome === 'success') {
+      update['payment.paidAt'] = new Date();
+
+      //  Même correctif que confirm() : la simulation doit reproduire le
+      // vrai comportement métier, sinon on teste un flux qui ne correspond
+      // pas à la production.
+      if (appointment.status.current === 'pending') {
+        update['status.current'] = 'confirmed';
+      }
+    }
+
+    await Appointment.findByIdAndUpdate(appointmentId, { $set: update });
 
     return { appointmentId, status: newStatus, simulatedAt: new Date() };
   }

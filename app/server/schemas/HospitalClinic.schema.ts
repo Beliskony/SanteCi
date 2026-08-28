@@ -94,7 +94,7 @@ const ImageCoverSchema = z.object({
   publicId: z.string().min(1),
 }).optional();
 
-// ✅ CORRECTION : StatusSchema simplifié
+//  CORRECTION : StatusSchema simplifié
 const StatusSchema = z.object({
   accountStatus: z.enum(['active', 'suspended', 'blocked']).default('active'),
 });
@@ -115,7 +115,7 @@ export const HospitalClinicSchema = z.object({
   partnerships: PartnershipsSchema,
   hours:        HoursSchema,
   certification: CertificationSchema,
-  status:       StatusSchema, // ✅ Correction : plus d'imbrication
+  status:       StatusSchema, //  Correction : plus d'imbrication
   metadata:     MetadataSchema.default(() => ({
     createdAt:    new Date(),
     updatedAt:    new Date(),

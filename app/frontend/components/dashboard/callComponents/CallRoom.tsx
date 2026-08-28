@@ -7,8 +7,9 @@ import {
   FileText, Paperclip, Send, Loader2, Phone,
 } from "lucide-react";
 import { useCallStore, formatCallDuration } from "@/app/frontend/store/callStore";
-import { useSocketStore }                   from "@/app/frontend/store/soketStore";
+import { useSocketStore } from "@/app/frontend/store/soketStore";
 import { useAuthStore, isDoctor, isPatient } from "@/app/frontend/store/useAuthStore";
+import { useAgora } from "@/app/frontend/hooks/useAgora";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -106,7 +107,7 @@ function IncomingCallScreen({ onEnd }: { onEnd?: () => void }) {
     : "Appel audio entrant";
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-slate-950 gap-8">
+  <div className="fixed inset-0 z-9999 flex flex-col items-center justify-center h-screen bg-slate-950 gap-8">
       <div className="flex flex-col items-center gap-4">
         <div className="w-24 h-24 rounded-full bg-slate-700 border-4 border-[#1e3a8a] flex items-center justify-center text-3xl font-bold text-white animate-pulse">
           ?
@@ -167,11 +168,12 @@ export default function CallRoom({ onEnd }: CallRoomProps) {
   const isCameraOff = useCallStore((s) => s.isCameraOff);
   const elapsed     = useCallStore((s) => s.elapsedSeconds);
   const agoraTokens = useCallStore((s) => s.agoraTokens);
+  const myUid       = useCallStore((s) => s.myUid);
 
   const toggleMute   = useCallStore((s) => s.toggleMute);
   const toggleCamera = useCallStore((s) => s.toggleCamera);
+  const endCall      = useCallStore((s) => s.endCall);
 
-  const socketEndCall = useSocketStore((s) => s.endCall);
   const isConnected   = useSocketStore((s) => s.isConnected);
 
   const [activePanel, setActivePanel] = useState<PanelTab>("chat");
@@ -180,6 +182,25 @@ export default function CallRoom({ onEnd }: CallRoomProps) {
   const [hasNewMsg,   setHasNewMsg]   = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  //  Vérifier que les tokens sont disponibles
+const hasValidTokens = agoraTokens && 
+  agoraTokens.appId && 
+  agoraTokens.channelName && 
+  (agoraTokens.callerToken || agoraTokens.receiverToken) && 
+  myUid;
+
+  //  Utiliser Agora (les hooks doivent être dans le composant)
+ const { 
+  isConnected: isAgoraConnected,
+  toggleMute: toggleAgoraMute,
+  toggleCamera: toggleAgoraCamera
+} = useAgora({
+  appId: hasValidTokens ? agoraTokens.appId : '',
+  channelName: hasValidTokens ? agoraTokens.channelName : '',
+  token: hasValidTokens ? (agoraTokens.callerToken || agoraTokens.receiverToken) : '',
+  uid: hasValidTokens ? myUid : 0,
+});
 
   // Nom de l'autre participant
   const myName = (() => {
@@ -222,13 +243,23 @@ export default function CallRoom({ onEnd }: CallRoomProps) {
     setChatMsg("");
   }, [chatMsg]);
 
+  //  Raccrochage - utilise la méthode du store
   const handleEnd = useCallback(() => {
-    if (session) {
-      const endedBy = phase === "calling" ? "caller" : "receiver";
-      socketEndCall(session._id, userId, endedBy);
-    }
-    onEnd?.();
-  }, [session, phase, socketEndCall, userId, onEnd]);
+    console.log('[CallRoom] Raccrochage appelé');
+    endCall();
+  }, [endCall]);
+
+  //  Gestion du micro avec Agora
+  const handleToggleMute = useCallback(() => {
+    toggleMute();
+    toggleAgoraMute();
+  }, [toggleMute, toggleAgoraMute]);
+
+  //  Gestion de la caméra avec Agora
+  const handleToggleCamera = useCallback(() => {
+    toggleCamera();
+    toggleAgoraCamera();
+  }, [toggleCamera, toggleAgoraCamera]);
 
   // ── Écran appel entrant ────────────────────────────────────────────────────
   if (phase === "ringing") {
@@ -251,6 +282,15 @@ export default function CallRoom({ onEnd }: CallRoomProps) {
         </button>
       </div>
     );
+  }
+
+  //  Hors appel actif (idle, ended, missed, declined, failed...), on ne rend
+  // RIEN. Avant ce garde, toutes ces phases tombaient dans le rendu principal
+  // ci-dessous : la salle d'appel complète (avec useAgora() actif) restait
+  // montée en permanence dans le DOM dès que CallGlobalListener était monté,
+  // même sans appel en cours.
+  if (phase !== "ongoing") {
+    return null;
   }
 
   // ── Salle d'appel principale ───────────────────────────────────────────────
@@ -289,50 +329,44 @@ export default function CallRoom({ onEnd }: CallRoomProps) {
           </div>
         </div>
 
-        {/* Vidéo principale — placeholder Agora */}
+        {/* Vidéo principale - remote */}
         <div className="flex-1 relative flex items-center justify-center bg-slate-900">
-          {/* 
-            🔌 ICI : brancher le flux vidéo Agora
-            Une fois le compte créé :
-            import AgoraRTC from "agora-rtc-sdk-ng";
-            const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-            await client.join(agoraTokens.appId, agoraTokens.channelName, token, uid);
-            → remplacer ce div par <div id="remote-video" />
-          */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="flex flex-col items-center gap-4">
-              <div className="relative">
-                <div className="w-28 h-28 rounded-full bg-slate-700 border-4 border-slate-600 flex items-center justify-center">
-                  <span className="text-3xl font-bold text-slate-400">Dr</span>
-                </div>
-                {isMuted && (
-                  <div className="absolute bottom-0 right-0 w-8 h-8 bg-red-500 rounded-full flex items-center justify-center border-2 border-slate-900">
-                    <MicOff size={14} className="text-white" />
-                  </div>
-                )}
-              </div>
-              <p className="text-white font-bold text-lg">Médecin</p>
-              <p className="text-white/50 text-sm">
-                {isConnected ? "Connecté" : "Reconnexion..."}
-              </p>
-            </div>
+          {/*  Conteneur vidéo distante */}
+          <div id="remote-video" className="absolute inset-0 w-full h-full">
+            {/* La vidéo distante s'affichera ici via Agora */}
           </div>
 
-          {/* Miniature "Vous" */}
-          <div className="absolute top-5 right-5 z-10">
-            <div className="relative w-36 h-28 rounded-2xl bg-slate-700 border-2 border-slate-600 overflow-hidden shadow-2xl">
-              {/*
-                🔌 ICI : brancher la caméra locale Agora
-                const localVideoTrack = await AgoraRTC.createCameraVideoTrack();
-                → remplacer ce div par <div id="local-video" />
-              */}
-              {isCameraOff ? (
-                <div className="w-full h-full flex items-center justify-center">
-                  <VideoOff size={20} className="text-slate-500" />
+          {/* Fallback si pas de vidéo */}
+          {!isAgoraConnected && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-4">
+                <div className="relative">
+                  <div className="w-28 h-28 rounded-full bg-slate-700 border-4 border-slate-600 flex items-center justify-center">
+                    <span className="text-3xl font-bold text-slate-400">Dr</span>
+                  </div>
+                  {isMuted && (
+                    <div className="absolute bottom-0 right-0 w-8 h-8 bg-red-500 rounded-full flex items-center justify-center border-2 border-slate-900">
+                      <MicOff size={14} className="text-white" />
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-slate-800">
-                  <span className="text-slate-500 text-xs">{myName}</span>
+                <p className="text-white font-bold text-lg">Médecin</p>
+                <p className="text-white/50 text-sm">
+                  {isAgoraConnected ? "Connecté" : "Connexion en cours..."}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/*  Miniature "Vous" - local video */}
+          <div className="absolute top-5 right-5 z-10">
+            <div className="relative w-48 h-36 rounded-2xl bg-slate-700 border-2 border-slate-600 overflow-hidden shadow-2xl">
+              <div id="local-video" className="w-full h-full">
+                {/* La vidéo locale s'affichera ici via Agora */}
+              </div>
+              {isCameraOff && (
+                <div className="absolute inset-0 flex items-center justify-center bg-slate-800">
+                  <VideoOff size={24} className="text-slate-500" />
                 </div>
               )}
               <span className="absolute bottom-1.5 left-1.5 text-[10px] font-bold text-white bg-black/50 px-1.5 py-0.5 rounded-md">
@@ -346,11 +380,11 @@ export default function CallRoom({ onEnd }: CallRoomProps) {
         <div className="absolute bottom-0 left-0 right-0 z-20 flex justify-center pb-8 bg-linear-to-t from-black/60 to-transparent">
           <div className="flex items-center gap-3 bg-slate-900/80 backdrop-blur-md px-5 py-3 rounded-2xl border border-white/10 shadow-2xl">
 
-            <ControlBtn onClick={toggleMute} active={!isMuted} label={isMuted ? "Activer micro" : "Couper micro"}>
+            <ControlBtn onClick={handleToggleMute} active={!isMuted} label={isMuted ? "Activer micro" : "Couper micro"}>
               {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
             </ControlBtn>
 
-            <ControlBtn onClick={toggleCamera} active={!isCameraOff} label={isCameraOff ? "Activer caméra" : "Couper caméra"}>
+            <ControlBtn onClick={handleToggleCamera} active={!isCameraOff} label={isCameraOff ? "Activer caméra" : "Couper caméra"}>
               {isCameraOff ? <VideoOff size={18} /> : <Video size={18} />}
             </ControlBtn>
 

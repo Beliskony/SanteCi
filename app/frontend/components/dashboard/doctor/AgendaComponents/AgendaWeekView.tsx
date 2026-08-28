@@ -28,27 +28,69 @@ const TYPE_DOT: Record<string, string> = {
   audio: "bg-cyan-500",
 };
 
+//  Configuration des couleurs de statut
+const STATUS_COLORS: Record<string, string> = {
+  pending: "bg-amber-100 text-amber-700 border-amber-200",
+  confirmed: "bg-green-100 text-green-700 border-green-200",
+  ongoing: "bg-red-500 text-white border-red-400",
+  completed: "bg-blue-100 text-blue-700 border-blue-200",
+  cancelled: "bg-red-100 text-red-700 border-red-200",
+  no_show: "bg-gray-100 text-gray-500 border-gray-200",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: "En attente",
+  confirmed: "Confirmé",
+  ongoing: "En cours",
+  completed: "Terminé",
+  cancelled: "Annulé",
+  no_show: "Absent",
+};
+
 interface AgendaWeekViewProps {
   selectedDate: Date;
   appointments: Appointment[];
   onClickAppt:  (appointment: Appointment) => void;
   onSelectDay:  (date: Date) => void;
+  statusFilter?: string | null; //  Ajout du filtre
 }
 
-export function AgendaWeekView({ selectedDate, appointments, onClickAppt, onSelectDay }: AgendaWeekViewProps) {
+export function AgendaWeekView({ 
+  selectedDate, 
+  appointments, 
+  onClickAppt, 
+  onSelectDay,
+  statusFilter = null //  Par défaut: tous
+}: AgendaWeekViewProps) {
   const weekDays = useMemo(() => getWeekDays(selectedDate), [selectedDate]);
   const today = new Date();
 
+  //  Filtrer les rendez-vous par statut
+  const filteredAppointments = useMemo(() => {
+    if (!statusFilter) return appointments;
+    return appointments.filter(a => a.status.current === statusFilter);
+  }, [appointments, statusFilter]);
+
   const apptsByDay = useMemo(() => {
     return weekDays.map((day) =>
-      appointments
+      filteredAppointments
         .filter((a) => {
           const dt = new Date(a.details.scheduledFor);
           return dt.toDateString() === day.toDateString();
         })
         .sort((a, b) => new Date(a.details.scheduledFor).getTime() - new Date(b.details.scheduledFor).getTime())
     );
-  }, [appointments, weekDays]);
+  }, [filteredAppointments, weekDays]);
+
+  //  Récupérer la classe de couleur pour un statut
+  const getStatusColor = (status: string): string => {
+    return STATUS_COLORS[status] || "bg-slate-100 text-slate-600";
+  };
+
+  //  Récupérer le libellé d'un statut
+  const getStatusLabel = (status: string): string => {
+    return STATUS_LABELS[status] || status;
+  };
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -82,16 +124,37 @@ export function AgendaWeekView({ selectedDate, appointments, onClickAppt, onSele
                     const time = new Date(appt.details.scheduledFor).toLocaleTimeString("fr-FR", {
                       hour: "2-digit", minute: "2-digit",
                     });
+                    const statusColor = getStatusColor(appt.status.current);
+                    const statusLabel = getStatusLabel(appt.status.current);
+                    const isOngoing = appt.status.current === "ongoing";
+                    const isPending = appt.status.current === "pending";
+                    const isCancelled = appt.status.current === "cancelled" || appt.status.current === "no_show";
+
                     return (
                       <button
                         key={appt._id}
                         onClick={() => onClickAppt(appt)}
-                        className="flex items-center gap-1.5 bg-white border border-slate-100 rounded-lg px-2 py-1.5 text-left hover:border-slate-300 transition-colors"
+                        className={`flex items-center gap-1.5 bg-white border rounded-lg px-2 py-1.5 text-left hover:border-slate-300 transition-colors ${
+                          isOngoing ? "border-red-400 ring-1 ring-red-400" :
+                          isPending ? "border-amber-300" :
+                          isCancelled ? "border-slate-200 opacity-60" :
+                          "border-slate-100"
+                        }`}
                       >
+                        {/* Point de couleur pour le type */}
                         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${TYPE_DOT[appt.details.type] ?? "bg-slate-400"}`} />
-                        <div className="min-w-0">
-                          <p className="text-[10px] font-bold text-slate-700 leading-tight">{time}</p>
-                          <p className="text-[10px] text-slate-500 truncate leading-tight">
+                        
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <p className="text-[10px] font-bold text-slate-700 leading-tight">{time}</p>
+                            {/*  Badge de statut */}
+                            <span className={`text-[8px] font-semibold px-1 py-0.5 rounded-full ${statusColor}`}>
+                              {isOngoing ? "EN COURS" : statusLabel}
+                            </span>
+                          </div>
+                          <p className={`text-[10px] truncate leading-tight ${
+                            isCancelled ? "text-slate-400 line-through" : "text-slate-500"
+                          }`}>
                             {patient ? `${patient.profile.firstName} ${patient.profile.lastName}` : "Patient"}
                           </p>
                         </div>

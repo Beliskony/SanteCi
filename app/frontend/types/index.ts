@@ -116,24 +116,9 @@ export interface ConsultationFilters {
 
 // ─── Ordonnance ───────────────────────────────────────────────
 
-export interface Medicament {
-  name: string;
-  dosage: string;
-  frequency: string;
-  duration: string;
-  instructions?: string;
-}
+// ─── Ordonnance ───────────────────────────────────────────────
 
-export interface Prescription {
-  _id: string;
-  consultationId: string;
-  patientId: string;
-  doctorId: string;
-  medications: Medicament[];
-  generalInstructions?: string;
-  validUntil?: Date;
-  createdAt: Date;
-}
+export type { Prescription } from "@/app/frontend/services/prescriptionService";
 
 // ─── Notification ─────────────────────────────────────────────
 

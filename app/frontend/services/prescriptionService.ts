@@ -40,19 +40,60 @@ export interface CreatePrescriptionPayload {
 export interface Prescription {
   _id: string;
   prescriptionId: string;
-  doctorId: string;
   patientId: string;
-  appointmentId?: string;
-  date: string;
+  doctorId: string | {
+    _id: string;
+    profile: {
+      firstName: string;
+      lastName: string;
+      title?: string;
+      specialty?: string;
+    };
+  };
+  date: string; // ISODate
   validityDays: number;
   diagnosis: string;
+  notes?: string;
   medications: MedicationDTO[];
   testsRequested: TestRequestedDTO[];
-  notes?: string;
+  status: "active" | "expired" | "completed" | "cancelled";
+  isDigital: boolean;
   refillsAllowed: number;
   refillsUsed: number;
-  status: "active" | "expired" | "completed" | "cancelled";
-  followUp: { required: boolean; date?: string; notes?: string };
+  followUp: {
+    required: boolean;
+    date?: string;
+    notes?: string;
+  };
+  sharing: {
+    sharedWithPharmacies: string[];
+    patientAcknowledged: boolean;
+  };
+  metadata: {
+    createdAt: string;
+    updatedAt: string;
+    generatedBy: "doctor" | "patient" | "system";
+  };
+  //  Pour l'affichage dans le dashboard patient
+  documentName?: string;
+  documentUrl?: string;
+  doctorName?: string;
+}
+
+export interface MedicationDTO {
+  name: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  instructions?: string;
+  quantity: number;
+  unit: string;
+}
+
+export interface TestRequestedDTO {
+  type: string;
+  instructions?: string;
+  laboratory?: string;
 }
 
 export const prescriptionService = {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { usePaymentStore } from "@/app/frontend/store/paymentStore";
 import { useAppointmentStore } from "@/app/frontend/store/appoitmentStore";

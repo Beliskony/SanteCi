@@ -77,7 +77,7 @@ export async function POST(
       chatRoomId:  roomId,
       messageType: 'audio',
       content:     durationSeconds ? `Message vocal (${Math.ceil(durationSeconds)}s)` : 'Message vocal',
-      appointmentId, // ✅ toujours défini, statut déjà vérifié ci-dessus
+      appointmentId, //  toujours défini, statut déjà vérifié ci-dessus
       file: { url: audioUrl, name: fileName, size: fileSize, type: fileMimeType },
     });
 

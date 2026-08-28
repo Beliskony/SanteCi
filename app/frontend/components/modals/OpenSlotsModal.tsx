@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { X, Clock, Calendar } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { X, Clock, Calendar, AlertTriangle } from "lucide-react";
 import { useDoctorDashStore } from "@/app/frontend/store/doctorStore";
 import { useAuthStore, isDoctor } from "@/app/frontend/store/useAuthStore";
 
@@ -20,8 +20,57 @@ const DAYS = [
   { value: "dimanche", label: "Dimanche" },
 ] as const;
 
+type DayValue = typeof DAYS[number]["value"];
+
+// Index JS natif (0 = dimanche ... 6 = samedi), utilisé par Date.getDay()
+const DAY_INDEX: Record<DayValue, number> = {
+  dimanche: 0, lundi: 1, mardi: 2, mercredi: 3, jeudi: 4, vendredi: 5, samedi: 6,
+};
+const DAY_VALUE_BY_INDEX: DayValue[] = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+
+// Doit rester identique au MIN_MINUTES_BEFORE_SLOT de SlotPicker.tsx (côté patient),
+// sinon un créneau peut sembler "ouvert aujourd'hui" ici tout en étant invisible
+// pour les patients côté réservation.
+const MIN_MINUTES_BEFORE_SLOT = 15;
+
+/**
+ * Résout la prochaine occurrence réelle d'un jour récurrent + heure de début.
+ * Si le jour choisi est aujourd'hui mais que l'heure de début est déjà passée,
+ * on bascule sur l'occurrence de la semaine suivante (même logique que côté
+ * patient dans SlotPicker) — et on le signale via `rolledToNextWeek`.
+ * `tooSoon` signale un créneau techniquement "aujourd'hui" mais trop proche de
+ * l'heure actuelle pour être réservable par un patient (cf. MIN_MINUTES_BEFORE_SLOT).
+ */
+function getNextOccurrence(
+  day: DayValue,
+  startTime: string
+): { date: Date; rolledToNextWeek: boolean; tooSoon: boolean } {
+  const now = new Date();
+  const currentDayIndex = now.getDay();
+  const targetDayIndex = DAY_INDEX[day];
+
+  let daysToAdd = targetDayIndex - currentDayIndex;
+  if (daysToAdd < 0) daysToAdd += 7;
+
+  const candidate = new Date(now);
+  candidate.setDate(now.getDate() + daysToAdd);
+  const [hours, minutes] = startTime.split(":").map(Number);
+  candidate.setHours(hours, minutes, 0, 0);
+
+  let rolledToNextWeek = false;
+  if (daysToAdd === 0 && candidate.getTime() <= now.getTime()) {
+    candidate.setDate(candidate.getDate() + 7);
+    rolledToNextWeek = true;
+  }
+
+  const cutoff = new Date(now.getTime() + MIN_MINUTES_BEFORE_SLOT * 60000);
+  const tooSoon = !rolledToNextWeek && candidate.getTime() <= cutoff.getTime();
+
+  return { date: candidate, rolledToNextWeek, tooSoon };
+}
+
 export function OpenSlotsModal({ isOpen, onClose }: OpenSlotsModalProps) {
-  const [day, setDay] = useState<typeof DAYS[number]["value"]>("lundi");
+  const [day, setDay] = useState<DayValue>(DAY_VALUE_BY_INDEX[new Date().getDay()]);
   const [start, setStart] = useState("09:00");
   const [end, setEnd] = useState("12:00");
   const [isSaving, setIsSaving] = useState(false);
@@ -30,6 +79,40 @@ export function OpenSlotsModal({ isOpen, onClose }: OpenSlotsModalProps) {
   const updateTelemedicine = useDoctorDashStore((s) => s.updateTelemedicine);
   const user = useAuthStore((s) => s.user);
   const currentAvailability = user && isDoctor(user) ? user.telemedicine.availability : [];
+
+  // À chaque ouverture, on repart d'aujourd'hui plutôt que de rester bloqué sur "Lundi"
+  useEffect(() => {
+    if (isOpen) {
+      setDay(DAY_VALUE_BY_INDEX[new Date().getDay()]);
+      setStart("09:00");
+      setEnd("12:00");
+      setError(null);
+    }
+  }, [isOpen]);
+
+  const { date: nextOccurrence, rolledToNextWeek, tooSoon } = useMemo(
+    () => getNextOccurrence(day, start),
+    [day, start]
+  );
+
+  const isOccurrenceToday = nextOccurrence.toDateString() === new Date().toDateString();
+
+  const occurrenceLabel = nextOccurrence.toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+
+  // Quand le créneau du jour est trop proche pour être réservable (tooSoon),
+  // la prochaine occurrence réellement bookable par un patient est celle de
+  // la semaine suivante.
+  const nextBookableLabel = tooSoon
+    ? new Date(nextOccurrence.getTime() + 7 * 24 * 60 * 60000).toLocaleDateString("fr-FR", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+      })
+    : occurrenceLabel;
 
   const handleSubmit = async () => {
     if (start >= end) {
@@ -86,13 +169,16 @@ export function OpenSlotsModal({ isOpen, onClose }: OpenSlotsModalProps) {
             </label>
             <select
               value={day}
-              onChange={(e) => setDay(e.target.value as typeof day)}
+              onChange={(e) => setDay(e.target.value as DayValue)}
               className="w-full px-3 py-2 text-sm text-gray-700 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             >
               {DAYS.map((d) => (
                 <option key={d.value} value={d.value}>{d.label}</option>
               ))}
             </select>
+            <p className="text-[11px] text-gray-400 mt-1">
+              Ce créneau se répètera chaque {DAYS.find((d) => d.value === day)?.label.toLowerCase()}.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -118,6 +204,30 @@ export function OpenSlotsModal({ isOpen, onClose }: OpenSlotsModalProps) {
               />
             </div>
           </div>
+
+          {/* Aperçu de la date réelle appliquée, pour éviter toute surprise */}
+          {rolledToNextWeek ? (
+            <div className="flex items-start gap-2 p-2 bg-amber-50 border border-amber-100 rounded-lg text-xs text-amber-700">
+              <span>
+                Il est déjà {start} passé aujourd'hui : ce créneau ne sera pas disponible aujourd'hui.
+                Prochaine occurrence : <strong>{occurrenceLabel}</strong>.
+              </span>
+            </div>
+          ) : tooSoon ? (
+            <div className="flex items-start gap-2 p-2 bg-amber-50 border border-amber-100 rounded-lg text-xs text-amber-700">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span>
+                Ce créneau démarre dans moins de {MIN_MINUTES_BEFORE_SLOT} minutes : les patients ne
+                pourront pas le réserver aujourd'hui. Il ne redeviendra visible qu'à la prochaine
+                occurrence, le <strong>{occurrenceLabel}</strong> {isOccurrenceToday ? "en 8" : ""}.
+              </span>
+            </div>
+          ) : (
+            <p className="text-xs text-slate-500">
+              Prochaine occurrence : <strong>{occurrenceLabel}</strong>
+              {isOccurrenceToday && " (aujourd'hui)"}
+            </p>
+          )}
 
           {error && (
             <div className="p-2 bg-red-50 border border-red-100 rounded-lg text-xs text-red-600">

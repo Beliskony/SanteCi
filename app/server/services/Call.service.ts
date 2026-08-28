@@ -28,6 +28,12 @@ const AGORA_APP_ID          = process.env.AGORA_APP_ID!;
 const AGORA_APP_CERTIFICATE = process.env.AGORA_APP_CERTIFICATE!;
 const TOKEN_EXPIRY_SECONDS  = 3600; // 1 heure
 
+// Au-delà de ce délai sans qu'une session "active" ait été acceptée/terminée,
+// on la considère comme fantôme (crash client, perte réseau, bug côté front...)
+// et on l'auto-clôture plutôt que de bloquer indéfiniment tout nouvel appel
+// sur le même rendez-vous.
+const STALE_CALL_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes
+
 // ─── Call Service ─────────────────────────────────────────────────────────────
 
 class CallService {
@@ -67,7 +73,6 @@ class CallService {
   }
 
   // ── Initier un appel ──────────────────────────────────────────────────────
-  // Crée la session, génère les tokens Agora, notifie le destinataire
 
   async initiateCall(dto: InitiateCallDTO): Promise<ICallSession> {
     // Vérifier que le RDV existe et est confirmé ou en cours
@@ -85,7 +90,33 @@ class CallService {
       appointmentId: new Types.ObjectId(dto.appointmentId),
       status: { $in: ['initiated', 'ringing', 'accepted'] },
     });
-    if (activeCall) throw new Error('Un appel est déjà en cours pour ce rendez-vous.');
+
+    if (activeCall) {
+      //  Ne pas bloquer aveuglément : si cette session "active" n'a plus été
+      // mise à jour depuis longtemps (crash client, endCall jamais notifié au
+      // backend, réseau coupé...), c'est une session fantôme — on l'auto-clôture
+      // et on laisse le nouvel appel démarrer, au lieu de renvoyer une erreur
+      // qui bloquerait indéfiniment ce rendez-vous.
+      const lastActivity =
+        activeCall.timing.acceptedAt ??
+        activeCall.timing.ringingAt ??
+        activeCall.timing.initiatedAt;
+      const isStale = Date.now() - new Date(lastActivity).getTime() > STALE_CALL_THRESHOLD_MS;
+
+      if (isStale) {
+        console.warn(
+          `[CallService] Session fantôme détectée (${activeCall._id}), auto-clôture avant nouvel appel.`
+        );
+        activeCall.status            = 'failed';
+        activeCall.failureReason     = 'Session expirée (inactive, clôturée automatiquement).';
+        activeCall.endedBy           = 'system';
+        activeCall.timing.endedAt    = new Date();
+        activeCall.metadata.updatedAt = new Date();
+        await activeCall.save();
+      } else {
+        throw new Error('Un appel est déjà en cours pour ce rendez-vous.');
+      }
+    }
 
     // Déterminer le type du receiver (opposé du caller)
     const receiverType: CallerType = dto.callerType === 'doctor' ? 'patient' : 'doctor';
@@ -124,18 +155,20 @@ class CallService {
       },
     });
 
-    // ── Notifier le destinataire de l'appel entrant ───────────────────────
+    // ──  Notification d'appel entrant avec la nouvelle méthode ───────────
     try {
       const callerName = await this.resolveName(dto.callerId, dto.callerType);
-      const callLabel  = dto.callType === 'video' ? '📹 Appel vidéo' : '📞 Appel audio';
-
-      await notificationService.notifySystem(
+      
+      await notificationService.notifyIncomingCall(
         dto.receiverId,
         receiverType,
-        `${callLabel} entrant`,
-        `${callerName} vous appelle. Décrochez dès que possible.`,
-        'high'
+        callerName,
+        dto.callType,
+        String(callSession._id),
+        dto.appointmentId
       );
+      
+      console.log('[CallService]  Notification d\'appel entrant envoyée');
     } catch (err) {
       console.error('[CallService.initiateCall] Notification échec :', err);
     }
@@ -144,7 +177,6 @@ class CallService {
   }
 
   // ── Accepter un appel ─────────────────────────────────────────────────────
-  // Retourne les tokens pour que le receiver rejoigne le channel Agora
 
   async acceptCall(callSessionId: string, receiverId: string): Promise<ICallSession> {
     const callSession = await CallSession.findById(callSessionId);
@@ -191,23 +223,6 @@ class CallService {
     callSession.metadata.updatedAt = new Date();
     await callSession.save();
 
-    // ── Notifier le caller que l'appel a été refusé ───────────────────────
-    try {
-      const receiverName = await this.resolveName(
-        String(callSession.receiverId),
-        callSession.receiverType
-      );
-      await notificationService.notifySystem(
-        String(callSession.callerId),
-        callSession.callerType,
-        'Appel refusé',
-        `${receiverName} n'est pas disponible pour le moment.`,
-        'normal' as any
-      );
-    } catch (err) {
-      console.error('[CallService.declineCall] Notification échec :', err);
-    }
-
     return callSession;
   }
 
@@ -249,11 +264,53 @@ class CallService {
     callSession.metadata.updatedAt = new Date();
     await callSession.save();
 
+    // ──  Notification d'appel terminé (si durée > 5 secondes) ────────────
+    if (duration > 5) {
+      try {
+        const isCaller = String(callSession.callerId) === requesterId;
+        const otherUserId = isCaller
+          ? String(callSession.receiverId)
+          : String(callSession.callerId);
+        const otherUserType = isCaller
+          ? callSession.receiverType
+          : callSession.callerType;
+        
+        const otherUserName = await this.resolveName(otherUserId, otherUserType);
+        const myName = await this.resolveName(
+          requesterId, 
+          isCaller ? callSession.callerType : callSession.receiverType
+        );
+        
+        // Notifier l'autre participant
+        await notificationService.notifyCallEnded(
+          otherUserId,
+          otherUserType,
+          myName,
+          duration,
+          callSession.callType,
+          callSessionId
+        );
+        
+        // Notifier l'initiateur
+        await notificationService.notifyCallEnded(
+          requesterId,
+          isCaller ? callSession.callerType : callSession.receiverType,
+          otherUserName,
+          duration,
+          callSession.callType,
+          callSessionId
+        );
+        
+        console.log('[CallService]  Notifications d\'appel terminé envoyées');
+      } catch (err) {
+        console.error('[CallService.endCall] Notification échec :', err);
+      }
+    }
+
     return callSession;
   }
 
-  // ── Marquer comme manqué (appelé par le cron ou le gateway) ──────────────
-  // Si le receiver ne répond pas après X secondes
+  // ── Marquer comme manqué ──────────────────────────────────────────────────
 
   async markAsMissed(callSessionId: string): Promise<ICallSession> {
     const callSession = await CallSession.findById(callSessionId);
@@ -269,21 +326,23 @@ class CallService {
     callSession.metadata.updatedAt = new Date();
     await callSession.save();
 
-    // ── Notifier le receiver qu'il a manqué un appel ─────────────────────
+    // ──  Notification d'appel manqué ──────────────────────────────────────
     try {
       const callerName = await this.resolveName(
         String(callSession.callerId),
         callSession.callerType
       );
-      const callLabel = callSession.callType === 'video' ? 'vidéo' : 'audio';
-
-      await notificationService.notifySystem(
+      
+      await notificationService.notifyMissedCall(
         String(callSession.receiverId),
         callSession.receiverType,
-        'Appel manqué',
-        `Vous avez manqué un appel ${callLabel} de ${callerName}.`,
-        'normal' as any
+        callerName,
+        callSession.callType,
+        callSessionId,
+        String(callSession.appointmentId)
       );
+      
+      console.log('[CallService]  Notification d\'appel manqué envoyée');
     } catch (err) {
       console.error('[CallService.markAsMissed] Notification échec :', err);
     }
@@ -291,7 +350,7 @@ class CallService {
     return callSession;
   }
 
-  // ── Marquer comme échoué (erreur réseau, Agora, etc.) ────────────────────
+  // ── Marquer comme échoué ──────────────────────────────────────────────────
 
   async markAsFailed(callSessionId: string, reason: string): Promise<ICallSession> {
     const callSession = await CallSession.findByIdAndUpdate(
@@ -313,7 +372,6 @@ class CallService {
   }
 
   // ── Mettre à jour le statut "ringing" ────────────────────────────────────
-  // Appelé par le gateway quand le receiver a bien reçu la notif socket
 
   async markAsRinging(callSessionId: string): Promise<ICallSession> {
     const callSession = await CallSession.findByIdAndUpdate(
@@ -332,7 +390,7 @@ class CallService {
     return callSession;
   }
 
-  // ── Rafraîchir les tokens Agora (si proches d'expiration) ────────────────
+  // ── Rafraîchir les tokens Agora ──────────────────────────────────────────
 
   async refreshTokens(callSessionId: string): Promise<{
     callerToken: string;

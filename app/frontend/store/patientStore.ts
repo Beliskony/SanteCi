@@ -14,9 +14,9 @@ import type {
   BaseLocation,
 } from "@/app/frontend/store/useAuthStore";
 import type {
-  Prescription,
   PaginatedResponse,
 } from "@/app/frontend/types";
+import { Prescription } from "../services/prescriptionService";
 import type {
   EmergencyContactDTO,
   PatientStats,

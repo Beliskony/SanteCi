@@ -66,12 +66,14 @@ export interface InitiatedCallPayload {
 export interface IncomingCallPayload {
   callSessionId: string;
   callerId:      string;
+  callerName?:   string;
   callerType:    CallerType;
   callType:      CallType;
   channelName:   string;
   token:         string;
   uid:           number;
   appId:         string;
+  appointmentId?: string; 
 }
 
 export interface PaginatedCalls {

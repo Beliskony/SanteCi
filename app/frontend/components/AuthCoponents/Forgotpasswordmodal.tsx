@@ -1,15 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Mail, ArrowRight, Lock, Eye, EyeOff, X, KeyRound } from "lucide-react";
+import { Mail, ArrowRight, Lock, Eye, EyeOff, X, KeyRound, Loader2 } from "lucide-react";
+import { useAuthStore } from "@/app/frontend/store/useAuthStore";
 
 type Step = "email" | "otp" | "newPassword";
 
 interface ForgotPasswordModalProps {
   onClose: () => void;
+  role?: "doctor" | "patient";
 }
 
-const ForgotPasswordModal = ({ onClose }: ForgotPasswordModalProps) => {
+const ForgotPasswordModal = ({ onClose, role = "patient" }: ForgotPasswordModalProps) => {
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
@@ -17,13 +19,18 @@ const ForgotPasswordModal = ({ onClose }: ForgotPasswordModalProps) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  // ✅ Stocker l'OTP validé
+  const [validatedOtp, setValidatedOtp] = useState<string | null>(null);
+
+  const { forgotPassword, verifyOtp, resetPassword, isLoading } = useAuthStore();
 
   const handleOtpChange = (index: number, value: string) => {
     if (!/^\d?$/.test(value)) return;
     const updated = [...otp];
     updated[index] = value;
     setOtp(updated);
-    // focus suivant
     if (value && index < 5) {
       const next = document.getElementById(`otp-${index + 1}`);
       next?.focus();
@@ -37,37 +44,103 @@ const ForgotPasswordModal = ({ onClose }: ForgotPasswordModalProps) => {
     }
   };
 
-  const handleEmailSubmit = (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // POST /auth/forgot-password { email }
-    setStep("otp");
+    setError(null);
+    setSuccess(null);
+    try {
+      await forgotPassword(email, role);
+      setSuccess("Un code de vérification a été envoyé à votre email.");
+      setStep("otp");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur lors de l'envoi du code.");
+    }
   };
 
-  const handleOtpSubmit = (e: React.FormEvent) => {
+  // ✅ Vérifier l'OTP et le stocker
+  const handleOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // POST /auth/verify-otp { email, otp: otp.join("") }
-    setStep("newPassword");
+    setError(null);
+    const otpCode = otp.join("");
+    if (otpCode.length < 6) {
+      setError("Veuillez entrer les 6 chiffres du code.");
+      return;
+    }
+    try {
+      await verifyOtp(email, otpCode, role);
+      // ✅ Stocker l'OTP validé
+      setValidatedOtp(otpCode);
+      setSuccess("Code vérifié avec succès. Vous pouvez maintenant changer votre mot de passe.");
+      setStep("newPassword");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Code OTP invalide ou expiré.");
+    }
   };
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  // ✅ Utiliser l'OTP stocké pour la réinitialisation
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // POST /auth/reset-password { email, otp, newPassword }
-    onClose();
+    setError(null);
+    if (newPassword !== confirmPassword) {
+      setError("Les mots de passe ne correspondent pas.");
+      return;
+    }
+    if (newPassword.length < 8) {
+      setError("Le mot de passe doit contenir au moins 8 caractères.");
+      return;
+    }
+    // ✅ Utiliser l'OTP validé stocké
+    if (!validatedOtp) {
+      setError("Le code de vérification n'a pas été validé. Veuillez recommencer.");
+      return;
+    }
+    try {
+      await resetPassword(email, validatedOtp, newPassword, role);
+      setSuccess("Mot de passe réinitialisé avec succès !");
+      setTimeout(() => {
+        onClose();
+        window.location.href = "/login";
+      }, 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur lors de la réinitialisation.");
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setError(null);
+    try {
+      await forgotPassword(email, role);
+      setSuccess("Un nouveau code a été envoyé à votre email.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur lors du renvoi du code.");
+    }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-8">
 
-        {/* Fermer */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+          disabled={isLoading}
         >
           <X size={20} />
         </button>
 
-        {/* ── Étape 1 — Email ── */}
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-600">
+            {success}
+          </div>
+        )}
+
+        {/* Étape 1 — Email */}
         {step === "email" && (
           <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-1">
@@ -90,20 +163,25 @@ const ForgotPasswordModal = ({ onClose }: ForgotPasswordModalProps) => {
                   onChange={(e) => setEmail(e.target.value)}
                   className="flex-1 text-sm outline-none text-gray-700 placeholder-gray-400"
                   required
+                  disabled={isLoading}
                 />
               </div>
               <button
                 type="submit"
-                className="w-full flex items-center justify-center gap-2 bg-[#1e3a8a] hover:bg-[#3742fa] text-white text-sm font-semibold py-3 rounded-lg transition-colors"
+                disabled={isLoading || !email}
+                className="w-full flex items-center justify-center gap-2 bg-[#1e3a8a] hover:bg-[#2d4fa8] disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-semibold py-3 rounded-lg transition-colors"
               >
-                Envoyer le code
-                <ArrowRight size={15} />
+                {isLoading ? (
+                  <><Loader2 size={18} className="animate-spin" /> Envoi...</>
+                ) : (
+                  <><Mail size={16} /> Envoyer le code</>
+                )}
               </button>
             </form>
           </div>
         )}
 
-        {/* ── Étape 2 — OTP ── */}
+        {/* Étape 2 — OTP */}
         {step === "otp" && (
           <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-1">
@@ -117,7 +195,6 @@ const ForgotPasswordModal = ({ onClose }: ForgotPasswordModalProps) => {
             </div>
 
             <form onSubmit={handleOtpSubmit} className="flex flex-col gap-5">
-              {/* Champs OTP */}
               <div className="flex justify-between gap-2">
                 {otp.map((digit, index) => (
                   <input
@@ -130,25 +207,30 @@ const ForgotPasswordModal = ({ onClose }: ForgotPasswordModalProps) => {
                     onChange={(e) => handleOtpChange(index, e.target.value)}
                     onKeyDown={(e) => handleOtpKeyDown(index, e)}
                     className="w-12 h-12 text-center text-lg font-bold border border-gray-200 rounded-lg outline-none focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/20 transition-all"
+                    disabled={isLoading}
                   />
                 ))}
               </div>
 
               <button
                 type="submit"
-                disabled={otp.join("").length < 6}
-                className="w-full flex items-center justify-center gap-2 bg-[#1e3a8a] hover:bg-[#3742fa] disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-semibold py-3 rounded-lg transition-colors"
+                disabled={otp.join("").length < 6 || isLoading}
+                className="w-full flex items-center justify-center gap-2 bg-[#1e3a8a] hover:bg-[#2d4fa8] disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-semibold py-3 rounded-lg transition-colors"
               >
-                Vérifier le code
-                <ArrowRight size={15} />
+                {isLoading ? (
+                  <><Loader2 size={18} className="animate-spin" /> Vérification...</>
+                ) : (
+                  <>Vérifier le code <ArrowRight size={15} /></>
+                )}
               </button>
             </form>
 
             <p className="text-center text-xs text-gray-400">
               Pas reçu ?{" "}
               <button
-                onClick={() => setStep("email")}
+                onClick={handleResendOtp}
                 className="text-[#1e3a8a] font-medium hover:underline"
+                disabled={isLoading}
               >
                 Renvoyer
               </button>
@@ -156,7 +238,7 @@ const ForgotPasswordModal = ({ onClose }: ForgotPasswordModalProps) => {
           </div>
         )}
 
-        {/* ── Étape 3 — Nouveau mot de passe ── */}
+        {/* Étape 3 — Nouveau mot de passe */}
         {step === "newPassword" && (
           <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-1">
@@ -170,7 +252,6 @@ const ForgotPasswordModal = ({ onClose }: ForgotPasswordModalProps) => {
             </div>
 
             <form onSubmit={handlePasswordSubmit} className="flex flex-col gap-4">
-              {/* Nouveau mdp */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-gray-700">Nouveau mot de passe</label>
                 <div className="flex items-center gap-3 border border-gray-200 rounded-lg px-3 py-2.5 focus-within:border-[#1e3a8a] transition-colors">
@@ -183,6 +264,7 @@ const ForgotPasswordModal = ({ onClose }: ForgotPasswordModalProps) => {
                     className="flex-1 text-sm outline-none text-gray-700 placeholder-gray-400"
                     required
                     minLength={8}
+                    disabled={isLoading}
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}>
                     {showPassword ? <EyeOff size={16} className="text-gray-400" /> : <Eye size={16} className="text-gray-400" />}
@@ -190,7 +272,6 @@ const ForgotPasswordModal = ({ onClose }: ForgotPasswordModalProps) => {
                 </div>
               </div>
 
-              {/* Confirmer mdp */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium text-gray-700">Confirmer le mot de passe</label>
                 <div className="flex items-center gap-3 border border-gray-200 rounded-lg px-3 py-2.5 focus-within:border-[#1e3a8a] transition-colors">
@@ -202,6 +283,7 @@ const ForgotPasswordModal = ({ onClose }: ForgotPasswordModalProps) => {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="flex-1 text-sm outline-none text-gray-700 placeholder-gray-400"
                     required
+                    disabled={isLoading}
                   />
                   <button type="button" onClick={() => setShowConfirm(!showConfirm)}>
                     {showConfirm ? <EyeOff size={16} className="text-gray-400" /> : <Eye size={16} className="text-gray-400" />}
@@ -214,11 +296,14 @@ const ForgotPasswordModal = ({ onClose }: ForgotPasswordModalProps) => {
 
               <button
                 type="submit"
-                disabled={!newPassword || newPassword !== confirmPassword}
-                className="w-full flex items-center justify-center gap-2 bg-[#1e3a8a] hover:bg-[#3742fa] disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-semibold py-3 rounded-lg transition-colors"
+                disabled={!newPassword || newPassword !== confirmPassword || isLoading || !validatedOtp}
+                className="w-full flex items-center justify-center gap-2 bg-[#1e3a8a] hover:bg-[#2d4fa8] disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-semibold py-3 rounded-lg transition-colors"
               >
-                Réinitialiser le mot de passe
-                <ArrowRight size={15} />
+                {isLoading ? (
+                  <><Loader2 size={18} className="animate-spin" /> Réinitialisation...</>
+                ) : (
+                  <>Réinitialiser le mot de passe <ArrowRight size={15} /></>
+                )}
               </button>
             </form>
           </div>

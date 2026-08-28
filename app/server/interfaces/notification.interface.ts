@@ -9,7 +9,7 @@ export interface INotification extends Document {
   
   // Notification
   type: 'appointment' | 'prescription' | 'message' | 'reminder' | 
-        'payment' | 'system' | 'emergency';
+        'payment' | 'system' | 'emergency' | 'call';
   title: string;
   body: string;
   

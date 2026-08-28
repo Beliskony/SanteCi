@@ -411,45 +411,24 @@ describe('authService.refreshToken', () => {
 // ─── verifyOtp ──────────────────────────────────────────────────────────────
 
 describe('authService.verifyOtp', () => {
-  it("rejette un code OTP incorrect", async () => {
-    (Patient.findOne as any).mockReturnValue(
-      mockQuery({ status: { verificationCode: '123456', verificationExpires: new Date(Date.now() + 60000) } })
-    );
+  it("valide un OTP correct sans le supprimer ni modifier le compte", async () => {
+  (Patient.findOne as any).mockReturnValue(
+    mockQuery({
+      _id: 'pat1',
+      profile: { firstName: 'Yao' },
+      status: { verificationCode: '123456', verificationExpires: new Date(Date.now() + 60000) },
+    })
+  );
 
-    await expect(authService.verifyOtp('p@p.com', '000000', 'patient')).rejects.toThrow(
-      'Code OTP invalide.'
-    );
-  });
+  const result = await authService.verifyOtp('p@p.com', '123456', 'patient');
 
-  it('rejette un code OTP expiré', async () => {
-    (Patient.findOne as any).mockReturnValue(
-      mockQuery({ status: { verificationCode: '123456', verificationExpires: new Date(Date.now() - 1000) } })
-    );
-
-    await expect(authService.verifyOtp('p@p.com', '123456', 'patient')).rejects.toThrow(
-      'Code OTP expiré. Demandez-en un nouveau.'
-    );
-  });
-
-  it('valide un OTP correct et envoie l\'email de bienvenue', async () => {
-    (Patient.findOne as any).mockReturnValue(
-      mockQuery({
-        _id: 'pat1',
-        profile: { firstName: 'Yao' },
-        status: { verificationCode: '123456', verificationExpires: new Date(Date.now() + 60000) },
-      })
-    );
-    (Patient.findByIdAndUpdate as any).mockResolvedValue(undefined);
-
-    const result = await authService.verifyOtp('p@p.com', '123456', 'patient');
-
-    expect(Patient.findByIdAndUpdate).toHaveBeenCalledWith(
-      'pat1',
-      expect.objectContaining({ 'status.isVerified': true })
-    );
-    expect(mailService.sendWelcome).toHaveBeenCalledWith('p@p.com', 'Yao', 'patient');
-    expect(result.message).toMatch(/vérifié/);
-  });
+  // Nouveau comportement : verifyOtp ne touche plus la base ni n'envoie de mail —
+  // il valide juste le code (utile pour resetPassword, qui a besoin que l'OTP
+  // reste actif jusqu'à la réinitialisation effective du mot de passe).
+  expect(Patient.findByIdAndUpdate).not.toHaveBeenCalled();
+  expect(mailService.sendWelcome).not.toHaveBeenCalled();
+  expect(result.message).toBe('OTP valide.');
+});
 });
 
 // ─── changePassword ─────────────────────────────────────────────────────────

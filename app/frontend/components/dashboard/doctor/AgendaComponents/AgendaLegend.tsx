@@ -1,7 +1,5 @@
 "use client";
 
-import { Plus } from "lucide-react";
-
 const LEGEND_ITEMS = [
   { color: "bg-[#1e3a8a]",   label: "Consultation Vidéo"    },
   { color: "bg-emerald-500", label: "Consultation Cabinet"  },

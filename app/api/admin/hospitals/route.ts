@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       body = await req.json();
     }
 
-    // ✅ Vérifier que body a les champs requis
+    //  Vérifier que body a les champs requis
     console.log('Body reçu:', body);
 
     const parsed = CreateHospitalClinicSchema.safeParse(body);

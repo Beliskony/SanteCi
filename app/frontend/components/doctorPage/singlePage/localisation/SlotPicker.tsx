@@ -19,40 +19,25 @@ const DAYS_FR: Record<string, string> = {
   dimanche: "Dimanche",
 }
 
-const DAY_ORDER = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
-
-// Marge de sécurité avant un créneau — évite de proposer un rendez-vous dans 2 minutes
 const MIN_MINUTES_BEFORE_SLOT = 15
 
-// Helper pour obtenir la date réelle d'un jour
 const getRealDateForDay = (dayName: string): Date => {
   const today = new Date()
-  const currentDayIndex = today.getDay() // 0 = dimanche, 1 = lundi, ...
+  const currentDayIndex = today.getDay()
 
   const dayMap: Record<string, number> = {
-    lundi: 1,
-    mardi: 2,
-    mercredi: 3,
-    jeudi: 4,
-    vendredi: 5,
-    samedi: 6,
-    dimanche: 0,
+    lundi: 1, mardi: 2, mercredi: 3, jeudi: 4, vendredi: 5, samedi: 6, dimanche: 0,
   }
 
   const targetDayIndex = dayMap[dayName]
   let daysToAdd = targetDayIndex - currentDayIndex
-
-  if (daysToAdd < 0) {
-    daysToAdd += 7
-  }
+  if (daysToAdd < 0) daysToAdd += 7
 
   const targetDate = new Date(today)
   targetDate.setDate(today.getDate() + daysToAdd)
-
   return targetDate
 }
 
-// Formater la date pour l'affichage
 const formatDateDisplay = (date: Date): string => {
   return date.toLocaleDateString('fr-FR', {
     day: 'numeric',
@@ -60,12 +45,10 @@ const formatDateDisplay = (date: Date): string => {
   })
 }
 
-// Un créneau "HH:mm" combiné à une date donnée est-il encore dans le futur (+ marge) ?
 const isSlotStillBookable = (date: Date, slotStart: string): boolean => {
   const [hours, minutes] = slotStart.split(':').map(Number)
   const slotDateTime = new Date(date)
   slotDateTime.setHours(hours, minutes, 0, 0)
-
   const cutoff = new Date(Date.now() + MIN_MINUTES_BEFORE_SLOT * 60000)
   return slotDateTime > cutoff
 }
@@ -73,36 +56,36 @@ const isSlotStillBookable = (date: Date, slotStart: string): boolean => {
 export default function SlotPicker({ availability, selectedSlot, onSelectSlot }: SlotPickerProps) {
   const [currentDayIndex, setCurrentDayIndex] = useState(0)
 
-  // Trier par date réelle chronologique (pas par nom du jour) : si on est mardi,
-  // "lundi" doit passer APRÈS mercredi/vendredi puisqu'il tombe la semaine prochaine
-  const sortedDays = useMemo(() =>
-    [...availability].sort((a, b) =>
-      getRealDateForDay(a.day).getTime() - getRealDateForDay(b.day).getTime()
-    ),
-    [availability]
-  )
-
-  // Pour chaque jour, ne garder que les créneaux libres ET pas encore passés
-  // (les créneaux passés ne sont exclus que pour aujourd'hui — les autres jours
-  // sont dans le futur donc tous leurs créneaux libres restent valables)
   const daysWithFreeSlots = useMemo(() => {
-    return sortedDays
+    return availability
       .map((day) => {
-        const realDate = getRealDateForDay(day.day)
-        const isToday = realDate.toDateString() === new Date().toDateString()
+        let realDate = getRealDateForDay(day.day)
+        let isToday = realDate.toDateString() === new Date().toDateString()
 
-        const freeSlots = day.slots.filter((slot) => {
+        let freeSlots = day.slots.filter((slot) => {
           if (slot.isBooked) return false
           if (isToday) return isSlotStillBookable(realDate, slot.start)
           return true
         })
 
+        // Planning récurrent : si "aujourd'hui" correspond à ce jour mais que
+        // tous ses créneaux sont déjà passés, on bascule sur l'occurrence
+        // de la semaine suivante au lieu de supprimer le jour.
+        if (isToday && freeSlots.length === 0) {
+          realDate = new Date(realDate)
+          realDate.setDate(realDate.getDate() + 7)
+          isToday = false
+          freeSlots = day.slots.filter((slot) => !slot.isBooked)
+        }
+
         return { day, realDate, isToday, freeSlots }
       })
       .filter((d) => d.freeSlots.length > 0)
-  }, [sortedDays])
+      // Tri sur la date finale (post-rollover) pour que l'index 0
+      // corresponde toujours à la date la plus proche.
+      .sort((a, b) => a.realDate.getTime() - b.realDate.getTime())
+  }, [availability])
 
-  // Réinitialiser l'index si on change de médecin/disponibilités
   useMemo(() => {
     setCurrentDayIndex(0)
   }, [availability])
@@ -116,8 +99,6 @@ export default function SlotPicker({ availability, selectedSlot, onSelectSlot }:
     )
   }
 
-  // Sécurité : si l'index est devenu invalide (ex: le jour courant vient de perdre
-  // tous ses créneaux car l'heure a avancé), on retombe sur le premier jour dispo
   const safeIndex = currentDayIndex < daysWithFreeSlots.length ? currentDayIndex : 0
   const { day: currentDay, realDate, isToday, freeSlots } = daysWithFreeSlots[safeIndex]
 
@@ -129,13 +110,34 @@ export default function SlotPicker({ availability, selectedSlot, onSelectSlot }:
     setCurrentDayIndex((prev) => (prev < daysWithFreeSlots.length - 1 ? prev + 1 : 0))
   }
 
+  //  Format : "Mercredi 2 septembre à 13:00"
+  const formatSelectedDate = (date: Date): string => {
+    return date.toLocaleString('fr-FR', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
+  const getSelectedDate = (): Date | null => {
+    if (!selectedSlot) return null
+    try {
+      return new Date(selectedSlot)
+    } catch {
+      return null
+    }
+  }
+
+  const selectedDate = getSelectedDate()
+
   return (
     <div>
       <label className="block text-xs font-semibold text-slate-700 mb-2">
         Sélectionnez un créneau horaire
       </label>
 
-      {/* Navigation jour */}
       <div className="flex items-center justify-between mb-4">
         <button
           onClick={goToPreviousDay}
@@ -147,7 +149,7 @@ export default function SlotPicker({ availability, selectedSlot, onSelectSlot }:
 
         <div className="text-center">
           <p className="text-sm font-semibold text-slate-900">
-            {DAYS_FR[currentDay.day]}
+            {DAYS_FR[currentDay.day] || currentDay.day}
           </p>
           <p className="text-xs text-slate-500">
             {formatDateDisplay(realDate)}
@@ -164,7 +166,6 @@ export default function SlotPicker({ availability, selectedSlot, onSelectSlot }:
         </button>
       </div>
 
-      {/* Indicateur de progression */}
       <div className="flex justify-center gap-1 mb-4">
         {daysWithFreeSlots.map((_, idx) => (
           <button
@@ -180,7 +181,6 @@ export default function SlotPicker({ availability, selectedSlot, onSelectSlot }:
         ))}
       </div>
 
-      {/* Grille de créneaux */}
       {freeSlots.length === 0 ? (
         <p className="text-xs text-amber-600 text-center py-4 bg-amber-50 rounded-lg">
           Aucun créneau disponible pour ce jour.
@@ -188,7 +188,7 @@ export default function SlotPicker({ availability, selectedSlot, onSelectSlot }:
       ) : (
         <div className="grid grid-cols-3 gap-2">
           {freeSlots.map((slot, slotIdx) => {
-            const slotDateTime = `${realDate.toISOString().split('T')[0]}T${slot.start}`
+            const slotDateTime = `${realDate.toISOString().split('T')[0]}T${slot.start}:00`
             const isSelected = selectedSlot === slotDateTime
 
             return (
@@ -210,10 +210,10 @@ export default function SlotPicker({ availability, selectedSlot, onSelectSlot }:
         </div>
       )}
 
-      {/* Message informatif */}
-      {selectedSlot && (
+      {/*  Message de confirmation */}
+      {selectedDate && (
         <p className="text-xs text-emerald-600 text-center mt-3">
-          ✓ Créneau sélectionné : {new Date(selectedSlot).toLocaleString('fr-FR')}
+          ✓ Créneau sélectionné : {formatSelectedDate(selectedDate)}
         </p>
       )}
     </div>
