@@ -1,4 +1,6 @@
 // components/appointments/AppointmentMeta.tsx
+'use client';
+
 import type { Appointment, ConsultationType } from "@/app/frontend/types/Appointment";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────

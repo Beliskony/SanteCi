@@ -1,3 +1,5 @@
+'use client';
+
 import { Smartphone, Wifi, Shield, Check, AlertTriangle } from "lucide-react"
 
 const requirements = [

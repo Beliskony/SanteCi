@@ -1,3 +1,5 @@
+'use client';
+
 import DocDash from "@/app/frontend/components/dashboard/doctor/TableauBord/DocDash";
 
 function page() {

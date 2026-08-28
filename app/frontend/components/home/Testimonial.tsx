@@ -1,3 +1,5 @@
+'use client';
+
 import { Star, Quote } from "lucide-react";
 
 const StarRating = ({ rating }: { rating: number }) => (

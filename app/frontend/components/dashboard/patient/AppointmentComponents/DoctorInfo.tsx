@@ -1,4 +1,6 @@
 // components/appointments/DoctorInfo.tsx
+'use client';
+
 import Image from "next/image";
 import { isPopulatedDoctor } from "@/app/frontend/types/Appointment";
 import type { Appointment } from "@/app/frontend/types/Appointment";

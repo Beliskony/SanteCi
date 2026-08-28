@@ -1,3 +1,5 @@
+'use client';
+
 import FaqAccordion from "./FaqAccordion";
 
 const processSteps = [

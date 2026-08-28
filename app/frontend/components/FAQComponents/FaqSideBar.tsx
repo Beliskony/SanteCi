@@ -1,3 +1,5 @@
+'use client';
+
 import { faqCategories } from "@/app/frontend/lib/faq.data";
 
 interface FaqSidebarProps {

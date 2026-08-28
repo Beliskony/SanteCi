@@ -1,3 +1,5 @@
+'use client';
+
 import HospitalDetailPage from '@/app/frontend/components/hoptitalPage/singlePage/HospitalDetailPage'
 
 function page() {

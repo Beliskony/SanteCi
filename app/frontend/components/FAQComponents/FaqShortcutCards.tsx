@@ -1,3 +1,5 @@
+'use client';
+
 import { CreditCardIcon, LockIcon } from "lucide-react";
 import Link from "next/link";
 

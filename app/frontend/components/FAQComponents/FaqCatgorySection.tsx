@@ -1,3 +1,5 @@
+'use client';
+
 import { FaqCategory } from "@/app/frontend/lib/faq.data";
 import FaqAccordionItem from "./FaqAccordionItem";
 

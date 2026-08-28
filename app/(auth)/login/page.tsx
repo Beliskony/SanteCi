@@ -1,3 +1,5 @@
+'use client';
+
 import LoginPage from "@/app/frontend/components/AuthCoponents/LoginPage"
 
 function Login() {

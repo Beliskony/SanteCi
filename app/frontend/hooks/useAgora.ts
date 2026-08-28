@@ -1,10 +1,13 @@
 // app/frontend/hooks/useAgora.ts
 import { useEffect, useRef, useState } from 'react';
-import AgoraRTC, { 
-  IAgoraRTCClient, 
-  ILocalAudioTrack, 
+import type {
+  IAgoraRTCClient,
+  ILocalAudioTrack,
   ILocalVideoTrack,
 } from 'agora-rtc-sdk-ng';
+// ⚠️ On ne garde QUE les types en import statique — ça ne charge pas le SDK
+// à l'exécution, uniquement au moment de la compilation TypeScript.
+// Le SDK réel est chargé dynamiquement dans le useEffect, ci-dessous.
 
 interface UseAgoraProps {
   appId: string;
@@ -19,7 +22,7 @@ export function useAgora({ appId, channelName, token, uid }: UseAgoraProps) {
   const [remoteUsers, setRemoteUsers] = useState<any[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
-  
+
   const clientRef = useRef<IAgoraRTCClient | null>(null);
   const joinedRef = useRef(false);
   const tracksPublishedRef = useRef(false);
@@ -32,133 +35,139 @@ export function useAgora({ appId, channelName, token, uid }: UseAgoraProps) {
   useEffect(() => {
     // Vérifier les paramètres
     if (!appId || !channelName || !token) {
-      console.warn('[Agora] Paramètres manquants:', { appId, channelName, token: !!token });
       return;
     }
 
     // Éviter les doubles connexions
     if (joinedRef.current) {
-      console.log('[Agora] Déjà connecté');
       return;
     }
-
-    const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
-    clientRef.current = client;
-    setIsJoining(true);
 
     //  Empêche la boucle de reconnexion (retry setTimeout) de recréer des
     // tracks après que le composant se soit démonté / que l'effect ait été nettoyé.
     let isActive = true;
     let retryTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
-    // ── Événements ──────────────────────────────────────────────────────────
-    client.on('user-published', async (user, mediaType) => {
-      console.log('[Agora] user-published:', user.uid, mediaType);
-      try {
-        await client.subscribe(user, mediaType);
-        
-        if (mediaType === 'audio') {
-          const audioTrack = user.audioTrack;
-          audioTrack?.play();
-          console.log('[Agora] Audio distant connecté');
-        }
-        
-        if (mediaType === 'video') {
-          const videoTrack = user.videoTrack;
-          const remoteDiv = document.getElementById('remote-video');
-          if (remoteDiv) {
-            videoTrack?.play('remote-video');
-            console.log('[Agora] Vidéo distante connectée');
+    // ── Tout le travail Agora se fait dans cette IIFE async, APRÈS l'import
+    // dynamique. Le useEffect ne s'exécute jamais côté serveur (SSR/SSG),
+    // donc le SDK Agora n'est jamais chargé pendant le build. ──────────────
+    (async () => {
+      const { default: AgoraRTC } = await import('agora-rtc-sdk-ng');
+      if (!isActive) return;
+
+      const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+      clientRef.current = client;
+      setIsJoining(true);
+
+      // ── Événements ────────────────────────────────────────────────────
+      client.on('user-published', async (user, mediaType) => {
+        console.log('[Agora] user-published:', user.uid, mediaType);
+        try {
+          await client.subscribe(user, mediaType);
+
+          if (mediaType === 'audio') {
+            const audioTrack = user.audioTrack;
+            audioTrack?.play();
+            console.log('[Agora] Audio distant connecté');
           }
-        }
-        
-        setRemoteUsers(prev => {
-          if (prev.find(u => u.uid === user.uid)) return prev;
-          return [...prev, user];
-        });
-      } catch (error) {
-        console.error('[Agora] Erreur subscription:', error);
-      }
-    });
 
-    client.on('user-unpublished', (user) => {
-      console.log('[Agora] user-unpublished:', user.uid);
-      setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
-    });
-
-    client.on('user-left', (user) => {
-      console.log('[Agora] user-left:', user.uid);
-      setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
-    });
-
-    client.on('connection-state-change', (curState, prevState) => {
-      console.log('[Agora] Connection state:', prevState, '→', curState);
-      if (curState === 'CONNECTED') {
-        setIsConnected(true);
-        setIsJoining(false);
-        joinedRef.current = true;
-      }
-      if (curState === 'DISCONNECTED' || curState === 'RECONNECTING') {
-        setIsConnected(false);
-      }
-    });
-
-    // ── Joindre le channel ──────────────────────────────────────────────────
-    const joinChannel = async () => {
-      try {
-        console.log('[Agora] Connexion au channel:', channelName);
-        
-        // 1. Joindre
-        await client.join(appId, channelName, token, uid);
-        console.log('[Agora]  Channel rejoint');
-
-        // 2. Créer les tracks
-        console.log('[Agora] Création des tracks...');
-        const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
-        const videoTrack = await AgoraRTC.createCameraVideoTrack();
-        
-        // Activer les tracks par défaut
-        await audioTrack.setEnabled(true);
-        await videoTrack.setEnabled(true);
-        
-        //  Refs d'abord (source de vérité pour le cleanup), puis state (pour l'UI)
-        localAudioTrackRef.current = audioTrack;
-        localVideoTrackRef.current = videoTrack;
-        setLocalAudioTrack(audioTrack);
-        setLocalVideoTrack(videoTrack);
-
-        // 3. Publier les tracks
-        console.log('[Agora] Publication des tracks...');
-        await client.publish([audioTrack, videoTrack]);
-        tracksPublishedRef.current = true;
-        console.log('[Agora]  Tracks publiées');
-
-        // 4. Afficher la vidéo locale
-        const localDiv = document.getElementById('local-video');
-        if (localDiv) {
-          videoTrack.play('local-video');
-          console.log('[Agora]  Vidéo locale affichée');
-        }
-
-        setIsConnected(true);
-        setIsJoining(false);
-        joinedRef.current = true;
-
-      } catch (error) {
-        console.error('[Agora] ❌ Erreur de connexion:', error);
-        setIsJoining(false);
-        // Réessayer après 3s (seulement si le composant est toujours monté)
-        if (!isActive) return;
-        retryTimeoutId = setTimeout(() => {
-          if (isActive && !joinedRef.current && clientRef.current) {
-            console.log('[Agora] Tentative de reconnexion...');
-            joinChannel();
+          if (mediaType === 'video') {
+            const videoTrack = user.videoTrack;
+            const remoteDiv = document.getElementById('remote-video');
+            if (remoteDiv) {
+              videoTrack?.play('remote-video');
+              console.log('[Agora] Vidéo distante connectée');
+            }
           }
-        }, 3000);
-      }
-    };
 
-    joinChannel();
+          setRemoteUsers(prev => {
+            if (prev.find(u => u.uid === user.uid)) return prev;
+            return [...prev, user];
+          });
+        } catch (error) {
+          console.error('[Agora] Erreur subscription:', error);
+        }
+      });
+
+      client.on('user-unpublished', (user) => {
+        console.log('[Agora] user-unpublished:', user.uid);
+        setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
+      });
+
+      client.on('user-left', (user) => {
+        console.log('[Agora] user-left:', user.uid);
+        setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
+      });
+
+      client.on('connection-state-change', (curState, prevState) => {
+        console.log('[Agora] Connection state:', prevState, '→', curState);
+        if (curState === 'CONNECTED') {
+          setIsConnected(true);
+          setIsJoining(false);
+          joinedRef.current = true;
+        }
+        if (curState === 'DISCONNECTED' || curState === 'RECONNECTING') {
+          setIsConnected(false);
+        }
+      });
+
+      // ── Joindre le channel ────────────────────────────────────────────
+      const joinChannel = async () => {
+        try {
+          console.log('[Agora] Connexion au channel:', channelName);
+
+          // 1. Joindre
+          await client.join(appId, channelName, token, uid);
+          console.log('[Agora]  Channel rejoint');
+
+          // 2. Créer les tracks
+          console.log('[Agora] Création des tracks...');
+          const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+          const videoTrack = await AgoraRTC.createCameraVideoTrack();
+
+          // Activer les tracks par défaut
+          await audioTrack.setEnabled(true);
+          await videoTrack.setEnabled(true);
+
+          //  Refs d'abord (source de vérité pour le cleanup), puis state (pour l'UI)
+          localAudioTrackRef.current = audioTrack;
+          localVideoTrackRef.current = videoTrack;
+          setLocalAudioTrack(audioTrack);
+          setLocalVideoTrack(videoTrack);
+
+          // 3. Publier les tracks
+          console.log('[Agora] Publication des tracks...');
+          await client.publish([audioTrack, videoTrack]);
+          tracksPublishedRef.current = true;
+          console.log('[Agora]  Tracks publiées');
+
+          // 4. Afficher la vidéo locale
+          const localDiv = document.getElementById('local-video');
+          if (localDiv) {
+            videoTrack.play('local-video');
+            console.log('[Agora]  Vidéo locale affichée');
+          }
+
+          setIsConnected(true);
+          setIsJoining(false);
+          joinedRef.current = true;
+
+        } catch (error) {
+          console.error('[Agora] ❌ Erreur de connexion:', error);
+          setIsJoining(false);
+          // Réessayer après 3s (seulement si le composant est toujours monté)
+          if (!isActive) return;
+          retryTimeoutId = setTimeout(() => {
+            if (isActive && !joinedRef.current && clientRef.current) {
+              console.log('[Agora] Tentative de reconnexion...');
+              joinChannel();
+            }
+          }, 3000);
+        }
+      };
+
+      joinChannel();
+    })();
 
     // ── Nettoyage amélioré ──────────────────────────────────────────────────
     return () => {
@@ -167,7 +176,7 @@ export function useAgora({ appId, channelName, token, uid }: UseAgoraProps) {
       if (retryTimeoutId) clearTimeout(retryTimeoutId);
       joinedRef.current = false;
       tracksPublishedRef.current = false;
-      
+
       // 1. Fermer les tracks audio/vidéo
       //  On lit les refs (toujours à jour), pas le state `localAudioTrack`
       // qui serait figé sur la valeur `null` capturée à la création de l'effect.
@@ -181,7 +190,7 @@ export function useAgora({ appId, channelName, token, uid }: UseAgoraProps) {
         localAudioTrackRef.current = null;
         setLocalAudioTrack(null);
       }
-      
+
       if (localVideoTrackRef.current) {
         try {
           localVideoTrackRef.current.close();
@@ -192,7 +201,7 @@ export function useAgora({ appId, channelName, token, uid }: UseAgoraProps) {
         localVideoTrackRef.current = null;
         setLocalVideoTrack(null);
       }
-      
+
       // 2. Quitter le channel
       if (clientRef.current) {
         try {
@@ -204,12 +213,12 @@ export function useAgora({ appId, channelName, token, uid }: UseAgoraProps) {
         clientRef.current.removeAllListeners();
         clientRef.current = null;
       }
-      
+
       // 3. Réinitialiser l'état
       setIsConnected(false);
       setIsJoining(false);
       setRemoteUsers([]);
-      
+
       console.log('[Agora]  Nettoyage terminé');
     };
   }, [appId, channelName, token, uid]);

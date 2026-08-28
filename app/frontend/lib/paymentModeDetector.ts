@@ -1,4 +1,3 @@
-// app/frontend/lib/paymentModeDetector.ts
 import { AuthUser, isPatient, isDoctor } from '@/app/frontend/store/useAuthStore';
 
 export type PaymentMode = 'consultation' | 'subscription';
@@ -6,7 +5,6 @@ export type PaymentMode = 'consultation' | 'subscription';
 export interface PaymentModeDetectionResult {
   mode: PaymentMode;
   params: {
-    // Consultation
     doctorId?: string;
     patientId?: string;
     type?: string;
@@ -15,9 +13,7 @@ export interface PaymentModeDetectionResult {
     reason?: string;
     doctorName?: string;
     specialty?: string;
-    // Subscription
     plan?: 'premium' | 'elite';
-    // Communs
     amount: number;
   };
 }
@@ -28,15 +24,12 @@ export function detectPaymentMode(
 ): PaymentModeDetectionResult | null {
   const get = (key: string) => searchParams?.get(key) ?? null;
 
-  // ── 1. Vérifier les paramètres explicites ──────────────────────────────
   const explicitMode = get('mode');
   if (explicitMode === 'subscription' || explicitMode === 'consultation') {
     return buildResult(explicitMode as PaymentMode, searchParams);
   }
 
-  // ── 2. Vérifier par le rôle de l'utilisateur ───────────────────────────
   if (user) {
-    // Si l'utilisateur est un médecin → probablement un abonnement
     if (isDoctor(user)) {
       const plan = get('plan') as 'premium' | 'elite' | null;
       if (plan) {
@@ -44,7 +37,6 @@ export function detectPaymentMode(
       }
     }
     
-    // Si l'utilisateur est un patient → probablement une consultation
     if (isPatient(user)) {
       const doctorId = get('doctorId');
       const scheduledFor = get('scheduledFor');
@@ -54,7 +46,6 @@ export function detectPaymentMode(
     }
   }
 
-  // ── 3. Vérifier par la présence de paramètres spécifiques ──────────────
   const hasConsultationParams = 
     get('doctorId') && get('scheduledFor') && get('patientId');
   
@@ -69,8 +60,7 @@ export function detectPaymentMode(
     return buildResult('subscription', searchParams);
   }
 
-  // ── 4. Vérifier par le chemin URL ──────────────────────────────────────
-  // Si on est sur une page de rendez-vous
+  // Vérification du chemin URL uniquement côté client
   if (typeof window !== 'undefined') {
     const pathname = window.location.pathname;
     if (pathname.includes('/patient/rdv/') || pathname.includes('/appointments/')) {
@@ -81,7 +71,7 @@ export function detectPaymentMode(
     }
   }
 
-  return null; // Mode non détecté
+  return null;
 }
 
 function buildResult(
@@ -111,59 +101,4 @@ function buildResult(
   }
 
   return result;
-}
-
-// Hook personnalisé pour utiliser le détecteur dans les composants
-import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { useAuthStore } from '@/app/frontend/store/useAuthStore';
-
-export function usePaymentMode() {
-  const searchParams = useSearchParams();
-  const user = useAuthStore((s) => s.user);
-  const [modeInfo, setModeInfo] = useState<{
-    mode: PaymentMode;
-    props: any;
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!searchParams) {
-      setLoading(false);
-      return;
-    }
-
-    const detection = detectPaymentMode(searchParams, user);
-    
-    if (!detection) {
-      setLoading(false);
-      setModeInfo(null);
-      return;
-    }
-
-    const { mode, params } = detection;
-
-    // Construire les props selon le mode détecté
-    const props = {
-      mode,
-      amount: params.amount,
-      ...(mode === 'consultation' ? {
-        doctorId: params.doctorId,
-        patientId: params.patientId || user?._id,
-        doctorName: params.doctorName || 'Dr. Non spécifié',
-        specialty: params.specialty || 'Généraliste',
-        scheduledFor: params.scheduledFor ? new Date(params.scheduledFor) : new Date(),
-        consultType: params.type || 'video',
-        duration: Number(params.duration || '30'),
-        reason: params.reason || '',
-      } : {
-        plan: params.plan || 'premium',
-      }),
-    };
-
-    setModeInfo({ mode, props });
-    setLoading(false);
-  }, [searchParams, user]);
-
-  return { modeInfo, loading };
 }

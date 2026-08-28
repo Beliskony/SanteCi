@@ -1,3 +1,5 @@
+'use client';
+
 import RegisterPatientPage from "@/app/frontend/components/AuthCoponents/RegisterPatientpage"
 
 function page() {

@@ -1,4 +1,6 @@
 // components/appointments/StatusBadge.tsx
+'use client';
+
 import type { AppointmentStatus } from "@/app/frontend/types/Appointment";
 
 const STATUS_CONFIG: Record<AppointmentStatus, { label: string; className: string }> = {

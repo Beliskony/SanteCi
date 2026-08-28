@@ -1,3 +1,5 @@
+'use client';
+
 import { Users, MapPin, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { IHospitalClinic } from "@/app/server/interfaces/hopitalClinic.interface";

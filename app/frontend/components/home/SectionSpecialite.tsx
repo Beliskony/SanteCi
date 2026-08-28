@@ -1,3 +1,5 @@
+'use client';
+
 import { Stethoscope, Baby, Activity, Sun, Eye, Heart, Brain, Smile, ArrowRight } from "lucide-react";
 import Link from "next/link";
 

@@ -1,3 +1,5 @@
+'use client';
+
 import BookingCard from "@/app/frontend/components/doctorPage/singlePage/BookingCard"
 import ConsultationTarifs from "@/app/frontend/components/doctorPage/singlePage/ConsultationTarifs"
 import DoctorProfileHeader from "@/app/frontend/components/doctorPage/singlePage/DoctorProfileHeader"

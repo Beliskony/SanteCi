@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, MapPin, CircleCheckBig, Video } from "lucide-react";
+import { CircleCheckBig, Video } from "lucide-react";
 
 const listCheck = [
   "Médecins certifiés",

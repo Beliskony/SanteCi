@@ -1,3 +1,5 @@
+'use client';
+
 import { Video } from "lucide-react"
 import type { DoctorUser } from "@/app/frontend/store/useAuthStore"
 

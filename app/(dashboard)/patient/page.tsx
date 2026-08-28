@@ -1,3 +1,5 @@
+'use client';
+
 import PatDash from '@/app/frontend/components/dashboard/patient/PatDash'
 
 function page() {

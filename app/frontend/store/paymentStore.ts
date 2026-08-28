@@ -135,6 +135,6 @@ export const usePaymentStore = create<PaymentState>()(
       clearPayment: () => set({ currentPayment: null, paymentStatus: null }),
       clearError:   () => set({ error: null }),
     }),
-    { name: 'PaymentStore' }
+    { name: 'PaymentStore', enabled: process.env.NODE_ENV === "development" }
   )
 );

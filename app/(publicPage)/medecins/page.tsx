@@ -1,3 +1,5 @@
+'use client';
+
 import FilterSection from '@/app/frontend/components/doctorPage/FilterSerction'
 import RenderResultSection from '@/app/frontend/components/doctorPage/RenderResultSection'
 

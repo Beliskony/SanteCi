@@ -1,3 +1,5 @@
+'use client';
+
 import { Search, CalendarCheck, FileText } from "lucide-react";
 
 const steps = [

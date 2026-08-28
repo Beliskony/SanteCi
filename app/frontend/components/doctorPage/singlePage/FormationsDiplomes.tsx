@@ -1,3 +1,5 @@
+'use client';
+
 import type { DoctorUser } from "@/app/frontend/store/useAuthStore"
 
 interface FormationsDiplomesProps {

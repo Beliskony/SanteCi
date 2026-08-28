@@ -1,3 +1,5 @@
+'use client';
+
 import Image from "next/image"
 import { BadgeCheck, Star, Languages, Briefcase } from "lucide-react"
 import type { DoctorUser } from "@/app/frontend/store/useAuthStore"

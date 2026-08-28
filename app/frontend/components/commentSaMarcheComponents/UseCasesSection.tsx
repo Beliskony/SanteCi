@@ -1,3 +1,5 @@
+'use client';
+
 const useCases = [
   "Renouvellement d'ordonnance",
   "Suivi médecin traitant",

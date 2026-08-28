@@ -1,3 +1,5 @@
+'use client';
+
 import HeroHopiSection from '@/app/frontend/components/hoptitalPage/HeroHopiSection'
 import ResultSection from '@/app/frontend/components/hoptitalPage/ResultSection'
 

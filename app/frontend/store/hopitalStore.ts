@@ -301,6 +301,6 @@ export const useHospitalStore = create<HospitalState>()(
       clearCurrent: () => set({ currentFacility: null }),
       clearError:   () => set({ error: null }),
     }),
-    { name: "HospitalStore" }
+    { name: "HospitalStore", enabled: process.env.NODE_ENV === "development" }
   )
 );

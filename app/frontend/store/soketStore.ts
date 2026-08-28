@@ -240,6 +240,6 @@ export const useSocketStore = create<SocketState>()(
         socket.emit("call:token-refresh", { callSessionId });
       },
     }),
-    { name: "SocketStore" }
+    { name: "SocketStore", enabled: process.env.NODE_ENV === "development" }
   )
 );
