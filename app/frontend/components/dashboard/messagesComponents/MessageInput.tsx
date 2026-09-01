@@ -12,7 +12,9 @@ interface Props {
   appointmentId?: string;
 }
 
-const EMOJI_LIST = ["😊", "👍", "🙏", "❤️", "😢", "😮", "👋", "", "🔥", "💊"];
+const EMOJI_LIST = ["😊", "👍", "🙏", "❤️", "😢", "😮", "👋", "🧑‍⚕️", "🔥", "💊",
+    "💔", "💉", "🩺", "🏥", "🩹", "🧬", "🦠", "🧪", "⚕️", "🩻", "🧫",
+];
 
 export default function MessageInput({ roomId, receiverId, appointmentId }: Props) {
   const [text, setText]                   = useState("");
@@ -31,7 +33,7 @@ export default function MessageInput({ roomId, receiverId, appointmentId }: Prop
   const recordingDurationRef = useRef<number>(0);
 
   const { sendText, sendMedia, sendAudio, isSending } = useChatStore();
-  
+
   // ← AJOUT : Récupérer les valeurs du socket store
   const { emit, isConnected } = useSocketStore();
   const currentUserId = useAuthStore((s) => s.user?._id ?? "");
@@ -46,17 +48,17 @@ export default function MessageInput({ roomId, receiverId, appointmentId }: Prop
   const handleSendText = useCallback(async () => {
     const trimmed = text.trim();
     if (!trimmed || isSending) return;
-    
+
     setText("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
 
      // 1. Sauvegarder en base via API
   let savedMessage: any = null;
   try {
-    savedMessage = await sendText(roomId, { 
-      receiverId, 
-      content: trimmed, 
-      appointmentId 
+    savedMessage = await sendText(roomId, {
+      receiverId,
+      content: trimmed,
+      appointmentId
     });
   } catch (error) {
     console.error('Erreur lors de l\'envoi du message:', error);
@@ -74,7 +76,7 @@ export default function MessageInput({ roomId, receiverId, appointmentId }: Prop
         timestamp: new Date().toISOString(),
         _id: savedMessage?._id || `temp-${Date.now()}`,
       };
-      
+
       console.log('📤 Émission sendMessage:', messageData);
       emit('sendMessage', messageData);
     } else {
@@ -139,8 +141,20 @@ export default function MessageInput({ roomId, receiverId, appointmentId }: Prop
   // ── Enregistrement audio ────────────────────────────────────
   const startRecording = async () => {
     try {
-      const stream   = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Demander explicitement un codec supporté plutôt que de laisser le
+      // navigateur choisir puis mentir sur le type du Blob ensuite.
+      const preferredMimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : ""; // repli sur le défaut du navigateur si aucun des deux n'est supporté
+
+      const recorder = new MediaRecorder(
+        stream,
+        preferredMimeType ? { mimeType: preferredMimeType } : undefined
+      );
       mediaRecorderRef.current     = recorder;
       audioChunksRef.current       = [];
       recordingDurationRef.current = 0;
@@ -150,21 +164,32 @@ export default function MessageInput({ roomId, receiverId, appointmentId }: Prop
       recorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
 
-        const blob     = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        const file     = new File([blob], `audio_${Date.now()}.webm`, { type: "audio/webm" });
+        // Utiliser le mimeType RÉELLEMENT utilisé par l'enregistreur, pas une
+        // valeur supposée — évite un Blob mal étiqueté.
+        const actualMimeType = recorder.mimeType || preferredMimeType || "audio/webm";
+        const blob     = new Blob(audioChunksRef.current, { type: actualMimeType });
+        const file     = new File([blob], `audio_${Date.now()}.webm`, { type: actualMimeType });
         const duration = recordingDurationRef.current;
 
         setUploading(true);
         try {
-          const arrayBuffer = await blob.arrayBuffer();
-          const audioBase64 = btoa(
-            new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-          );
+          // FileReader natif : encodage base64 fiable, plutôt que la
+          // conversion manuelle byte-par-byte (fragile, lente, et source
+          // potentielle de corruption sur certains navigateurs).
+          const audioBase64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const result = reader.result as string; // "data:<mime>;base64,XXXX"
+              resolve(result.split(",")[1] ?? "");
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
 
           const apiRes  = await fetch("/api/upload-audio", {
             method:  "POST",
             headers: { "Content-Type": "application/json" },
-            body:    JSON.stringify({ audioBase64, fileName: file.name, format: 'mp3', }),
+            body:    JSON.stringify({ audioBase64, fileName: file.name, mimeType: actualMimeType }),
           });
           const apiData = await apiRes.json();
 
@@ -184,8 +209,8 @@ export default function MessageInput({ roomId, receiverId, appointmentId }: Prop
             appointmentId,
           });
 
-          console.log(' Audio uploadé avec succès:', apiData.secure_url);
-          
+          console.log('✅ Audio uploadé avec succès:', apiData.secure_url);
+
         } catch (err) {
           console.error("Audio send error:", err);
           alert("Erreur lors de l'envoi du message vocal.");
@@ -270,14 +295,15 @@ export default function MessageInput({ roomId, receiverId, appointmentId }: Prop
             className="p-2 rounded-xl text-gray-400 hover:text-[#1e3a8a] hover:bg-gray-100 transition-colors">
             <Smile size={20} />
           </button>
+
           {showEmoji && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowEmoji(false)} />
-              <div className="absolute bottom-10 right-0 z-20 bg-white border border-gray-100 rounded-xl shadow-lg p-3 grid grid-cols-5 gap-2">
-                {EMOJI_LIST.map((e) => (
-                  <button key={e} onClick={() => { setText((t) => t + e); setShowEmoji(false); }}
+                <div className="fixed sm:absolute bottom-20 sm:bottom-10 left-1/2 sm:left-auto right-auto sm:right-0 -translate-x-1/2 sm:translate-x-0 z-20 bg-white border border-gray-100 rounded-xl shadow-lg p-3 grid grid-cols-5 gap-2 w-64 max-w-[90vw]">
+                  {EMOJI_LIST.map((e) => (
+                    <button key={e} onClick={() => { setText((t) => t + e); setShowEmoji(false); }}
                     className="text-xl hover:scale-125 transition-transform">{e}</button>
-                ))}
+                  ))}
               </div>
             </>
           )}

@@ -79,6 +79,7 @@ const Header = () => {
 
   const userRef  = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+  const mobileNotifRef = useRef<HTMLDivElement>(null); // ← ref séparée pour le mobile
 
 //  isAuthenticated basé sur le vrai flag d'hydratation Zustand
 const isAuthenticated = hasHydrated && !!role && !!firstName;
@@ -86,7 +87,12 @@ const isAuthenticated = hasHydrated && !!role && !!firstName;
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (userRef.current  && !userRef.current.contains(e.target as Node))  setUserDropdown(false);
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifDropdown(false);
+      if (
+        notifRef.current && !notifRef.current.contains(e.target as Node) &&
+        mobileNotifRef.current && !mobileNotifRef.current.contains(e.target as Node)
+      ) {
+        setNotifDropdown(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -195,7 +201,6 @@ const isAuthenticated = hasHydrated && !!role && !!firstName;
                       </button>
                     </div>
                     <div className="flex flex-col max-h-72 overflow-y-auto">
-                      <div className="flex flex-col max-h-72 overflow-y-auto">
                       {notifications.length === 0 ? (
                         <div className="px-4 py-6 text-center text-xs text-gray-400">
                           Aucune notification pour le moment.
@@ -210,30 +215,20 @@ const isAuthenticated = hasHydrated && !!role && !!firstName;
                                 const section = getNotificationTarget(n);
                                 router.push(`${dashboardHref}?section=${section}`);
                               }}
-                              
+
                             className={`flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-none cursor-pointer ${
                               !n.statut.read ? "bg-[#1e3a8a]/5" : ""
                             }`}
                           >
                             <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${!n.statut.read ? "bg-[#1e3a8a]" : "bg-gray-300"}`} />
-                            <div className="flex flex-col gap-0.5 flex-1">
-                              <p className="text-xs font-medium text-gray-800 leading-relaxed">{n.title}</p>
-                              <p className="text-xs text-gray-600 leading-relaxed">{n.body}</p>
+                            <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                              <p className="text-xs font-medium text-gray-800 leading-relaxed truncate">{n.title}</p>
+                              <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">{n.body}</p>
                               <span className="text-[10px] text-gray-400">{formatTimeAgo(n.metadata.createdAt)}</span>
                             </div>
                           </div>
                         ))
                       )}
-                    </div>
-                    </div>
-                    <div className="px-4 py-2.5 border-t border-gray-100">
-                      <Link
-                        href="/notifications"
-                        onClick={() => setNotifDropdown(false)}
-                        className="text-xs text-[#1e3a8a] font-medium hover:underline"
-                      >
-                        Voir toutes les notifications →
-                      </Link>
                     </div>
                   </div>
                 )}
@@ -319,91 +314,160 @@ const isAuthenticated = hasHydrated && !!role && !!firstName;
 
       {/* ── Menu mobile ── */}
       {menuOpen && (
-        <div className="lg:hidden bg-white border-b border-gray-200 px-6 py-4 flex flex-col gap-1">
-          {NavItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setMenuOpen(false)}
-              className={`py-3 text-sm border-b border-gray-100 last:border-none transition-colors ${
-                pathname === item.href
-                  ? "text-[#3742fa] font-medium"
-                  : "text-[#1e3a8a] hover:text-[#3742fa]"
-              }`}
-            >
-              {item.name}
-            </Link>
-          ))}
+        <>
+          {/* Overlay pour fermer au clic extérieur */}
+          <div
+            className="lg:hidden fixed inset-0 z-40 bg-black/20"
+            onClick={() => setMenuOpen(false)}
+          />
 
-          <div className="mt-3 flex flex-col gap-2">
-            {isAuthenticated ? (
-              <>
-                <div className="flex items-center gap-3 px-3 py-3 rounded-xl border border-gray-200 bg-gray-50">
-                  <div className="w-13 h-13 overflow-hidden shrink-0">
-                    {photo ? (
-                        <img src={photo} alt="Photo" className="w-13 h-13 rounded-full object-cover border-2 border-white shadow-md" />
-                        ) : (
-                        <div className="w-13 h-13 rounded-full bg-linear-to-br from-[#1e3a8a] to-blue-400 flex items-center justify-center text-white text-2xl font-bold shadow-md">
-                        {initials || <User size={28} />}
+          <div className="lg:hidden relative z-50 bg-white border-b border-gray-200 px-6 py-4 flex flex-col gap-1 max-h-[calc(100vh-8rem)] overflow-y-auto">
+            {NavItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMenuOpen(false)}
+                className={`py-3 text-sm border-b border-gray-100 last:border-none transition-colors ${
+                  pathname === item.href
+                    ? "text-[#3742fa] font-medium"
+                    : "text-[#1e3a8a] hover:text-[#3742fa]"
+                }`}
+              >
+                {item.name}
+              </Link>
+            ))}
+
+            <div className="mt-3 flex flex-col gap-2">
+              {isAuthenticated ? (
+                <>
+                  {/* Carte profil */}
+                  <div className="flex items-center gap-3 px-3 py-3 rounded-xl border border-gray-200 bg-gray-50">
+                    <div className="w-13 h-13 overflow-hidden shrink-0">
+                      {photo ? (
+                          <img src={photo} alt="Photo" className="w-13 h-13 rounded-full object-cover border-2 border-white shadow-md" />
+                          ) : (
+                          <div className="w-13 h-13 rounded-full bg-linear-to-br from-[#1e3a8a] to-blue-400 flex items-center justify-center text-white text-2xl font-bold shadow-md">
+                          {initials || <User size={28} />}
+                        </div>
+                       )}
+                    </div>
+                    <div className="flex flex-col items-start leading-tight min-w-0">
+                      <span className="text-sm font-semibold text-[#1e3a8a] truncate">
+                        {firstName} {lastName}
+                      </span>
+                      <span className="text-xs text-gray-400 truncate">{roleLabel}</span>
+                    </div>
+                    <span className="ml-auto w-2 h-2 rounded-full bg-[#10b981] shrink-0" />
+                  </div>
+
+                  {/* ── Notifications — panneau inline, plus de dropdown absolute ── */}
+                  <div ref={mobileNotifRef} className="rounded-lg border border-gray-100 overflow-hidden">
+                    <button
+                      onClick={() => setNotifDropdown((v) => !v)}
+                      className="relative w-full flex items-center gap-2 px-3 py-2.5 text-[#1e3a8a] hover:bg-gray-50 transition-colors cursor-pointer"
+                    >
+                      <Bell size={18} />
+                      <span className="text-sm font-medium">Notifications</span>
+                      {unreadCount > 0 && (
+                        <span className="ml-1 w-4 h-4 rounded-full bg-[#ef4444] text-white text-[9px] font-bold flex items-center justify-center shrink-0">
+                          {unreadCount}
+                        </span>
+                      )}
+                      <ChevronDown
+                        size={14}
+                        className={`ml-auto text-gray-400 transition-transform duration-200 shrink-0 ${notifDropdown ? "rotate-180" : ""}`}
+                      />
+                    </button>
+
+                    {notifDropdown && (
+                      <div className="border-t border-gray-100">
+                        <div className="flex justify-between items-center px-3 py-2 border-b border-gray-100 bg-gray-50">
+                          <span className="text-xs font-semibold text-gray-700">Récentes</span>
+                          <button
+                            onClick={() => markAllAsRead()}
+                            className="text-xs text-[#1e3a8a] hover:underline cursor-pointer"
+                          >
+                            Tout marquer lu
+                          </button>
+                        </div>
+                        <div className="flex flex-col max-h-56 overflow-y-auto">
+                          {notifications.length === 0 ? (
+                            <div className="px-3 py-4 text-center text-xs text-gray-400">
+                              Aucune notification pour le moment.
+                            </div>
+                          ) : (
+                            notifications.map((n) => (
+                              <div
+                                key={n._id}
+                                onClick={() => {
+                                  if (!n.statut.read) markAsRead(n._id);
+                                  setNotifDropdown(false);
+                                  setMenuOpen(false);
+                                  const section = getNotificationTarget(n);
+                                  router.push(`${dashboardHref}?section=${section}`);
+                                }}
+                                className={`flex items-start gap-2.5 px-3 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-none cursor-pointer ${
+                                  !n.statut.read ? "bg-[#1e3a8a]/5" : ""
+                                }`}
+                              >
+                                <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${!n.statut.read ? "bg-[#1e3a8a]" : "bg-gray-300"}`} />
+                                <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                                  <p className="text-xs font-medium text-gray-800 leading-relaxed truncate">{n.title}</p>
+                                  <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">{n.body}</p>
+                                  <span className="text-[10px] text-gray-400">{formatTimeAgo(n.metadata.createdAt)}</span>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        <Link
+                          href="/notifications"
+                          onClick={() => { setNotifDropdown(false); setMenuOpen(false); }}
+                          className="block px-3 py-2.5 text-xs text-[#1e3a8a] font-medium hover:underline border-t border-gray-100"
+                        >
+                          Voir toutes les notifications →
+                        </Link>
                       </div>
-                     )}
+                    )}
                   </div>
-                  <div className="flex flex-col items-start leading-tight">
-                    <span className="text-sm font-semibold text-[#1e3a8a]">
-                      {firstName} {lastName}
-                    </span>
-                    <span className="text-xs text-gray-400">{roleLabel}</span>
-                  </div>
-                  <span className="ml-auto w-2 h-2 rounded-full bg-[#10b981]" />
-                </div>
 
-                <Link
-                  href={dashboardHref}
-                  onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50 border border-gray-100 transition-colors"
-                >
-                  <LayoutDashboard size={16} className="text-[#1e3a8a]" />
-                  Dashboard
-                </Link>
-                <Link
-                  href="/notifications"
-                  onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50 border border-gray-100 transition-colors cursor-pointer"
-                >
-                  <Bell size={16} className="text-[#1e3a8a]" />
-                  Notifications
-                  {unreadCount > 0 && (
-                    <span className="ml-auto w-5 h-5 rounded-full bg-[#ef4444] text-white text-[10px] font-bold flex items-center justify-center">
-                      {unreadCount}
-                    </span>
-                  )}
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-red-500 hover:bg-red-50 border border-red-100 transition-colors"
-                >
-                  <LogOut size={16} />
-                  Déconnexion
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => { setMenuOpen(false); router.push("/login"); }}
-                  className="w-full py-2.5 text-sm text-[#1e3a8a] border border-[#1e3a8a] rounded-lg hover:bg-[#f0f4ff] transition-colors"
-                >
-                  Se connecter
-                </button>
-                <button
-                  onClick={() => { setMenuOpen(false); router.push("/register"); }}
-                  className="w-full py-2.5 text-sm bg-[#1e3a8a] text-white rounded-lg hover:bg-[#3742fa] transition-colors"
-                >
-                  S'inscrire
-                </button>
-              </>
-            )}
+                  {/* Dashboard — lien indépendant */}
+                  <Link
+                    href={dashboardHref}
+                    onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-gray-50 border border-gray-100 transition-colors"
+                  >
+                    <LayoutDashboard size={16} className="text-[#1e3a8a]" />
+                    Dashboard
+                  </Link>
+
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-red-500 hover:bg-red-50 border border-red-100 transition-colors"
+                  >
+                    <LogOut size={16} />
+                    Déconnexion
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => { setMenuOpen(false); router.push("/login"); }}
+                    className="w-full py-2.5 text-sm text-[#1e3a8a] border border-[#1e3a8a] rounded-lg hover:bg-[#f0f4ff] transition-colors"
+                  >
+                    Se connecter
+                  </button>
+                  <button
+                    onClick={() => { setMenuOpen(false); router.push("/register"); }}
+                    className="w-full py-2.5 text-sm bg-[#1e3a8a] text-white rounded-lg hover:bg-[#3742fa] transition-colors"
+                  >
+                    S'inscrire
+                  </button>
+                </>
+              )}
+            </div>
           </div>
-        </div>
+        </>
       )}
     </header>
   );
