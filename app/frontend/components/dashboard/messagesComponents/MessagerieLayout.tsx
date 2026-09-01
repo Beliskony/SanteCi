@@ -44,7 +44,6 @@ export default function MessagerieLayout() {
   const { activeChatRoomId, activeInterlocutor, closeRoom, openRoom } = useChatStore();
   const user = useAuthStore((s) => s.user);
 
-  const connect      = useSocketStore((s) => s.connect);
   const initiateCall = useSocketStore((s) => s.initiateCall);
   const isConnected  = useSocketStore((s) => s.isConnected);
 
@@ -53,9 +52,6 @@ export default function MessagerieLayout() {
   const [isResolvingCall, setIsResolvingCall] = useState(false);
   const [callError, setCallError] = useState<string | null>(null);
 
-  useEffect(() => {
-    connect();
-  }, [connect]);
 
   const handleStartCall = useCallback(async (type: "audio" | "video") => {
     if (!user || !activeInterlocutor) return;

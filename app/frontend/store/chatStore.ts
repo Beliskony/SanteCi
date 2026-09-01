@@ -84,6 +84,10 @@ interface ChatState {
   isLoading:        boolean;
   isSending:        boolean;
   error:            string | null;
+  // Source de vérité indépendante de `conversations` pour la présence —
+  // survit même si un event socket arrive avant que fetchConversations()
+  // ait rempli la liste (race condition HTTP vs socket au montage).
+  onlineUserIds:    Set<string>;
 
   // ── Conversations ──────────────────────────────────────────
   fetchConversations: () => Promise<void>;
@@ -134,17 +138,26 @@ export const useChatStore = create<ChatState>()(
       isLoading:          false,
       isSending:          false,
       error:              null,
+      onlineUserIds:      new Set<string>(),
 
       // ── fetchConversations ─────────────────────────────────
       fetchConversations: async () => {
         set({ isLoading: true, error: null });
         try {
           const raw = await chatService.getConversations();
+          // On applique la présence connue AVANT tout autre traitement :
+          // si un `user:online` est arrivé pendant que ce fetch était en vol,
+          // onlineUserIds l'a déjà, et on ne veut pas que la réponse HTTP
+          // (potentiellement périmée) l'écrase avec `false`.
+          const { onlineUserIds } = get();
           const conversations: PlainConversationSummary[] = raw.map((c) => ({
             chatRoomId:   c.chatRoomId,
             unreadCount:  c.unreadCount,
             lastMessage:  c.lastMessage ? toPlain(c.lastMessage) : null,
-            interlocutor: c.interlocutor,
+            interlocutor: {
+              ...c.interlocutor,
+              isOnline: onlineUserIds.has(c.interlocutor._id) || c.interlocutor.isOnline,
+            },
           }));
           const totalUnread = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
           set({ conversations, totalUnread, isLoading: false });
@@ -158,8 +171,16 @@ export const useChatStore = create<ChatState>()(
         set({ isLoading: true, error: null, activeChatRoomId: roomId, messages: [], hasMore: true });
         try {
           // Récupérer l'interlocuteur depuis la conversation déjà chargée
-          const conv = get().conversations.find((c) => c.chatRoomId === roomId);
-          const activeInterlocutor = conv?.interlocutor ?? null;
+          const { conversations, onlineUserIds } = get();
+          const conv = conversations.find((c) => c.chatRoomId === roomId);
+          const activeInterlocutor = conv
+            ? {
+                ...conv.interlocutor,
+                // Re-vérifie contre onlineUserIds au cas où l'event de
+                // présence serait arrivé après le chargement de cette conv
+                isOnline: onlineUserIds.has(conv.interlocutor._id) || conv.interlocutor.isOnline,
+              }
+            : null;
 
           const raw = await chatService.getMessages({ roomId, limit: 30 });
           set({
@@ -356,27 +377,36 @@ export const useChatStore = create<ChatState>()(
         });
       },
 
-      
-
       // ── setInterlocutorOnline (WebSocket presence) ────────
-      // Appel : socket.on("user_online", ({ userId, isOnline }) => store.setInterlocutorOnline(userId, isOnline))
+      // Appel : socket.on("user:online" | "user:offline", ({ userId }) => store.setInterlocutorOnline(userId, isOnline))
       setInterlocutorOnline: (interlocutorId, isOnline) => {
-        set((state) => ({
-          conversations: state.conversations.map((c) =>
-            c.interlocutor._id === interlocutorId
-              ? { ...c, interlocutor: { ...c.interlocutor, isOnline } }
-              : c
-          ),
-          activeInterlocutor:
-            state.activeInterlocutor?._id === interlocutorId
-              ? { ...state.activeInterlocutor, isOnline }
-              : state.activeInterlocutor,
-        }));
+        set((state) => {
+          // 1. Met à jour la source de vérité indépendante — c'est elle qui
+          //    protège contre la race condition avec fetchConversations()/openRoom().
+          const onlineUserIds = new Set(state.onlineUserIds);
+          if (isOnline) {
+            onlineUserIds.add(interlocutorId);
+          } else {
+            onlineUserIds.delete(interlocutorId);
+          }
+
+          return {
+            onlineUserIds,
+            conversations: state.conversations.map((c) =>
+              c.interlocutor._id === interlocutorId
+                ? { ...c, interlocutor: { ...c.interlocutor, isOnline } }
+                : c
+            ),
+            activeInterlocutor:
+              state.activeInterlocutor?._id === interlocutorId
+                ? { ...state.activeInterlocutor, isOnline }
+                : state.activeInterlocutor,
+          };
+        });
       },
 
       // ── markMessageDeliveredLocally ──────────────────────
       markMessageDeliveredLocally: (messageId: string) => {
-        console.log('markMessageDeliveredLocally:', messageId);
         set((state) => ({
           messages: state.messages.map((msg) =>
             msg._id === messageId
@@ -395,7 +425,6 @@ export const useChatStore = create<ChatState>()(
 
       // ── markRoomMessagesReadLocally ──────────────────────
       markRoomMessagesReadLocally: (chatRoomId: string) => {
-        console.log('📩 markRoomMessagesReadLocally:', chatRoomId);
         set((state) => ({
           messages: state.messages.map((msg) =>
             msg.chatRoomId === chatRoomId
@@ -419,7 +448,6 @@ export const useChatStore = create<ChatState>()(
 
       // ── markMessageReadLocally ──────────────────────────
       markMessageReadLocally: (messageId: string) => {
-        console.log(' markMessageReadLocally:', messageId);
         set((state) => ({
           messages: state.messages.map((msg) =>
             msg._id === messageId

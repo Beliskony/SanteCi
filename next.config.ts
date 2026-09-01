@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const ADMIN_ORIGIN = process.env.NODE_ENV === 'production'
   ? 'https://santeciadmin.vercel.app'
-  : 'http://localhost:5173'; //pour le local histoire de faire les tests
+  : 'http://localhost:3000'; //pour le local histoire de faire les tests
   
 
 const nextConfig: NextConfig = {

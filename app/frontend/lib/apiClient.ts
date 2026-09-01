@@ -7,6 +7,12 @@ import { useAuthStore } from "../store/useAuthStore";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://sante-ci-xi.vercel.app/api/";
 
+function buildUrl(endpoint: string): string {
+  const base = BASE_URL.replace(/\/+$/, "");       // retire les slashes finaux
+  const path = endpoint.replace(/^\/+/, "");        // retire les slashes initiaux
+  return `${base}/${path}`;
+}
+
 // ── Tokens ────────────────────────────────────────────────────
 
 function getToken(): string | null {
@@ -128,7 +134,7 @@ async function handleResponse<T>(
 // ── Méthodes HTTP ─────────────────────────────────────────────
 
 export async function get<T>(endpoint: string, withAuth = true): Promise<T> {
-  const res = await fetch(`${BASE_URL}${endpoint}`, {
+  const res = await fetch(buildUrl(endpoint), {
     method: "GET",
     headers: buildHeaders(withAuth),
   });
@@ -140,7 +146,7 @@ export async function post<T>(
   body: unknown,
   withAuth = true
 ): Promise<T> {
-  const res = await fetch(`${BASE_URL}${endpoint}`, {
+  const res = await fetch(buildUrl(endpoint), {
     method: "POST",
     headers: buildHeaders(withAuth),
     body: JSON.stringify(body),
@@ -153,7 +159,7 @@ export async function put<T>(
   body: unknown,
   withAuth = true
 ): Promise<T> {
-  const res = await fetch(`${BASE_URL}${endpoint}`, {
+  const res = await fetch(buildUrl(endpoint), {
     method: "PUT",
     headers: buildHeaders(withAuth),
     body: JSON.stringify(body),
@@ -166,7 +172,7 @@ export async function patch<T>(
   body: unknown,
   withAuth = true
 ): Promise<T> {
-  const res = await fetch(`${BASE_URL}${endpoint}`, {
+  const res = await fetch(buildUrl(endpoint), {
     method: "PATCH",
     headers: buildHeaders(withAuth),
     body: JSON.stringify(body),
@@ -175,7 +181,7 @@ export async function patch<T>(
 }
 
 export async function del<T>(endpoint: string, withAuth = true): Promise<T> {
-  const res = await fetch(`${BASE_URL}${endpoint}`, {
+  const res = await fetch(buildUrl(endpoint), {
     method: "DELETE",
     headers: buildHeaders(withAuth),
   });
@@ -190,7 +196,7 @@ export async function uploadFile<T>(
   const headers: HeadersInit = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(`${BASE_URL}${endpoint}`, {
+  const res = await fetch(buildUrl(endpoint), {
     method: "POST",
     headers,
     body: formData,
@@ -210,7 +216,7 @@ export async function putFile<T>(
   const headers: HeadersInit = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(`${BASE_URL}${endpoint}`, {
+  const res = await fetch(buildUrl(endpoint), {
     method: "PUT",  // ← Changement clé : PUT au lieu de POST
     headers,
     body: formData,

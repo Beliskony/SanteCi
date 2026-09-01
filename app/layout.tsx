@@ -5,6 +5,8 @@ import { CallCleanupManager } from "./frontend/components/dashboard/callComponen
 import { CallGlobalListener } from "./frontend/components/dashboard/callComponents/CallGlocalListener";
 import { NotificationGlobalListener } from "./frontend/components/notifications/NotificationGlobalListener";
 import NotificationToastContainer from "./frontend/components/notifications/NotificationToastConrainer";
+import { NotificationPoller } from "./frontend/components/notifications/NotificationPoller";
+import { SocketConnectionManager } from "./frontend/components/layouts/SocketConnectionManager";
 
 export const metadata: Metadata = {
   title: "SanteMedCI - Votre santé, notre priorité",
@@ -42,6 +44,8 @@ export default function RootLayout({
           {children}
           <CallGlobalListener />
           <NotificationGlobalListener />
+          <NotificationPoller />
+          <SocketConnectionManager />
         </AppShell>
         <NotificationToastContainer />
       </body>

@@ -14,14 +14,15 @@ import { useChatStore } from "./chatStore";
 // ─── State ────────────────────────────────────────────────────────────────────
 
 interface SocketState {
-  socket:      Socket | null;
-  isConnected: boolean;
-  error:       string | null;
+  socket:       Socket | null;
+  isConnected:  boolean;
+  isConnecting: boolean;
+  error:        string | null;
 
   // ── Actions ───────────────────────────────────────────────
   connect:    () => Promise<void>;
   disconnect: () => void;
-   emit: (event: string, data: any) => boolean;
+  emit: (event: string, data: any) => boolean;
 
   // ── Appel : émettre via socket ────────────────────────────
   initiateCall: (params: {
@@ -43,149 +44,169 @@ interface SocketState {
 export const useSocketStore = create<SocketState>()(
   devtools(
     (set, get) => ({
-      socket:      null,
-      isConnected: false,
-      error:       null,
+      socket:       null,
+      isConnected:  false,
+      isConnecting: false,
+      error:        null,
 
       // ── connect ───────────────────────────────────────────────────────────
       connect: async () => {
-        // Guard : déjà connecté
-        if (get().socket?.connected) return;
+        // Guard synchrone et indépendant de l'ordre async : bloque toute
+        // connexion concurrente dès le premier appel, y compris pendant le
+        // await fetch ci-dessous — avant même que le socket existe. Sans ça,
+        // deux appels rapprochés (React Strict Mode double les effets en dev)
+        // créaient chacun leur propre socket.io, provoquant des doubles
+        // user:register et des faux user:offline quand la connexion
+        // fantôme se fermait.
+        if (get().socket || get().isConnecting) return;
+        set({ isConnecting: true });
 
-        // S'assurer que le endpoint Socket.IO est monté
-        await fetch("/api/socket");
+        try {
+          // IMPORTANT : monter le endpoint Socket.IO côté serveur AVANT de
+          // créer le client — sinon le client tente un handshake websocket
+          // vers un serveur qui n'existe pas encore (→ timeout / "WebSocket
+          // closed before the connection is established").
+          await fetch("/api/socket");
 
-        const user = useAuthStore.getState().user;
+          const user = useAuthStore.getState().user;
           if (!user) {
             console.warn('[Socket] Pas d\'utilisateur');
+            set({ isConnecting: false });
             return;
           }
 
-        const raw      = user._id;
-        const userId   = typeof raw === "string" ? raw : raw;
-        const userType = user.role as "doctor" | "patient";
+          const raw      = user._id;
+          const userId   = typeof raw === "string" ? raw : raw;
+          const userType = user.role as "doctor" | "patient";
 
-        const socket = io({
-          path:                "/api/socket_io",
-          transports:          ["websocket", "polling"],
-          reconnectionAttempts: 5,
-          reconnectionDelay:   1000,
-        });
+          const socket = io({
+            path:                 "/api/socket_io",
+            transports:           ["websocket", "polling"],
+            reconnectionAttempts: 5,
+            reconnectionDelay:    1000,
+          });
 
-        // ── Connexion ──────────────────────────────────────────────────────
-        socket.on("connect", () => {
-          console.log("[Socket]  Connecté :", socket.id);
-          set({ isConnected: true, error: null });
+          set({ socket, isConnecting: false });
 
-          // S'enregistrer auprès du serveur
-          console.log(`[Socket] 📝 Envoi user:register pour ${userId}`);
-          socket.emit("user:register", { userId, userType });
-        });
+          // ── Connexion ──────────────────────────────────────────────────
+          socket.on("connect", () => {
+            console.log("[Socket] ✅ Connecté :", socket.id);
+            set({ isConnected: true, error: null });
 
-        socket.on("disconnect", (reason: any) => {
-          console.log("[Socket] Déconnecté :", reason);
-          set({ isConnected: false });
-        });
+            console.log(`[Socket] 📝 Envoi user:register pour ${userId}`);
+            socket.emit("user:register", { userId, userType });
+          });
 
-        socket.on("connect_error", (err: any) => {
-          console.error("[Socket] Erreur connexion :", err.message);
-          set({ error: err.message });
-        });
+          socket.on("disconnect", (reason: any) => {
+            console.log("[Socket] Déconnecté :", reason);
+            set({ isConnected: false });
+          });
 
-        // ── Événements d'appel → useCallStore ─────────────────────────────
-        const callStore = useCallStore.getState();
+          socket.on("connect_error", (err: any) => {
+            console.error("[Socket] Erreur connexion :", err.message);
+            set({ error: err.message });
+          });
 
-        // Caller : appel initié avec succès → tokens Agora reçus
-        socket.on("call:initiated", (payload: any) => {
-          console.log("[Socket] call:initiated", payload);
-          callStore.onCallInitiated(payload);
-        });
+          // ── Événements d'appel → useCallStore ─────────────────────────
+          const callStore = useCallStore.getState();
 
-        // Receiver : appel entrant
-        socket.on("call:incoming", (payload: any) => {
-          console.log("[Socket] call:incoming", payload);
-          callStore.onIncomingCall(payload);
-        });
+          // Caller : appel initié avec succès → tokens Agora reçus
+          socket.on("call:initiated", (payload: any) => {
+            console.log("[Socket] call:initiated", payload);
+            callStore.onCallInitiated(payload);
+          });
 
-        // Les deux : appel accepté
-        socket.on("call:accepted", (payload: any) => {
-          console.log("[Socket] call:accepted", payload);
-          callStore.onCallAccepted(payload);
-        });
+          // Receiver : appel entrant
+          socket.on("call:incoming", (payload: any) => {
+            console.log("[Socket] call:incoming", payload);
+            callStore.onIncomingCall(payload);
+          });
 
-        // Caller : appel refusé par le receiver
-        socket.on("call:declined", (payload: any) => {
-          console.log("[Socket] call:declined", payload);
-          callStore.onCallDeclined(payload);
-        });
+          // Les deux : appel accepté
+          socket.on("call:accepted", (payload: any) => {
+            console.log("[Socket] call:accepted", payload);
+            callStore.onCallAccepted(payload);
+          });
 
-        // Les deux : appel terminé
-        socket.on("call:ended", (payload: any) => {
-          console.log("[Socket] call:ended", payload);
-          callStore.onCallEnded(payload);
-        });
+          // Caller : appel refusé par le receiver
+          socket.on("call:declined", (payload: any) => {
+            console.log("[Socket] call:declined", payload);
+            callStore.onCallDeclined(payload);
+          });
 
-        // Caller : appel manqué (timeout 45s)
-        socket.on("call:missed", (payload: any) => {
-          console.log("[Socket] call:missed", payload);
-          callStore.onCallMissed(payload);
-        });
+          // Les deux : appel terminé
+          socket.on("call:ended", (payload: any) => {
+            console.log("[Socket] call:ended", payload);
+            callStore.onCallEnded(payload);
+          });
 
-        // Erreur technique
-        socket.on("call:failed", (payload: any) => {
-          //  Si le serveur renvoie un payload vide/malformé (ancien build,
-          // erreur non standard...), on ne perd plus l'info : au minimum on
-          // sait QUEL flux a échoué (via le state courant) au lieu d'un {}
-          // muet dans la console.
-          const message = payload?.message || "Le serveur n'a fourni aucun détail sur l'erreur (payload vide) — vérifie les logs backend.";
-          console.error("[Socket] call:failed —", message, payload);
-          callStore.onCallFailed({ message });
-        });
+          // Caller : appel manqué (timeout 45s)
+          socket.on("call:missed", (payload: any) => {
+            console.log("[Socket] call:missed", payload);
+            callStore.onCallMissed(payload);
+          });
 
-        // Tokens Agora rafraîchis
-        socket.on("call:tokens", (payload: any) => {
-          console.log("[Socket] call:tokens rafraîchis");
-          callStore.onTokensRefreshed(payload);
-        });
+          // Erreur technique
+          socket.on("call:failed", (payload: any) => {
+            // Si le serveur renvoie un payload vide/malformé (ancien build,
+            // erreur non standard...), on ne perd plus l'info : au minimum
+            // on sait QUEL flux a échoué au lieu d'un {} muet dans la console.
+            const message = payload?.message || "Le serveur n'a fourni aucun détail sur l'erreur (payload vide) — vérifie les logs backend.";
+            console.error("[Socket] call:failed —", message, payload);
+            callStore.onCallFailed({ message });
+          });
 
-        // ── Nouveaux messages en temps réel ─────────────
-        socket.on("new_message", (message: any) => {
-          console.log("[Socket] new_message reçu :", message);
-          useChatStore.getState().receiveMessage(message);
-        });
+          // Tokens Agora rafraîchis
+          socket.on("call:tokens", (payload: any) => {
+            console.log("[Socket] call:tokens rafraîchis");
+            callStore.onTokensRefreshed(payload);
+          });
 
-        // ── Statuts de lecture/livraison en temps réel ──────
-        socket.on("message:delivered", (payload: { messageId: string; chatRoomId: string }) => {
-          console.log("[Socket] message:delivered", payload);
-          useChatStore.getState().markMessageDeliveredLocally(payload.messageId);
-        });
+          // ── Nouveaux messages en temps réel ─────────────
+          socket.on("new_message", (message: any) => {
+            console.log("[Socket] new_message reçu :", message);
+            useChatStore.getState().receiveMessage(message);
+          });
 
-        socket.on("message:read", (payload: { messageId: string; chatRoomId: string }) => {
-          console.log("[Socket] message:read", payload);
-          useChatStore.getState().markMessageReadLocally(payload.messageId);
-        });
+          // ── Statuts de lecture/livraison en temps réel ──────
+          socket.on("message:delivered", (payload: { messageId: string; chatRoomId: string }) => {
+            console.log("[Socket] message:delivered", payload);
+            useChatStore.getState().markMessageDeliveredLocally(payload.messageId);
+          });
 
-        socket.on("messages:read", (payload: { chatRoomId: string; readBy: string }) => {
-          console.log("[Socket] messages:read", payload);
-          useChatStore.getState().markRoomMessagesReadLocally(payload.chatRoomId);
-        });
- 
-        // ── Présence en ligne ──────────────────────────────
-        socket.on("user:online",  ({ userId: uid }: any) => {
-          console.log("[Socket] user:online reçu :", uid);
-          useChatStore.getState().setInterlocutorOnline(uid, true);
-        });
-        socket.on("user:offline", ({ userId: uid }: any) => {
-          useChatStore.getState().setInterlocutorOnline(uid, false);
-        });
+          socket.on("message:read", (payload: { messageId: string; chatRoomId: string }) => {
+            console.log("[Socket] message:read", payload);
+            useChatStore.getState().markMessageReadLocally(payload.messageId);
+          });
 
-        set({ socket });
+          socket.on("messages:read", (payload: { chatRoomId: string; readBy: string }) => {
+            console.log("[Socket] messages:read", payload);
+            useChatStore.getState().markRoomMessagesReadLocally(payload.chatRoomId);
+          });
+
+          // ── Présence en ligne ──────────────────────────────
+          socket.on("user:online",  ({ userId: uid }: any) => {
+            console.log("[Socket] user:online reçu :", uid);
+            useChatStore.getState().setInterlocutorOnline(uid, true);
+          });
+          socket.on("user:offline", ({ userId: uid }: any) => {
+            console.log("[Socket] user:offline reçu :", uid);
+            useChatStore.getState().setInterlocutorOnline(uid, false);
+          });
+
+        } catch (err) {
+          console.error('[Socket] Erreur initialisation :', err);
+          set({
+            isConnecting: false,
+            error: err instanceof Error ? err.message : 'Erreur inconnue',
+          });
+        }
       },
 
       // ── disconnect ────────────────────────────────────────────────────────
       disconnect: () => {
         get().socket?.disconnect();
-        set({ socket: null, isConnected: false });
+        set({ socket: null, isConnected: false, isConnecting: false });
       },
 
       emit: (event: string, data: any) => {
@@ -206,9 +227,7 @@ export const useSocketStore = create<SocketState>()(
           console.error("[Socket] Non connecté — impossible d'initier l'appel");
           return;
         }
-        // Mettre à jour le store UI
         useCallStore.getState().startCall(params);
-        // Émettre via socket
         socket.emit("call:initiate", params);
       },
 

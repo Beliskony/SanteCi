@@ -142,13 +142,22 @@ export class ChatGateway {
       });
 
       // ── Déconnexion ──────────────────────────────────────────────────────
-      socket.on('disconnect', () => {
+      socket.on('disconnect', async () => {
         const userId = socket.data.userId as string | undefined;
-        if (userId) {
-          unregisterUser(userId);
-          console.log(`[ChatGateway] Utilisateur déconnecté : ${userId}`);
-          socket.broadcast.emit('user:offline', { userId });
-        }
+        const userType = socket.data.userType as 'doctor' | 'patient' | undefined;
+          if (userId) {
+            unregisterUser(userId);
+            try {
+              if (userType === 'doctor') {
+                await Doctor.findByIdAndUpdate(userId, { $set: { 'status.isOnline': false, 'status.lastActive': new Date() } });
+              } else {
+                await Patient.findByIdAndUpdate(userId, { $set: { 'status.isOnline': false } });
+              }
+            } catch (err) {
+              console.error('[ChatGateway] Erreur mise à jour isOnline (offline):', err);
+            }
+            socket.broadcast.emit('user:offline', { userId });
+          }
       });
     });
   }
