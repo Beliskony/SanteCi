@@ -79,7 +79,7 @@ export default function DossierPage() {
         //onShare={() => console.log("partager")}
       />
 
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3.5">
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3.5">
         <div className="flex flex-col gap-3.5">
           <VitalesCard profile={profile} health={health} />
           <AllergiesCard health={health} />

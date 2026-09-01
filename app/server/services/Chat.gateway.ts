@@ -3,6 +3,7 @@ import { Server as SocketServer, Socket } from 'socket.io';
 import { registerUser, unregisterUser, getOnlineUserIds, emitToUser } from './socketRegistry';
 import { Doctor } from '../models/medcin.model';
 import { Patient } from '../models/patient.model';
+import { notificationService } from './notification.service';
 
 export class ChatGateway {
   constructor(io: SocketServer) {
@@ -105,6 +106,30 @@ export class ChatGateway {
           messageId: data._id,
           chatRoomId: data.roomId,
         });
+
+                // 4. Créer + pousser la notification (badge + toast) chez le destinataire
+        try {
+          const [senderAsDoctor, senderAsPatient, receiverIsDoctor] = await Promise.all([
+            Doctor.findById(data.senderId).select('profile.firstName profile.title').lean(),
+            Patient.findById(data.senderId).select('profile.firstName').lean(),
+            Doctor.exists({ _id: data.receiverId }),
+          ]);
+
+          const senderName = senderAsDoctor
+            ? `${senderAsDoctor.profile?.title ?? 'Dr'} ${senderAsDoctor.profile?.firstName ?? ''}`.trim()
+            : (senderAsPatient?.profile?.firstName ?? 'Quelqu\'un');
+
+          const receiverType: 'doctor' | 'patient' = receiverIsDoctor ? 'doctor' : 'patient';
+
+          await notificationService.notifyNewMessage(
+            data.receiverId,
+            receiverType,
+            senderName,
+            data.content
+          );
+        } catch (err) {
+          console.error('[ChatGateway] Erreur création notification message:', err);
+        }
       });
 
       // ── Marquer un message comme lu ──────────────────────────────────────

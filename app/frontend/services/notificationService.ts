@@ -34,6 +34,11 @@ export interface NotificationData {
   callType?: 'audio' | 'video';
   duration?: number;
   otherUserName?: string;
+
+  // Marqueur ajouté côté client (pas en base) pour distinguer un appel
+  // entrant "en direct" (sonnerie + Accepter/Refuser) d'une notif d'appel
+  // informative (manqué, terminé) — voir NotificationGlobalListener.
+  isLiveIncomingCall?: boolean;
 }
 
 export interface NotificationChannels {

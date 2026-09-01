@@ -248,21 +248,21 @@ export default function DocSideBar() {
   }, [active, refreshBadges]);
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-[#f4f6fb]">
+    <div className="flex h-dvh w-full overflow-hidden bg-[#f4f6fb]">
 
       {/* Hamburger — mobile */}
       <button
         onClick={() => setIsOpen(true)}
         aria-label="Ouvrir le menu"
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-xl shadow-md border border-gray-100 text-gray-700 hover:bg-gray-50 active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1e3a8a]/30"
+        className="lg:hidden fixed top-4 z-40 left-4 p-2 bg-white rounded-xl shadow-md border border-gray-100 text-black hover:bg-gray-50 active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1e3a8a]/30"
       >
-        <Menu size={20} />
+        <Menu size={20}  />
       </button>
 
       {/* Overlay — mobile */}
       {isOpen && (
         <div
-          className="lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+          className="lg:hidden fixed inset-0 z-30 bg-black/40 backdrop-blur-sm"
           onClick={() => setIsOpen(false)}
         />
       )}
@@ -270,7 +270,7 @@ export default function DocSideBar() {
       {/* Drawer — mobile */}
       <aside
         className={`
-          lg:hidden fixed top-0 left-0 z-50 h-full w-72 bg-white shadow-2xl
+          lg:hidden fixed top-0 left-0 z-50 h-dvh w-72 bg-white shadow-2xl
           transform transition-transform duration-300 ease-out
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
         `}
@@ -285,7 +285,7 @@ export default function DocSideBar() {
       </aside>
 
       {/* Sidebar fixe — desktop */}
-      <aside className="hidden lg:flex flex-col h-screen w-64 bg-white border-r border-gray-100 shrink-0 sticky top-0">
+      <aside className="hidden lg:flex flex-col h-dvh w-64 bg-white border-r border-gray-100 shrink-0 sticky top-0">
         <SidebarContent
           active={active}
           setActive={setActive}

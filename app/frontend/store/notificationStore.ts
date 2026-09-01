@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { notificationService } from "../services/notificationService";
+import { useToastStore } from "./toastStore"
 import type {
   Notification,
   NotificationFiltersDTO,
@@ -167,6 +168,12 @@ export const useNotificationStore = create<NotificationState>()(
           unreadCount: unreadCount + 1,
           total: total + 1,
         });
+
+        // Affiche aussi un toast, peu importe où se trouve l'utilisateur sur le site.
+        // Les notifications de type "call" passent aussi par ici désormais —
+        // NotificationToast gère lui-même la sonnerie/les boutons Accepter-Refuser
+        // quand data.isLiveIncomingCall est présent (voir NotificationGlobalListener).
+        useToastStore.getState().push(notification);
       },
 
       setError: (error) => set({ error }),

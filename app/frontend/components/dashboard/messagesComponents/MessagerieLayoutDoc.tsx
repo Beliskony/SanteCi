@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useCallback, useState } from "react";
-import { Phone, AlertCircle } from "lucide-react";
+import { Phone, AlertCircle, ChevronLeft } from "lucide-react";
 import { useChatStore }   from "@/app/frontend/store/chatStore";
 import { useAuthStore }   from "@/app/frontend/store/useAuthStore";
 import { useCallStore }   from "@/app/frontend/store/callStore";
@@ -42,7 +42,7 @@ async function resolveCallableAppointmentId(
 }
 
 export default function MessagerieLayoutDoc() {
-  const { activeChatRoomId, activeInterlocutor, openRoom } = useChatStore();
+  const { activeChatRoomId, activeInterlocutor, closeRoom, openRoom } = useChatStore();
   const user = useAuthStore((s) => s.user);
 
   const connect      = useSocketStore((s) => s.connect);
@@ -97,6 +97,7 @@ export default function MessagerieLayoutDoc() {
     <div className="flex h-full w-full bg-[#f4f6fb] overflow-hidden">
 
       <ConversationList
+        className={activeChatRoomId ? "hidden md:flex" : "flex"}
         onSelectRoom={(roomId) => {
           if (roomId !== activeChatRoomId) openRoom(roomId);
         }}
@@ -104,6 +105,15 @@ export default function MessagerieLayoutDoc() {
 
       {activeChatRoomId && activeInterlocutor ? (
         <div className="flex flex-col flex-1 min-w-0 w-full h-full">
+          {/* Bouton retour, mobile uniquement */}
+          <button
+            onClick={closeRoom}
+            className="md:hidden flex items-center gap-2 px-4 py-2 text-sm text-[#1e3a8a] border-b border-gray-100"
+          >
+            <ChevronLeft size={16} />
+            Retour aux conversations
+          </button>
+
           {callError && (
             <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border-b border-amber-100 text-xs text-amber-700">
               <AlertCircle size={14} className="shrink-0" />

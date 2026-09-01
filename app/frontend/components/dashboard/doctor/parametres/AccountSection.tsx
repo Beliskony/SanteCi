@@ -57,13 +57,13 @@ export function AccountSection() {
 
       {/* Photo + nom (lecture seule) */}
       <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col gap-5">
-        <div className="flex items-center justify-between">
+        <div className="flex items-start sm:items-center justify-between gap-3 flex-wrap">
           <div>
             <h2 className="text-base font-bold text-slate-900">Compte professionnel</h2>
             <p className="text-xs text-slate-400 mt-0.5">Gérez vos informations publiques et vos préférences d&apos;activité.</p>
           </div>
           {user?.status?.isVerified && (
-            <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
+            <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full shrink-0">
               <CheckCircle size={12} /> Vérifié
             </span>
           )}

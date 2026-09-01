@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useAuthStore, isDoctor } from "@/app/frontend/store/useAuthStore";
 import { useAppointmentStore }    from "@/app/frontend/store/appoitmentStore";
 import { useSocketStore }         from "@/app/frontend/store/soketStore";
@@ -44,6 +44,7 @@ export default function AgendaPage() {
   const [activeAppt,   setActiveAppt]   = useState<Appointment | null>(null);
   const [isSlotsModalOpen, setIsSlotsModalOpen] = useState(false);
   const [isStarting,   setIsStarting]   = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all"); //  Filtre de statut
 
@@ -168,8 +169,29 @@ export default function AgendaPage() {
   return (
     <div className="flex h-[calc(100vh-0)] bg-[#f4f6fb] overflow-hidden gap-x-4 py-3.5">
 
+      {/* Overlay — mobile uniquement, quand le drawer calendrier est ouvert */}
+      {isSidebarOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-30 bg-black/30"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* ── Colonne gauche ── */}
-      <aside className="w-72 shrink-0 flex flex-col gap-4 p-4 overflow-y-auto border-r border-slate-200 bg-white">
+      <aside className={`
+          fixed lg:static inset-y-0 left-0 z-40 w-72 shrink-0 flex flex-col gap-4 p-4
+          overflow-y-auto border-r border-slate-200 bg-white
+          transform transition-transform duration-300 ease-out
+          ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0
+        `}
+      >
+        <button
+          onClick={() => setIsSidebarOpen(false)}
+          className="lg:hidden self-end p-1.5 rounded-lg text-slate-400 hover:bg-slate-100"
+        >
+          <X size={16} />
+        </button>
+
         <AgendaCalendar
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
@@ -179,13 +201,20 @@ export default function AgendaPage() {
       </aside>
 
       {/* ── Colonne droite ── */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0 lg:ml-4">
 
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-5 py-4 bg-white border-b border-slate-200 shrink-0 flex-wrap gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-5 py-4 bg-white border-b border-slate-200 shrink-0">
 
-          {/* Date + navigation */}
-          <div className="flex items-center gap-3">
+           {/* Date + navigation + toggle calendrier mobile */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
+              aria-label="Ouvrir le calendrier"
+            >
+              <CalendarDays size={18} />
+            </button>
             <div className="flex items-center gap-1">
               <button
                 onClick={goToPrev}
@@ -200,38 +229,34 @@ export default function AgendaPage() {
                 <ChevronRight size={16} />
               </button>
             </div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold text-slate-900">{dateLabel}</h2>
+            <div className="flex items-center gap-2 min-w-0">
+              <h2 className="text-sm font-bold text-slate-900 truncate">{dateLabel}</h2>
               {prevApptCount > 0 && (
-                <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                <span className="hidden sm:inline text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full shrink-0">
                   {prevApptCount} RDV précédents
                 </span>
               )}
             </div>
           </div>
 
-          {/* Filtre + sélecteur de vue */}
-          <div className="flex items-center gap-3">
-            {/*  Filtre de statut */}
+         {/* Filtre + sélecteur de vue */}
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="text-xs font-medium border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1e3a8a]/30"
+              className="flex-1 sm:flex-none text-xs font-medium border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1e3a8a]/30"
             >
               {STATUS_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
 
-            {/* Sélecteur de vue */}
             <div className="flex items-center bg-slate-100 rounded-xl p-1 gap-0.5">
               {(["Jour", "Semaine", "Mois"] as ViewMode[]).map((mode) => (
                 <button
                   key={mode}
                   onClick={() => setViewMode(mode)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                  className={`px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
                     viewMode === mode
                       ? "bg-white text-slate-900 shadow-sm"
                       : "text-slate-500 hover:text-slate-700"
@@ -243,6 +268,7 @@ export default function AgendaPage() {
             </div>
           </div>
         </div>
+
 
         {/* ── Timeline ── */}
         <div className="flex-1 overflow-hidden px-2 py-3">

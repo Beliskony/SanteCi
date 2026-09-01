@@ -42,15 +42,15 @@ export default function SettingsPage() {
 
           {/* Sidebar nav */}
           <aside className="w-full lg:w-48 shrink-0">
-            <nav className="bg-white border border-slate-200 rounded-2xl p-2 flex flex-row lg:flex-col gap-1">
+            <nav className="bg-white border border-slate-200 rounded-2xl p-2 flex flex-row lg:flex-col gap-1 overflow-x-auto">
               {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
                 <button
                   key={key}
                   onClick={() => setActive(key)}
-                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors w-full text-left cursor-pointer ${
-                    active === key
-                      ? "bg-[#1e3a8a]/10 text-[#1e3a8a]"
-                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors shrink-0 lg:w-full text-left cursor-pointer whitespace-nowrap ${
+                  active === key
+                    ? "bg-[#1e3a8a]/10 text-[#1e3a8a]"
+                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
                   }`}
                 >
                   <Icon size={15} />
@@ -61,7 +61,7 @@ export default function SettingsPage() {
           </aside>
 
           {/* Contenu */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 w-full">
             {active === "compte"       && <AccountSection />}
             {active === "securite"     && <DoctorSecuritySection />}
             {active === "document"     && <DoctorDocumentsSection/>}

@@ -64,12 +64,12 @@ export function TelemedicineSection() {
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col gap-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h2 className="text-base font-bold text-slate-900">Téléconsultation &amp; tarifs</h2>
           <p className="text-xs text-slate-400 mt-0.5">Activez les types de consultation et définissez vos tarifs.</p>
         </div>
-        <button onClick={() => setAvailable(!available)} className="flex items-center gap-2">
+        <button onClick={() => setAvailable(!available)} className="flex items-center gap-2 shrink-0">
           {available
             ? <ToggleRight size={28} className="text-emerald-500" />
             : <ToggleLeft  size={28} className="text-slate-300"  />}
@@ -81,17 +81,20 @@ export function TelemedicineSection() {
 
       <div className="flex flex-col divide-y divide-slate-100">
         {TYPES.map(({ key, label, icon: Icon, sub }) => {
-          const active = types.includes(key);
-          return (
-            <div key={key} className="flex items-center gap-4 py-4">
+        const active = types.includes(key);
+        return (
+          <div key={key} className="flex flex-col sm:flex-row sm:items-center gap-3 py-4">
+            <div className="flex items-center gap-4 flex-1 min-w-0">
               <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${active ? "bg-[#1e3a8a]/10" : "bg-slate-100"}`}>
                 <Icon size={16} className={active ? "text-[#1e3a8a]" : "text-slate-400"} />
               </div>
-              <div className="flex-1">
+              <div className="min-w-0">
                 <p className={`text-sm font-semibold ${active ? "text-slate-900" : "text-slate-400"}`}>{label}</p>
                 <p className="text-xs text-slate-400">{active ? `Active • ${sub}` : "Désactivée"}</p>
               </div>
-              <div className="flex items-center gap-1.5 shrink-0">
+            </div>
+            <div className="flex items-center gap-3 pl-13 sm:pl-0 shrink-0">
+              <div className="flex items-center gap-1.5">
                 <input
                   type="number"
                   min={0}
@@ -108,8 +111,9 @@ export function TelemedicineSection() {
                   ? <ToggleRight size={22} className="text-emerald-500" />
                   : <ToggleLeft  size={22} className="text-slate-300"  />}
               </button>
-            </div>
-          );
+           </div>
+          </div>
+        );
         })}
       </div>
 

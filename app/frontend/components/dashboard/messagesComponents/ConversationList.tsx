@@ -8,9 +8,10 @@ import ConversationItem from "./conversationItem";
 
 interface Props {
   onSelectRoom: (roomId: string) => void;
+  className?: string;
 }
 
-export default function ConversationList({ onSelectRoom }: Props) {
+export default function ConversationList({ onSelectRoom, className = "" }: Props) {
   const [query, setQuery] = useState("");
 
   const { conversations, activeChatRoomId, isLoading, fetchConversations } = useChatStore();
@@ -26,7 +27,7 @@ export default function ConversationList({ onSelectRoom }: Props) {
   );
 
   return (
-    <aside className="w-72 shrink-0 flex flex-col h-full border-r border-gray-100 bg-white">
+    <aside className={`w-full md:w-72 shrink-0 flex-col h-full border-r border-gray-100 bg-white ${className}`}>
       {/* Header */}
       <div className="px-4 pt-5 pb-3">
         <h2 className="text-base font-bold text-gray-900 mb-3">Messagerie</h2>

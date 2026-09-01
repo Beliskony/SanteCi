@@ -90,13 +90,13 @@ function PrescriptionView({
 
   return (
     <div>
-      <div className="flex items-start justify-between mb-4">
-        <div>
+      <div className="flex items-start justify-between mb-4 gap-3">
+        <div className="min-w-0">
           <p className="text-xs text-amber-600 font-semibold mb-1">Ordonnance</p>
           <h3 className="text-lg font-bold text-gray-900">Ordonnance du {formatDate(p.date)}</h3>
-          <p className="text-xs text-gray-400 mt-0.5">{doctorName}</p>
+          <p className="text-xs text-gray-400 mt-0.5 truncate">{doctorName}</p>
         </div>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 shrink-0">
           <X className="w-5 h-5" />
         </button>
       </div>
@@ -145,7 +145,7 @@ function PrescriptionView({
         </div>
       )}
 
-      <div className="flex items-center gap-2 pt-3 border-t border-gray-100 text-xs text-gray-400">
+      <div className="flex items-center gap-2 pt-3 border-t border-gray-100 text-xs text-gray-400 flex-wrap">
         <span>Validité : {p.validityDays} jours</span>
         <span>·</span>
         <span className="capitalize">{p.status}</span>
@@ -167,15 +167,15 @@ function AppointmentDocView({
 
   return (
     <div>
-      <div className="flex items-start justify-between mb-4">
-        <div>
+      <div className="flex items-start justify-between mb-4 gap-3">
+        <div className="min-w-0">
           <p className={`text-xs font-semibold mb-1 ${TYPE_STYLE[type].split(" ")[1]}`}>{type}</p>
-          <h3 className="text-lg font-bold text-gray-900">{a.details.reason}</h3>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <h3 className="text-lg font-bold text-gray-900 wrap-break-words">{a.details.reason}</h3>
+          <p className="text-xs text-gray-400 mt-0.5 truncate">
             {doctorLabel(a)} · {formatDate(a.details.scheduledFor)}
           </p>
         </div>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 shrink-0">
           <X className="w-5 h-5" />
         </button>
       </div>
@@ -265,17 +265,17 @@ export function DocumentsCard({
   return (
     <>
       <div className="bg-white border border-gray-100 rounded-xl p-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Folder className="w-4 h-4 text-gray-400" />
-            <span className="text-sm font-medium text-gray-800">Documents & Ordonnances</span>
+        <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
+          <div className="flex items-center gap-2 min-w-0">
+            <Folder className="w-4 h-4 text-gray-400 shrink-0" />
+            <span className="text-sm font-medium text-gray-800 truncate">Documents & Ordonnances</span>
             {prescriptions.length > 0 && (
-              <span className="text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded-full">
+              <span className="text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded-full shrink-0">
                 {prescriptions.length}
               </span>
             )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 shrink-0">
             <button
               onClick={() => setIsFilterModalOpen(true)}
               className="flex items-center gap-1 px-2.5 py-1 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
@@ -303,86 +303,88 @@ export function DocumentsCard({
         ) : !hasDocuments ? (
           <p className="text-xs text-gray-400">Aucun document disponible</p>
         ) : (
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-gray-100">
-                <th className="text-left font-medium text-gray-400 pb-2 w-[36%]">Nom du document</th>
-                <th className="text-left font-medium text-gray-400 pb-2 w-[16%]">Type</th>
-                <th className="text-left font-medium text-gray-400 pb-2 w-[16%]">Date</th>
-                <th className="text-left font-medium text-gray-400 pb-2 w-[22%]">Médecin</th>
-                <th className="text-left font-medium text-gray-400 pb-2 w-[10%]">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {previewPrescriptions.map((p) => {
-                const doctorName = prescriptionDoctorLabel(p);
-                return (
-                  <tr key={p._id}>
-                    <td className="py-2.5 pr-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <FileBadge className="w-3.5 h-3.5 text-amber-500" />
-                        <span className="truncate text-gray-700 max-w-30">
-                          Ordonnance du {formatDate(p.date)}
+          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            <table className="w-full min-w-140 sm:min-w-0 text-xs">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left font-medium text-gray-400 pb-2 w-[36%]">Nom du document</th>
+                  <th className="text-left font-medium text-gray-400 pb-2 w-[16%]">Type</th>
+                  <th className="text-left font-medium text-gray-400 pb-2 w-[16%]">Date</th>
+                  <th className="text-left font-medium text-gray-400 pb-2 w-[22%]">Médecin</th>
+                  <th className="text-left font-medium text-gray-400 pb-2 w-[10%]">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {previewPrescriptions.map((p) => {
+                  const doctorName = prescriptionDoctorLabel(p);
+                  return (
+                    <tr key={p._id}>
+                      <td className="py-2.5 pr-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FileBadge className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                          <span className="truncate text-gray-700 max-w-30">
+                            Ordonnance du {formatDate(p.date)}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-2.5 pr-2">
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 whitespace-nowrap">
+                          Ordonnance
                         </span>
-                      </div>
-                    </td>
-                    <td className="py-2.5 pr-2">
-                      <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700">
-                        Ordonnance
-                      </span>
-                    </td>
-                    <td className="py-2.5 pr-2 text-gray-500 whitespace-nowrap">
-                      {formatDate(p.date)}
-                    </td>
-                    <td className="py-2.5 pr-2 text-gray-500 truncate max-w-20">
-                      {doctorName}
-                    </td>
-                    <td className="py-2.5">
-                      <button
-                        onClick={() => setViewingItem({ kind: "prescription", data: p })}
-                        className="text-gray-400 hover:text-blue-600 transition-colors"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+                      </td>
+                      <td className="py-2.5 pr-2 text-gray-500 whitespace-nowrap">
+                        {formatDate(p.date)}
+                      </td>
+                      <td className="py-2.5 pr-2 text-gray-500 truncate max-w-20">
+                        {doctorName}
+                      </td>
+                      <td className="py-2.5">
+                        <button
+                          onClick={() => setViewingItem({ kind: "prescription", data: p })}
+                          className="text-gray-400 hover:text-blue-600 transition-colors"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
 
-              {previewAppointments.map((a) => {
-                const type = getDocType(a);
-                return (
-                  <tr key={a._id}>
-                    <td className="py-2.5 pr-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <DocIcon type={type} />
-                        <span className="truncate text-gray-700 max-w-30">{docLabel(a)}</span>
-                      </div>
-                    </td>
-                    <td className="py-2.5 pr-2">
-                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${TYPE_STYLE[type]}`}>
-                        {type}
-                      </span>
-                    </td>
-                    <td className="py-2.5 pr-2 text-gray-500 whitespace-nowrap">
-                      {formatDate(a.details.scheduledFor)}
-                    </td>
-                    <td className="py-2.5 pr-2 text-gray-500 truncate max-w-20">
-                      {doctorLabel(a)}
-                    </td>
-                    <td className="py-2.5">
-                      <button
-                        onClick={() => setViewingItem({ kind: "appointment", data: a })}
-                        className="text-gray-400 hover:text-blue-600 transition-colors"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                {previewAppointments.map((a) => {
+                  const type = getDocType(a);
+                  return (
+                    <tr key={a._id}>
+                      <td className="py-2.5 pr-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <DocIcon type={type} />
+                          <span className="truncate text-gray-700 max-w-30">{docLabel(a)}</span>
+                        </div>
+                      </td>
+                      <td className="py-2.5 pr-2">
+                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${TYPE_STYLE[type]}`}>
+                          {type}
+                        </span>
+                      </td>
+                      <td className="py-2.5 pr-2 text-gray-500 whitespace-nowrap">
+                        {formatDate(a.details.scheduledFor)}
+                      </td>
+                      <td className="py-2.5 pr-2 text-gray-500 truncate max-w-20">
+                        {doctorLabel(a)}
+                      </td>
+                      <td className="py-2.5">
+                        <button
+                          onClick={() => setViewingItem({ kind: "appointment", data: a })}
+                          className="text-gray-400 hover:text-blue-600 transition-colors"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
 
         {totalDocuments > 6 && (

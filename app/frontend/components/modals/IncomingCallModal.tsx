@@ -1,11 +1,12 @@
 // app/frontend/components/dashboard/callComponents/IncomingCallModal.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Phone, PhoneOff, Volume2, VolumeX } from 'lucide-react';
 import { useCallStore } from '@/app/frontend/store/callStore';
 import { useSocketStore } from '@/app/frontend/store/soketStore';
 import { useAuthStore } from '@/app/frontend/store/useAuthStore';
+import { useNotificationSound } from '@/app/frontend/hooks/useNotificationSound';
 
 export default function IncomingCallModal() {
   const { 
@@ -17,10 +18,19 @@ export default function IncomingCallModal() {
   const { acceptCall, declineCall } = useSocketStore();
   const user = useAuthStore((s) => s.user);
   const [isMuted, setIsMuted] = useState(false);
+  const { start, stop } = useNotificationSound();
 
-  //  Log pour debug
-  console.log('[IncomingCallModal] isIncomingVisible:', isIncomingVisible);
-  console.log('[IncomingCallModal] incomingCallNotification:', incomingCallNotification);
+  // Sonnerie tant que le modal est visible et non coupé. On la stoppe
+  // systématiquement au démontage / à la fermeture pour ne jamais la
+  // laisser tourner en arrière-plan.
+  useEffect(() => {
+    if (isIncomingVisible && incomingCallNotification && !isMuted) {
+      start('call');
+    } else {
+      stop();
+    }
+    return () => stop();
+  }, [isIncomingVisible, incomingCallNotification, isMuted, start, stop]);
 
   // Ne rien afficher si pas visible
   if (!isIncomingVisible || !incomingCallNotification) {
@@ -29,20 +39,20 @@ export default function IncomingCallModal() {
 
   const handleAccept = () => {
     const userId = typeof user?._id === 'string' ? user._id : String(user?._id || '');
-    console.log('[IncomingCallModal]  Accepter l\'appel:', incomingCallNotification.callSessionId);
+    stop();
     acceptCall(incomingCallNotification.callSessionId, userId);
     hideIncomingCall();
   };
 
   const handleDecline = () => {
     const userId = typeof user?._id === 'string' ? user._id : String(user?._id || '');
-    console.log('[IncomingCallModal] ❌ Refuser l\'appel:', incomingCallNotification.callSessionId);
+    stop();
     declineCall(incomingCallNotification.callSessionId, userId, 'declined');
     hideIncomingCall();
   };
 
   const toggleMute = () => {
-    setIsMuted(!isMuted);
+    setIsMuted((m) => !m);
   };
 
   const callLabel = incomingCallNotification.callType === 'video' ? '📹 Appel vidéo' : '📞 Appel audio';
@@ -72,7 +82,9 @@ export default function IncomingCallModal() {
             <span className="w-1.5 h-1.5 rounded-full bg-[#1e3a8a] animate-bounce" style={{ animationDelay: '150ms' }} />
             <span className="w-1.5 h-1.5 rounded-full bg-[#1e3a8a] animate-bounce" style={{ animationDelay: '300ms' }} />
           </div>
-          <span className="text-xs text-gray-400">Sonnerie en cours...</span>
+          <span className="text-xs text-gray-400">
+            {isMuted ? 'Sonnerie coupée...' : 'Sonnerie en cours...'}
+          </span>
         </div>
 
         <div className="flex items-center justify-center gap-6 mt-8">

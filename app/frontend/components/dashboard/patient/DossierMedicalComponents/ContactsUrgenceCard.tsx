@@ -72,19 +72,19 @@ export function ContactsUrgenceCard({ onCall }: ContactsUrgenceCardProps) {
             <p className="text-xs text-gray-400 pb-3">Aucun contact renseigné</p>
           )}
           {contacts.map((contact, i) => (
-            <div key={`${contact.phone}-${i}`} className="flex items-center justify-between py-2.5">
-              <div className="flex items-center gap-2.5">
+            <div key={`${contact.phone}-${i}`} className="flex items-center justify-between py-2.5 gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-xs font-medium text-blue-800 shrink-0">
                   {initials(contact.name)}
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-800">{contact.name}</p>
-                  <p className="text-xs text-gray-500">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-800 truncate">{contact.name}</p>
+                  <p className="text-xs text-gray-500 truncate">
                     {contact.relationship} · {contact.phone}
                   </p>
                 </div>
               </div>
-              <div className="flex gap-1">
+              <div className="flex gap-1 shrink-0">
                 <button
                   onClick={() => onCall?.(contact.phone)}
                   className="text-gray-400 hover:text-blue-600 transition-colors"

@@ -2,6 +2,7 @@ import { Types } from 'mongoose';
 import { Notification } from '../models/notification.model';
 import { INotification } from '../interfaces/notification.interface';
 import type { TNotificationData } from '../schemas/notification.schema';
+import { emitToUser } from './socketRegistry';
 import { mailService } from '../services/mail.service';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -77,6 +78,15 @@ class NotificationService {
         // On ne bloque pas si l'email échoue
       }
     } */}
+
+    // ── Émission temps réel ────────────────────────────────────────────────
+    // Pousse la notification instantanément à l'utilisateur s'il est connecté.
+    // S'il ne l'est pas, emitToUser renvoie false silencieusement — la notif
+    // reste en base et sera vue au prochain fetch (comportement inchangé).
+    if (notification.channels.inApp) {
+      console.log('[NotificationService] 🔔 Émission notification:new →', dto.userId, notification.title);
+      emitToUser(String(dto.userId), 'notification:new', notification);
+    }
 
     return notification;
   }
