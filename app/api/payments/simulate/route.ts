@@ -8,9 +8,9 @@ import { SimulatePaymentSchema } from '@/app/server/schemas/payment.schema';
 
 export async function POST(req: NextRequest) {
   // Bloquer en production
-  if (process.env.NODE_ENV === 'production') {
-    return NextResponse.json({ success: false, message: 'Non disponible en production.' }, { status: 403 });
-  }
+  //if (process.env.NODE_ENV === 'production') {
+    //return NextResponse.json({ success: false, message: 'Non disponible en production.' }, { status: 403 });
+  //}
 
   try {
     await connectDB();
