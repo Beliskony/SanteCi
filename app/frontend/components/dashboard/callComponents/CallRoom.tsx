@@ -98,6 +98,12 @@ function IncomingCallScreen({ onEnd }: { onEnd?: () => void }) {
   const declineCall     = useSocketStore((s) => s.declineCall);
   const user            = useAuthStore((s) => s.user);
 
+  // ✅ Empêche un double-clic (ou un double tap mobile) d'envoyer deux
+  // call:accept / call:decline quasi simultanés — c'était la cause du
+  // "Impossible d'accepter un appel en statut accepted" et de l'écran
+  // d'appel qui ne s'affichait jamais correctement.
+  const [isResponding, setIsResponding] = useState(false);
+
   const userId = user
     ? (typeof user._id === "string" ? user._id : user._id)
     : "";
@@ -123,12 +129,15 @@ function IncomingCallScreen({ onEnd }: { onEnd?: () => void }) {
         <div className="flex flex-col items-center gap-2">
           <button
             onClick={() => {
+              if (isResponding) return;
+              setIsResponding(true);
               if (incomingPayload) {
                 declineCall(incomingPayload.callSessionId, userId, "Occupé");
               }
               onEnd?.();
             }}
-            className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors shadow-lg shadow-red-500/40"
+            disabled={isResponding}
+            className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors shadow-lg shadow-red-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <PhoneOff size={24} className="text-white" />
           </button>
@@ -139,11 +148,14 @@ function IncomingCallScreen({ onEnd }: { onEnd?: () => void }) {
         <div className="flex flex-col items-center gap-2">
           <button
             onClick={() => {
+              if (isResponding) return;
+              setIsResponding(true);
               if (incomingPayload) {
                 acceptCall(incomingPayload.callSessionId, userId);
               }
             }}
-            className="w-16 h-16 rounded-full bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center transition-colors shadow-lg shadow-emerald-500/40"
+            disabled={isResponding}
+            className="w-16 h-16 rounded-full bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center transition-colors shadow-lg shadow-emerald-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Phone size={24} className="text-white" />
           </button>
@@ -269,7 +281,7 @@ const hasValidTokens = agoraTokens &&
   // ── Écran connecting ───────────────────────────────────────────────────────
   if (phase === "connecting" || phase === "calling") {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-slate-950 gap-4">
+      <div className="fixed inset-0 z-9999 flex flex-col items-center justify-center h-screen bg-slate-950 gap-4">
         <Loader2 size={40} className="text-[#1e3a8a] animate-spin" />
         <p className="text-white font-medium">
           {phase === "calling" ? "Appel en cours..." : "Connexion..."}
@@ -295,7 +307,7 @@ const hasValidTokens = agoraTokens &&
 
   // ── Salle d'appel principale ───────────────────────────────────────────────
   return (
-    <div className="flex h-screen w-full bg-slate-950 overflow-hidden">
+    <div className="fixed inset-0 z-9999 flex h-screen w-full bg-slate-950 overflow-hidden">
 
       {/* ══ Zone vidéo ══════════════════════════════════════════════════════ */}
       <div className="flex-1 flex flex-col relative">

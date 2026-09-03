@@ -38,7 +38,7 @@ export default function BookingCard({ telemedicine, location, doctor }: BookingC
     chat:  consultationFees.chat,
   }), [consultationFees])
 
-  const handleConfirm = useCallback(() => {
+ const handleConfirm = useCallback(() => {
     if (!selectedSlot) return
 
     if (!user) {
@@ -53,8 +53,7 @@ export default function BookingCard({ telemedicine, location, doctor }: BookingC
 
     setError(null)
 
-    const [date, time] = selectedSlot.split('T')
-    const scheduledFor = new Date(`${date}T${time}:00`).toISOString()
+    const scheduledFor = new Date(selectedSlot).toISOString()
 
     const params = new URLSearchParams({
       doctorId:    doctor._id.toString(),
@@ -70,8 +69,6 @@ export default function BookingCard({ telemedicine, location, doctor }: BookingC
 
     router.push(`/payment?${params.toString()}`)
   }, [selectedSlot, doctor, selectedType, feeMap, user, router])
- console.log('📊 BookingCard - availability reçue:', availability);
-  console.log('📊 BookingCard - availability longueur:', availability?.length);
   return (
     <div className="flex flex-col gap-4">
       {/* Carte principale RDV */}

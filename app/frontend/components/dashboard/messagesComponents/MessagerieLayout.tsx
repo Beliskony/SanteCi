@@ -4,40 +4,50 @@ import { useEffect, useCallback, useState } from "react";
 import { Phone, AlertCircle, ChevronLeft } from "lucide-react";
 import { useChatStore }    from "@/app/frontend/store/chatStore";
 import { useAuthStore }    from "@/app/frontend/store/useAuthStore";
-import { useCallStore }    from "@/app/frontend/store/callStore";
 import { useSocketStore }  from "@/app/frontend/store/soketStore";
 import { appointmentService } from "@/app/frontend/services/consultationService";
 import ConversationList    from "./ConversationList";
 import ConversationHeader  from "./ConversationHeader";
 import ConversationBody    from "./ConversationBody";
 import MessageInput        from "./MessageInput";
-import CallRoom            from "@/app/frontend/components/dashboard/callComponents/CallRoom";
 
 // ── Résoudre le rendez-vous appelable entre ce patient et ce médecin ─────────
-// Même logique que côté médecin : priorité au RDV "ongoing", sinon le
-// "confirmed" le plus proche de maintenant. Un chatRoomId n'est PAS un appointmentId.
-async function resolveCallableAppointmentId(
+// Priorité au RDV "ongoing", sinon le "confirmed" le plus proche de maintenant.
+// Un chatRoomId n'est PAS un appointmentId. Seuls video/audio sont appelables.
+
+interface CallableAppointment {
+  appointmentId: string;
+  callType:      "audio" | "video";
+  status:        "confirmed" | "ongoing";
+}
+
+async function resolveCallableAppointment(
   doctorId: string,
   patientId: string
-): Promise<string | null> {
+): Promise<CallableAppointment | null> {
   const res = await appointmentService.list({ doctorId, patientId, limit: 20 });
 
   const eligible = res.appointments.filter((a) =>
-    a.status.current === "ongoing" || a.status.current === "confirmed"
+    (a.status.current === "ongoing" || a.status.current === "confirmed") &&
+    (a.details.type === "video" || a.details.type === "audio")
   );
 
   if (eligible.length === 0) return null;
 
   const ongoing = eligible.find((a) => a.status.current === "ongoing");
-  if (ongoing) return ongoing._id;
+  const chosen = ongoing ?? (() => {
+    const now = Date.now();
+    return [...eligible].sort((a, b) =>
+      Math.abs(new Date(a.details.scheduledFor).getTime() - now) -
+      Math.abs(new Date(b.details.scheduledFor).getTime() - now)
+    )[0];
+  })();
 
-  const now = Date.now();
-  eligible.sort((a, b) =>
-    Math.abs(new Date(a.details.scheduledFor).getTime() - now) -
-    Math.abs(new Date(b.details.scheduledFor).getTime() - now)
-  );
-
-  return eligible[0]._id;
+  return {
+    appointmentId: chosen._id,
+    callType:      chosen.details.type as "audio" | "video",
+    status:        chosen.status.current as "confirmed" | "ongoing",
+  };
 }
 
 export default function MessagerieLayout() {
@@ -47,56 +57,44 @@ export default function MessagerieLayout() {
   const initiateCall = useSocketStore((s) => s.initiateCall);
   const isConnected  = useSocketStore((s) => s.isConnected);
 
-  const phase = useCallStore((s) => s.phase);
-
+  const [callableAppointment, setCallableAppointment] = useState<CallableAppointment | null>(null);
   const [isResolvingCall, setIsResolvingCall] = useState(false);
   const [callError, setCallError] = useState<string | null>(null);
 
+  // Résoudre le RDV appelable dès qu'on ouvre une conversation
+  useEffect(() => {
+    if (!user || !activeInterlocutor) {
+      setCallableAppointment(null);
+      return;
+    }
 
-  const handleStartCall = useCallback(async (type: "audio" | "video") => {
-    if (!user || !activeInterlocutor) return;
+    let cancelled = false;
+    setIsResolvingCall(true);
+    setCallError(null);
 
-    const callerId = typeof user._id === "string" ? user._id : user._id;
+    resolveCallableAppointment(
+      activeInterlocutor._id, // le médecin, côté patient
+      String(user._id)
+    )
+      .then((info) => { if (!cancelled) setCallableAppointment(info); })
+      .catch(() => { if (!cancelled) setCallableAppointment(null); })
+      .finally(() => { if (!cancelled) setIsResolvingCall(false); });
+
+    return () => { cancelled = true; };
+  }, [user, activeInterlocutor]);
+
+  const handleStartCall = useCallback(() => {
+    if (!user || !activeInterlocutor || !callableAppointment) return;
 
     setCallError(null);
-    setIsResolvingCall(true);
-    try {
-      const appointmentId = await resolveCallableAppointmentId(
-        activeInterlocutor._id, // le médecin, côté patient
-        String(callerId)
-      );
-
-      if (!appointmentId) {
-        setCallError("Aucun rendez-vous confirmé ou en cours avec ce médecin — impossible de démarrer l'appel.");
-        return;
-      }
-
-      initiateCall({
-        callerId,
-        callerType:    user.role as "doctor" | "patient",
-        receiverId:    activeInterlocutor._id,
-        appointmentId,
-        callType:      type,
-      });
-    } catch (err: any) {
-      setCallError(err.message ?? "Impossible de vérifier le rendez-vous.");
-    } finally {
-      setIsResolvingCall(false);
-    }
-  }, [user, activeInterlocutor, initiateCall]);
-
-  const isInCall = phase !== "idle" && phase !== "ended" &&
-                   phase !== "declined" && phase !== "missed" && phase !== "failed";
-
-  if (isInCall) {
-    return (
-      <CallRoom
-        onEnd={() => {
-          // Le store repasse en idle automatiquement via onCallEnded/socket
-        }}
-      />
-    );
-  }
+    initiateCall({
+      callerId:      String(user._id),
+      callerType:    user.role as "doctor" | "patient",
+      receiverId:    activeInterlocutor._id,
+      appointmentId: callableAppointment.appointmentId,
+      callType:      callableAppointment.callType,
+    });
+  }, [user, activeInterlocutor, callableAppointment, initiateCall]);
 
   return (
     <div className="flex h-full w-full bg-[#f4f6fb] overflow-hidden">
@@ -113,13 +111,13 @@ export default function MessagerieLayout() {
       {activeChatRoomId && activeInterlocutor ? (
         <div className="flex flex-col flex-1 min-w-0 w-full">
           {/* Bouton retour, mobile uniquement */}
-            <button
-              onClick={closeRoom}
-              className="md:hidden flex items-center gap-2 px-4 py-2 text-sm text-[#1e3a8a] border-b border-gray-100"
-            >
-              <ChevronLeft size={16} />
-                Retour aux conversations
-            </button>
+          <button
+            onClick={closeRoom}
+            className="md:hidden flex items-center gap-2 px-4 py-2 text-sm text-[#1e3a8a] border-b border-gray-100"
+          >
+            <ChevronLeft size={16} />
+            Retour aux conversations
+          </button>
 
           {callError && (
             <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border-b border-amber-100 text-xs text-amber-700">
@@ -132,6 +130,7 @@ export default function MessagerieLayout() {
           )}
           <ConversationHeader
             interlocutor={activeInterlocutor}
+            callType={callableAppointment?.callType ?? null}
             onStartCall={handleStartCall}
           />
           <ConversationBody roomId={activeChatRoomId} />

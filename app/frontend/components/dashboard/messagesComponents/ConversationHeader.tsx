@@ -7,10 +7,11 @@ import type { Interlocutor } from "@/app/frontend/services/chatService";
 
 interface Props {
   interlocutor: Interlocutor;
-  onStartCall:  (type: "audio" | "video") => void;
+  callType:     "audio" | "video" | null; // null = pas de RDV appelable
+  onStartCall:  () => void;
 }
 
-export default function ConversationHeader({ interlocutor, onStartCall }: Props) {
+export default function ConversationHeader({ interlocutor, callType, onStartCall }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -43,20 +44,15 @@ export default function ConversationHeader({ interlocutor, onStartCall }: Props)
 
       {/* Actions */}
       <div className="flex items-center gap-1">
-        <button
-          onClick={() => onStartCall("audio")}
-          title="Appel audio"
-          className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-[#1e3a8a] transition-colors"
-        >
-          <Phone size={18} />
-        </button>
-        <button
-          onClick={() => onStartCall("video")}
-          title="Appel vidéo"
-          className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-[#1e3a8a] transition-colors"
-        >
-          <Video size={18} />
-        </button>
+        {callType && (
+          <button
+            onClick={onStartCall}
+            title={callType === "audio" ? "Appel audio" : "Appel vidéo"}
+            className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-[#1e3a8a] transition-colors"
+          >
+            {callType === "audio" ? <Phone size={18} /> : <Video size={18} />}
+          </button>
+        )}
 
         {/* Menu contextuel */}
         <div className="relative">

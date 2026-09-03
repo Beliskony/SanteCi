@@ -321,31 +321,24 @@ acceptCall: async () => {
       },
 
       // ── endCall ───────────────────────────────────────────────────────────
-// useCallStore.ts
-endCall: async () => {
-  const { session, phase } = get();
-  get()._clearTimers();
+      endCall: async () => {
+        const { session, phase } = get();
+        get()._clearTimers();
   
-  if (!session) { 
-    set({ ...IDLE_STATE }); 
-    return; 
-  }
+        if (!session) { set({ ...IDLE_STATE }); return; }
   
-  const endedBy = phase === "calling" ? "caller" : "receiver";
+        const endedBy = phase === "calling" ? "caller" : "receiver";
+
+        // On coupe côté UI/hardware immédiatement — la réussite ou l'échec de
+        // l'appel API/socket ne doit jamais conditionner la libération du micro/caméra.
+        set({ ...IDLE_STATE, phase: "ended", elapsedSeconds: get().elapsedSeconds });
+        setTimeout(() => set({ phase: "idle", elapsedSeconds: 0 }), 4000);
   
   try {
-    // 1. Appel API
     await callService.end(session._id, endedBy);
-    
-    // 2. Émettre via Socket
     useSocketStore.getState().endCall(session._id, session.callerId, endedBy);
-    
-    // 3. Mettre à jour le state
-    set({ ...IDLE_STATE, phase: "ended", elapsedSeconds: get().elapsedSeconds });
-    
-    setTimeout(() => set({ phase: "idle", elapsedSeconds: 0 }), 4000);
   } catch (err) {
-    set({ error: toMessage(err), phase: "failed" });
+      console.error('[CallStore] endCall API a échoué (état local déjà nettoyé):', err);
   }
 },
 

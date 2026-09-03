@@ -1,3 +1,4 @@
+
 // ============================================================
 // components/notifications/NotificationToast.tsx
 // Une carte de notification individuelle. Style aligné sur
@@ -9,10 +10,27 @@
 // pas d'auto-fermeture, boutons Accepter/Refuser au lieu du body
 // standard. Les autres notifications de type "call" (appel manqué,
 // appel terminé...) restent des toasts informatifs classiques.
+//
+// ⚠️ Ce toast et l'écran plein écran de CallRoom.tsx (IncomingCallScreen)
+// affichent tous les deux un appel entrant. Pour éviter que l'un reste
+// affiché alors que l'autre a déjà avancé (accepté/refusé/raccroché
+// ailleurs), ce toast :
+//   1. Accepte/refuse via useSocketStore (socket.emit "call:accept" /
+//      "call:decline") — c'est le SEUL chemin qui déclenche réellement
+//      CallGateway côté backend et fait avancer l'appel pour les deux
+//      participants. callStore.acceptCall()/declineCall() ne font QUE
+//      des appels REST de repli (cf. leur JSDoc) et ne doivent pas être
+//      utilisés ici — les utiliser directement ne fait rien avancer
+//      côté serveur, l'appel reste bloqué.
+//   2. Se ferme automatiquement dès que `callStore.phase` quitte "ringing"
+//      (peuplé par NotificationGlobalListener via onIncomingCall), quelle
+//      que soit la raison : action ici, action dans CallRoom, ou event
+//      serveur (call:accepted / call:missed / call:ended) reçu par
+//      useSocketStore et répercuté dans callStore.
 // ============================================================
-
+ 
 "use client";
-
+ 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -37,7 +55,8 @@ import { useToastStore } from "@/app/frontend/store/toastStore";
 import { useNotificationSound } from "@/app/frontend/hooks/useNotificationSound";
 import { useSocketStore } from "@/app/frontend/store/soketStore";
 import { useAuthStore } from "@/app/frontend/store/useAuthStore";
-
+import { useCallStore } from "@/app/frontend/store/callStore";
+ 
 const ICONS: Record<NotificationType, typeof Bell> = {
   appointment: Calendar,
   prescription: Pill,
@@ -48,7 +67,7 @@ const ICONS: Record<NotificationType, typeof Bell> = {
   emergency: AlertTriangle,
   call: Phone,
 };
-
+ 
 const ACCENTS: Record<NotificationType, string> = {
   appointment: "text-[#1e3a8a] bg-[#1e3a8a]/10",
   prescription: "text-emerald-700 bg-emerald-50",
@@ -59,14 +78,14 @@ const ACCENTS: Record<NotificationType, string> = {
   emergency: "text-red-700 bg-red-50",
   call: "text-green-700 bg-green-50",
 };
-
+ 
 // Durée d'affichage automatique (ms) selon la priorité back-end
 const AUTO_DISMISS_MS: Record<Notification["metadata"]["priority"], number> = {
   high: 8000,
   normal: 5000,
   low: 4000,
 };
-
+ 
 function buildHref(notification: Notification): string | null {
   const { type, data } = notification;
   if (data?.url) return data.url;
@@ -87,12 +106,12 @@ function buildHref(notification: Notification): string | null {
       return null;
   }
 }
-
+ 
 interface NotificationToastProps {
   id: string;
   notification: Notification;
 }
-
+ 
 export default function NotificationToast({
   id,
   notification,
@@ -103,25 +122,31 @@ export default function NotificationToast({
   const [isLeaving, setIsLeaving] = useState(false);
   const [isSoundMuted, setIsSoundMuted] = useState(false);
   const timerRef = useRef<number | null>(null);
-
+ 
+  const user = useAuthStore((s) => s.user);
+ 
+  // ── Accept/decline réels : via socket, seul chemin qui déclenche
+  //    CallGateway côté backend ────────────────────────────────────────────
   const acceptCall = useSocketStore((s) => s.acceptCall);
   const declineCall = useSocketStore((s) => s.declineCall);
-  const user = useAuthStore((s) => s.user);
-
+ 
+  // ── callPhase : uniquement pour savoir quand se fermer, jamais pour agir ──
+  const callPhase = useCallStore((s) => s.phase);
+ 
   const Icon = ICONS[notification.type] ?? Bell;
   const accent = ACCENTS[notification.type] ?? ACCENTS.system;
-
+ 
   const isLiveIncomingCall =
     notification.type === "call" && !!notification.data?.isLiveIncomingCall;
-
+ 
   // Urgences + appel entrant en direct : reste affiché tant qu'on n'agit pas
   const isUrgent = notification.type === "emergency" || isLiveIncomingCall;
-
+ 
   const close = () => {
     setIsLeaving(true);
     window.setTimeout(() => dismiss(id), 200);
   };
-
+ 
   // Sonnerie : boucle pour un appel entrant en direct, bip unique pour une urgence
   useEffect(() => {
     if (isLiveIncomingCall) {
@@ -132,7 +157,7 @@ export default function NotificationToast({
     return () => stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
+ 
   useEffect(() => {
     if (isUrgent) return;
     const duration =
@@ -143,18 +168,33 @@ export default function NotificationToast({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
+ 
+  // ── Fermeture auto dès que l'appel n'est plus "ringing" ───────────────────
+  // Couvre : accepté/refusé/raccroché depuis CallRoom (écran plein écran),
+  // appel manqué (timeout serveur), appel qui échoue — tout ce qui fait
+  // avancer callStore.phase ailleurs que dans ce toast.
+  useEffect(() => {
+    if (!isLiveIncomingCall) return;
+    if (callPhase !== "ringing") {
+      stop();
+      close();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callPhase, isLiveIncomingCall]);
+ 
   const getUserId = () =>
     typeof user?._id === "string" ? user._id : String(user?._id || "");
-
+ 
   const handleAccept = (e: React.MouseEvent) => {
     e.stopPropagation();
     const sessionId = notification.data?.callSessionId;
     if (sessionId) acceptCall(sessionId, getUserId());
     stop();
-    close();
+    // Pas de close() ici : le useEffect sur callPhase s'en charge dès que
+    // call:accepted revient du serveur (phase passe à "connecting"/"ongoing").
+    // Fermer immédiatement ici masquerait un échec silencieux de l'accept.
   };
-
+ 
   const toggleSound = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isSoundMuted) {
@@ -164,22 +204,23 @@ export default function NotificationToast({
     }
     setIsSoundMuted((m) => !m);
   };
-
+ 
   const handleDecline = (e: React.MouseEvent) => {
     e.stopPropagation();
     const sessionId = notification.data?.callSessionId;
     if (sessionId) declineCall(sessionId, getUserId(), "declined");
     stop();
-    close();
+    // Idem : le useEffect sur callPhase fermera le toast une fois
+    // call:declined confirmé côté serveur.
   };
-
+ 
   const handleClick = () => {
     if (isLiveIncomingCall) return; // pas de navigation sur une alerte d'appel
     const href = buildHref(notification);
     if (href) router.push(href);
     close();
   };
-
+ 
   return (
     <div
       role="alert"
@@ -207,7 +248,7 @@ export default function NotificationToast({
           <p className="mt-0.5 line-clamp-2 text-sm text-gray-500">
             {notification.body}
           </p>
-
+ 
           {isLiveIncomingCall && (
             <div className="mt-3 flex items-center gap-2">
               <button
@@ -248,3 +289,4 @@ export default function NotificationToast({
     </div>
   );
 }
+ 

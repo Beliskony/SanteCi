@@ -59,8 +59,18 @@ export function ConsultationCard({
   const isOngoing  = status.current === "ongoing";
   const isConfirmed= status.current === "confirmed";
 
-  const scheduledFor = new Date(details.scheduledFor);
-  const time = scheduledFor.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+
+const scheduledFor = new Date(details.scheduledFor);
+const endTime = new Date(scheduledFor.getTime() + details.duration * 60000);
+
+const startLabel = scheduledFor.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+const endLabel   = endTime.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+
+const dateLabel = scheduledFor.toLocaleDateString("fr-FR", {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+}); // ex. "ven. 28 août"
   const patientName = patient
     ? `${patient.profile.firstName} ${patient.profile.lastName}`
     : "Patient";
@@ -80,14 +90,17 @@ export function ConsultationCard({
       <div className={`flex gap-4 p-4 ${isExpanded ? "border-l-4 border-l-[#1e3a8a]" : ""}`}>
 
         {/* ── Heure + durée ── */}
-        <div className={`flex flex-col items-center justify-center shrink-0 w-14 py-2 rounded-xl text-center ${
-          isExpanded ? "bg-[#1e3a8a] text-white" : "bg-slate-100 text-slate-600"
-        }`}>
-          <span className="text-sm font-bold leading-none">{time}</span>
-          <span className={`text-[10px] mt-1 ${isExpanded ? "text-white/70" : "text-slate-400"}`}>
-            {details.duration}min
-          </span>
-        </div>
+        <div className={`flex flex-col items-center justify-center shrink-0 w-16 py-2 rounded-xl text-center ${
+  isExpanded ? "bg-[#1e3a8a] text-white" : "bg-slate-100 text-slate-600"
+}`}>
+  <span className={`text-[9px] font-semibold uppercase tracking-wide ${isExpanded ? "text-white/70" : "text-slate-400"}`}>
+    {dateLabel}
+  </span>
+  <span className="text-sm font-bold leading-none mt-1">{startLabel}</span>
+  <span className={`text-[10px] mt-0.5 ${isExpanded ? "text-white/70" : "text-slate-400"}`}>
+    → {endLabel}
+  </span>
+</div>
 
         {/* ── Contenu ── */}
         <div className="flex-1 min-w-0 flex flex-col gap-2">

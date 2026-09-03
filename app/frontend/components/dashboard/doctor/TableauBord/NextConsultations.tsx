@@ -30,9 +30,12 @@ function ConsultationCard({
   const typeCfg  = TYPE_CONFIG[details.type] ?? TYPE_CONFIG.in_person;
   const isOngoing = status.current === "ongoing";
 
-  const time = new Date(details.scheduledFor).toLocaleTimeString("fr-FR", {
-    hour: "2-digit", minute: "2-digit",
-  });
+  const scheduledFor = new Date(details.scheduledFor);
+  const endTime = new Date(scheduledFor.getTime() + details.duration * 60000);
+
+  const startLabel = scheduledFor.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  const endLabel   = endTime.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  const dateLabel  = scheduledFor.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
 
   // Info patient
   const patientName = patient
@@ -52,13 +55,18 @@ function ConsultationCard({
       {isFirst && (
         <div className="absolute left-0 top-3 bottom-3 w-1 bg-[#1e3a8a] rounded-full" />
       )}
-
       {/* Heure */}
-      <div className={`shrink-0 flex flex-col items-center justify-center w-14 py-1 rounded-xl ${
-        isFirst ? "bg-[#1e3a8a] text-white" : "bg-slate-200/60 text-slate-600"
-      }`}>
-        <span className="text-sm font-bold leading-none">{time}</span>
-      </div>
+<div className={`shrink-0 flex flex-col items-center justify-center w-16 py-1.5 rounded-xl text-center ${
+  isFirst ? "bg-[#1e3a8a] text-white" : "bg-slate-200/60 text-slate-600"
+}`}>
+  <span className={`text-[9px] font-semibold uppercase tracking-wide ${isFirst ? "text-white/70" : "text-slate-500"}`}>
+    {dateLabel}
+  </span>
+  <span className="text-sm font-bold leading-none mt-1">{startLabel}</span>
+  <span className={`text-[10px] mt-0.5 ${isFirst ? "text-white/70" : "text-slate-400"}`}>
+    → {endLabel}
+  </span>
+</div>
 
       {/* Contenu */}
       <div className="flex-1 min-w-0 flex flex-col gap-2">

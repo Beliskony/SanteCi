@@ -186,6 +186,15 @@ class CallService {
       throw new Error('Action non autorisée.');
     }
 
+    // ✅ Idempotence : si CE receveur a déjà accepté cet appel (double-clic,
+    // requête réseau rejouée, etc.), on renvoie simplement la session déjà
+    // acceptée au lieu de jeter une erreur — celle-ci provoquait un
+    // call:failed qui pouvait interférer avec le phase "ongoing" côté client
+    // juste après qu'il ait été correctement établi par le premier accept.
+    if (callSession.status === 'accepted') {
+      return callSession;
+    }
+
     if (callSession.status !== 'ringing' && callSession.status !== 'initiated') {
       throw new Error(`Impossible d'accepter un appel en statut "${callSession.status}".`);
     }

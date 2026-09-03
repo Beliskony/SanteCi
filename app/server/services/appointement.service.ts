@@ -102,7 +102,16 @@ class AppointmentService {
     if (conflict) throw new Error('Ce créneau est déjà réservé pour ce médecin.');
 
     const appointmentId = `APT-${crypto.randomBytes(5).toString('hex').toUpperCase()}`;
-    const chatRoomId = `ROOM-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
+      const previousAppointment = await Appointment.findOne({
+    patientId: new Types.ObjectId(dto.patientId),
+    doctorId:  new Types.ObjectId(dto.doctorId),
+  })
+    .select('communication.chatRoomId')
+    .sort({ 'metadata.createdAt': -1 });
+
+  const chatRoomId =
+    previousAppointment?.communication.chatRoomId ??
+    `ROOM-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
 
     const appointment = await Appointment.create({
       appointmentId,
