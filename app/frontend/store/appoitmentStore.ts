@@ -76,6 +76,15 @@ interface AppointmentState {
   /** PATCH /api/appointments/[id]/no-show — médecin uniquement */
   markNoShow: (id: string) => Promise<void>;
 
+    /**
+   * PATCH /api/appointments/[id]/resolve-missed — médecin/admin uniquement
+   * missed_review → no_show, avec décision sur le paiement.
+   */
+  resolveMissed: (
+    id: string,
+    decision: "refund" | "keep_payment" | "reschedule_credit"
+  ) => Promise<void>;
+
   /**
    * POST /api/appointments/[id]/join
    * Enregistre patientJoinedAt ou doctorJoinedAt.
@@ -313,6 +322,28 @@ export const useAppointmentStore = create<AppointmentState>()(
           set({
             error:
               err instanceof Error ? err.message : "Erreur lors du marquage absent",
+            isLoading: false,
+          });
+          throw err;
+        }
+      },
+
+       resolveMissed: async (id, decision) => {
+        set({ isLoading: true, error: null });
+        try {
+          const updated = await appointmentService.resolveMissed(id, decision);
+          set((state) => ({
+            appointments: replaceInList(state.appointments, updated),
+            currentAppointment: maybeUpdateCurrent(
+              state.currentAppointment,
+              updated
+            ),
+            isLoading: false,
+          }));
+        } catch (err) {
+          set({
+            error:
+              err instanceof Error ? err.message : "Erreur lors de la résolution du rendez-vous manqué",
             isLoading: false,
           });
           throw err;

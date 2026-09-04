@@ -71,6 +71,7 @@ export function AgendaMonthView({
     if (statuses.includes('confirmed')) return 'bg-green-100 text-green-700';
     if (statuses.includes('completed')) return 'bg-blue-100 text-blue-700';
     if (statuses.includes('cancelled')) return 'bg-red-100 text-red-700';
+    if (statuses.includes('missed_review')) return 'bg-amber-100 text-amber-700';
     return 'bg-blue-50 text-[#1e3a8a]';
   };
 

@@ -15,7 +15,8 @@ export type AppointmentStatus =
   | "ongoing"
   | "completed"
   | "cancelled"
-  | "no_show";
+  | "no_show"
+  | "missed_review";
 
 export type PaymentStatus = "pending" | "paid" | "refunded" | "failed";
 

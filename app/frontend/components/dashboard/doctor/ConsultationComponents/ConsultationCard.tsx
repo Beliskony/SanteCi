@@ -4,6 +4,7 @@ import { Video, MessageSquare, Phone, MapPin, FolderOpen, FileText } from "lucid
 import type { Appointment } from "@/app/frontend/types/Appointment";
 import { isPopulatedPatient } from "@/app/frontend/types/Appointment";
 import { useAppointmentStore } from "@/app/frontend/store/appoitmentStore";
+import { useState } from "react";
 
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -22,6 +23,7 @@ const STATUS_CONFIG: Record<string, { label: string; style: string }> = {
   completed: { label: "Terminée",   style: "bg-green-100 text-green-700"   },
   cancelled: { label: "Annulée",    style: "bg-slate-100 text-slate-500"   },
   no_show:   { label: "Absent",     style: "bg-orange-100 text-orange-600" },
+  missed_review: { label: "À examiner",   style: "bg-amber-100 text-amber-700"   },
 };
 
 // Étiquette spéciale côté patient
@@ -52,12 +54,15 @@ export function ConsultationCard({
   const { details, status, payment, patientId, _id } = appointment;
 
   const markNoShow = useAppointmentStore((s) => s.markNoShow);
+  const resolveMissed = useAppointmentStore((s) => s.resolveMissed); // ← ajouté
+  const [isResolving, setIsResolving] = useState(false); 
 
   const patient    = isPopulatedPatient(patientId) ? patientId : null;
   const typeCfg    = TYPE_CONFIG[details.type]    ?? TYPE_CONFIG.in_person;
   const statusCfg  = STATUS_CONFIG[status.current] ?? STATUS_CONFIG.pending;
   const isOngoing  = status.current === "ongoing";
   const isConfirmed= status.current === "confirmed";
+  const isUnderReview   = status.current === "missed_review";
 
 
 const scheduledFor = new Date(details.scheduledFor);
@@ -134,44 +139,83 @@ const dateLabel = scheduledFor.toLocaleDateString("fr-FR", {
 
             {/* Actions selon le mode */}
             {isExpanded ? (
-              <div className="flex flex-col gap-1.5 shrink-0">
-
-                {/* Bouton Message */}
-                <button
-                  onClick={() => onMessage(patient?._id ?? "")}
-                  className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 text-slate-600 text-xs font-semibold rounded-xl hover:bg-slate-50 transition-colors"
-                >
-                  <MessageSquare size={12} />
-                  Envoyer un message
-                </button>
-                {/* Marquer Absent (si confirmé ou en cours) */}
-                {(isConfirmed || isOngoing) && (
-                  <button
-                    onClick={() => { markNoShow(_id); onMarkAbsent(_id); }}
-                    className="flex items-center gap-1.5 px-4 py-2 border border-orange-200 text-orange-500 text-xs font-semibold rounded-xl hover:bg-orange-50 transition-colors"
-                  >
-                    Marquer absent
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => onViewDetail(_id)}
-                  className="px-3 py-1.5 text-xs font-semibold text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-                >
-                  Voir détail
-                </button>
-                {(isConfirmed || isOngoing) && (
-                  <button
-                    onClick={() => { markNoShow(_id); onMarkAbsent(_id); }}
-                    className="px-3 py-1.5 text-xs font-semibold text-orange-500 border border-orange-100 rounded-xl hover:bg-orange-50 transition-colors"
-                  >
-                    Marquer absent
-                  </button>
-                )}
-              </div>
-            )}
+  <div className="flex flex-col gap-1.5 shrink-0">
+    {isUnderReview ? (
+      <>
+        <p className="text-[10px] text-amber-600 bg-amber-50 rounded-lg px-2.5 py-2 max-w-48 text-right">
+          RDV payé manqué — à trancher
+        </p>
+        <button
+          onClick={async () => {
+            setIsResolving(true);
+            try { await resolveMissed(_id, "refund"); } finally { setIsResolving(false); }
+          }}
+          disabled={isResolving}
+          className="flex items-center gap-1.5 px-4 py-2 bg-red-500 text-white text-xs font-semibold rounded-xl hover:bg-red-600 transition-colors disabled:opacity-50"
+        >
+          Rembourser
+        </button>
+       {/* <button
+          onClick={async () => {
+            setIsResolving(true);
+            try { await resolveMissed(_id, "reschedule_credit"); } finally { setIsResolving(false); }
+          }}
+          disabled={isResolving}
+          className="flex items-center gap-1.5 px-4 py-2 bg-[#1e3a8a] text-white text-xs font-semibold rounded-xl hover:bg-blue-800 transition-colors disabled:opacity-50"
+        >
+          Offrir un crédit
+        </button> */}
+        <button
+          onClick={async () => {
+            setIsResolving(true);
+            try { await resolveMissed(_id, "keep_payment"); } finally { setIsResolving(false); }
+          }}
+          disabled={isResolving}
+          className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 text-slate-600 text-xs font-semibold rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
+        >
+          Conserver le paiement
+        </button>
+      </>
+    ) : (
+      <>
+        {/* Bouton Message */}
+        <button
+          onClick={() => onMessage(patient?._id ?? "")}
+          className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 text-slate-600 text-xs font-semibold rounded-xl hover:bg-slate-50 transition-colors"
+        >
+          <MessageSquare size={12} />
+          Envoyer un message
+        </button>
+        {/* Marquer Absent (si confirmé ou en cours) */}
+        {(isConfirmed || isOngoing) && (
+          <button
+            onClick={() => { markNoShow(_id); onMarkAbsent(_id); }}
+            className="flex items-center gap-1.5 px-4 py-2 border border-orange-200 text-orange-500 text-xs font-semibold rounded-xl hover:bg-orange-50 transition-colors"
+          >
+            Marquer absent
+          </button>
+        )}
+      </>
+    )}
+  </div>
+) : (
+  <div className="flex items-center gap-2 shrink-0">
+    <button
+      onClick={() => onViewDetail(_id)}
+      className="px-3 py-1.5 text-xs font-semibold text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+    >
+      Voir détail
+    </button>
+    {(isConfirmed || isOngoing) && (
+      <button
+        onClick={() => { markNoShow(_id); onMarkAbsent(_id); }}
+        className="px-3 py-1.5 text-xs font-semibold text-orange-500 border border-orange-100 rounded-xl hover:bg-orange-50 transition-colors"
+      >
+        Marquer absent
+      </button>
+    )}
+  </div>
+)}
           </div>
 
           {/* Ligne 2 : détails expanded */}

@@ -36,6 +36,7 @@ const STATUS_COLORS: Record<string, string> = {
   completed: "bg-blue-100 text-blue-700 border-blue-200",
   cancelled: "bg-red-100 text-red-700 border-red-200",
   no_show: "bg-gray-100 text-gray-500 border-gray-200",
+  missed_review: "bg-amber-100 text-amber-700 border-amber-300",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -45,6 +46,7 @@ const STATUS_LABELS: Record<string, string> = {
   completed: "Terminé",
   cancelled: "Annulé",
   no_show: "Absent",
+  missed_review: "À examiner",
 };
 
 interface AgendaWeekViewProps {

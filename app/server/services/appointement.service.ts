@@ -13,7 +13,7 @@ import { notificationService } from './notification.service';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type ConsultationType = 'video' | 'audio' | 'chat' | 'in_person';
-type AppointmentStatus = 'pending' | 'confirmed' | 'ongoing' | 'completed' | 'cancelled' | 'no_show';
+type AppointmentStatus = 'pending' | 'confirmed' | 'ongoing' | 'completed' | 'cancelled' | 'no_show' | 'missed_review'; 
 type PaymentStatus = 'pending' | 'paid' | 'refunded' | 'failed';
 type Priority = 'low' | 'medium' | 'high' | 'emergency';
 type Currency = 'XOF' | 'EUR' | 'USD';
@@ -727,47 +727,104 @@ class AppointmentService {
       .sort({ 'details.scheduledFor': 1 });
   }
 
-  // ── Auto-marquer les rendez-vous manqués (cron ou appel à la volée) ───────
+// ── Auto-marquer les rendez-vous manqués (cron ou appel à la volée) ───────
+// Un RDV payé et manqué ne va pas directement en "no_show" : il passe par
+// "missed_review" pour qu'un médecin/admin tranche (remboursement, crédit,
+// ou paiement maintenu) au lieu de trancher automatiquement à la place du patient.
 
-  async autoMarkMissedAppointments(): Promise<number> {
-    const now = new Date();
+async autoMarkMissedAppointments(): Promise<number> {
+  const now = new Date();
 
-    // Un rdv confirmé/pending dont l'heure de fin est dépassée et qui n'a
-    // jamais démarré (pas de consultation.startedAt) est considéré manqué.
-    const missed = await Appointment.find({
-      'status.current': { $in: ['pending', 'confirmed'] },
-      $expr: {
-        $lt: [
-          { $add: ['$details.scheduledFor', { $multiply: ['$details.duration', 60000] }] },
-          now,
-        ],
-      },
-    });
+  const missed = await Appointment.find({
+    'status.current': { $in: ['pending', 'confirmed'] },
+    $expr: {
+      $lt: [
+        { $add: ['$details.scheduledFor', { $multiply: ['$details.duration', 60000] }] },
+        now,
+      ],
+    },
+  });
 
-    if (missed.length === 0) return 0;
+  if (missed.length === 0) return 0;
 
-    await Appointment.updateMany(
-      { _id: { $in: missed.map((a) => a._id) } },
-      { $set: { 'status.current': 'no_show', 'metadata.updatedAt': now } }
+  for (const appt of missed) {
+    const nextStatus: AppointmentStatus =
+      appt.status.paymentStatus === 'paid' ? 'missed_review' : 'no_show';
+
+    await Appointment.updateOne(
+      { _id: appt._id },
+      { $set: { 'status.current': nextStatus, 'metadata.updatedAt': now } }
     );
 
-    // Notifier chaque patient concerné
-    for (const appt of missed) {
-      try {
-        await notificationService.notifySystem(
-          String(appt.patientId),
-          'patient',
-          'Rendez-vous manqué',
-          'Votre rendez-vous est passé sans confirmation de présence. Vous pouvez le reprogrammer depuis votre espace.',
-          'high'
-        );
-      } catch (err) {
-        console.error('[AppointmentService.autoMarkMissedAppointments] Notification échec :', err);
-      }
+    try {
+      await notificationService.notifySystem(
+        String(appt.patientId),
+        'patient',
+        nextStatus === 'missed_review' ? 'Rendez-vous manqué — en cours d\'examen' : 'Rendez-vous manqué',
+        nextStatus === 'missed_review'
+          ? 'Votre rendez-vous payé n\'a pas eu lieu. Notre équipe examine la situation et vous recontactera.'
+          : 'Votre rendez-vous est passé sans confirmation de présence. Vous pouvez le reprogrammer depuis votre espace.',
+        'high'
+      );
+    } catch (err) {
+      console.error('[AppointmentService.autoMarkMissedAppointments] Notification échec :', err);
     }
-
-    return missed.length;
   }
+
+  return missed.length;
+}
+
+
+// ── Résoudre un rendez-vous manqué payé (médecin ou admin) ─────────────────
+// missed_review → no_show, avec décision sur le paiement.
+
+async resolveMissedAppointment(
+  appointmentId: string,
+  resolverId: string,
+  resolverType: 'doctor' | 'admin',
+  decision: 'refund' | 'keep_payment' | 'reschedule_credit'
+): Promise<IAppointment> {
+  const appointment = await Appointment.findById(appointmentId);
+  if (!appointment) throw new Error('Rendez-vous introuvable.');
+
+  if (appointment.status.current !== 'missed_review') {
+    throw new Error('Ce rendez-vous n\'est pas en attente de revue.');
+  }
+
+  if (resolverType === 'doctor' && String(appointment.doctorId) !== resolverId) {
+    throw new Error('Action non autorisée.');
+  }
+
+  appointment.status.current = 'no_show';
+  appointment.metadata.updatedAt = new Date();
+
+  // "refund" ET "reschedule_credit" font tous deux sortir ce RDV du revenu du
+  // médecin — dans les deux cas le patient ne repaiera pas pour la session
+  // manquée (remboursement direct, ou crédit consommé sur un futur RDV).
+  // Seul "keep_payment" laisse le paiement acquis au médecin.
+  if (decision === 'refund' || decision === 'reschedule_credit') {
+    appointment.status.paymentStatus = 'refunded';
+    // TODO: déclencher le vrai remboursement mobile money/carte ici pour 'refund'.
+    // Pour 'reschedule_credit', pas de remboursement réel — juste retiré du
+    // revenu du médecin ; le crédit patient sera consommé par le futur RDV.
+  }
+
+  await appointment.save();
+
+  await notificationService.notifySystem(
+    String(appointment.patientId),
+    'patient',
+    'Décision sur votre rendez-vous manqué',
+    decision === 'refund'
+      ? 'Votre paiement a été remboursé suite à votre rendez-vous manqué.'
+      : decision === 'reschedule_credit'
+      ? 'Un crédit a été ajouté pour reprogrammer votre rendez-vous.'
+      : 'Après examen, le paiement de ce rendez-vous est maintenu.',
+    'high'
+  );
+
+  return appointment;
+}
 
   // ── Stats for doctor ───────────────────────────────────────────────────────
 
@@ -777,6 +834,7 @@ class AppointmentService {
     cancelled: number;
     noShow: number;
     pending: number;
+    missedReview: number;
     totalEarnings: number;
     consultationsToday: number;
   }> {
@@ -795,7 +853,7 @@ class AppointmentService {
       },
     ]);
 
-    const stats = { total: 0, completed: 0, cancelled: 0, noShow: 0, pending: 0, totalEarnings: 0, consultationsToday: 0 };
+    const stats = { total: 0, completed: 0, cancelled: 0, noShow: 0, pending: 0, missedReview: 0, totalEarnings: 0, consultationsToday: 0 };
 
     for (const r of results) {
       stats.total += r.count;
@@ -804,6 +862,7 @@ class AppointmentService {
       if (r._id === 'cancelled') stats.cancelled = r.count;
       if (r._id === 'no_show') stats.noShow = r.count;
       if (r._id === 'pending') stats.pending = r.count;
+      if (r._id === 'missed_review') stats.missedReview = r.count;
     }
 
     // ── Consultations prévues aujourd'hui (toutes statuts actifs, hors annulé) ──

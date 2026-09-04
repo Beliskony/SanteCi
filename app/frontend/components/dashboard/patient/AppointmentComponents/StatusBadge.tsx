@@ -10,6 +10,7 @@ const STATUS_CONFIG: Record<AppointmentStatus, { label: string; className: strin
   ongoing:   { label: "En cours",   className: "text-blue-600   bg-blue-50"     },
   completed: { label: "Terminé",    className: "text-slate-500  bg-slate-100"   },
   no_show:   { label: "Absent",     className: "text-orange-500 bg-orange-50"   },
+  missed_review: { label: "En cours d'examen", className: "text-amber-600  bg-amber-50"    },
 };
 
 export function StatusBadge({ status }: { status: AppointmentStatus }) {

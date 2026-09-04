@@ -51,6 +51,7 @@ const STATUS_BADGE: Record<string, string> = {
   completed: "bg-blue-100 text-blue-700 border border-blue-200",
   cancelled: "bg-red-100 text-red-700 border border-red-200",
   no_show:   "bg-gray-100 text-gray-500 border border-gray-200",
+  missed_review: "bg-amber-100 text-amber-700 border border-amber-300",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -60,6 +61,7 @@ const STATUS_LABEL: Record<string, string> = {
   completed: "Terminé",
   cancelled: "Annulé",
   no_show:   "Absent",
+  missed_review: "À examiner",
 };
 
 // ── Calcul de position sur la timeline ───────────────────────────────────────

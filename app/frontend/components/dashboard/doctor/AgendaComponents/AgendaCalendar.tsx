@@ -85,6 +85,7 @@ export function AgendaCalendar({
   //  Couleur du point selon le statut
   const getStatusColor = (statuses: string[]): string => {
     if (statuses.includes('ongoing')) return 'bg-red-500';
+    if (statuses.includes('missed_review')) return 'bg-amber-500';
     if (statuses.includes('pending')) return 'bg-amber-500';
     if (statuses.includes('confirmed')) return 'bg-green-500';
     if (statuses.includes('completed')) return 'bg-blue-500';

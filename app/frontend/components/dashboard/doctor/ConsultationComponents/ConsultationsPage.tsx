@@ -17,7 +17,7 @@ const TAB_STATUSES: Record<ConsultTab, string[]> = {
   pending:   ["pending"],
   confirmed: ["confirmed", "ongoing"],
   completed: ["completed"],
-  cancelled: ["cancelled", "no_show"],
+  cancelled: ["cancelled", "no_show", "missed_review"],
 };
 
 // ── Helper : filtre du jour ───────────────────────────────────────────────────

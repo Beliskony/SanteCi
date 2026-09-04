@@ -20,7 +20,7 @@ export interface IAppointment extends Document {
   
   // Statut
   status: {
-    current: 'pending' | 'confirmed' | 'ongoing' | 'completed' | 'cancelled' | 'no_show';
+    current: 'pending' | 'confirmed' | 'ongoing' | 'completed' | 'cancelled' | 'no_show' | 'missed_review';
     paymentStatus: 'pending' | 'paid' | 'refunded' | 'failed';
     cancellationReason?: string;
     cancelledBy?: 'patient' | 'doctor' | 'system';

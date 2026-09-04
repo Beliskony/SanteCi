@@ -6,7 +6,7 @@ export type TabKey = "upcoming" | "past" | "cancelled"
 
 export const TAB_STATUSES: Record<TabKey, AppointmentStatus[]> = {
   upcoming:  ["pending", "confirmed", "ongoing"],
-  past:      ["completed", "no_show"],
+  past:      ["completed", "no_show", "missed_review"],
   cancelled: ["cancelled"],
 }
 

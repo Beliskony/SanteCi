@@ -95,6 +95,18 @@ export const appointmentService = {
     return res.data;
   },
 
+  // ── Trancher un RDV payé et manqué (missed_review → no_show) ─────────────
+  // Réservé au médecin concerné ou à un admin (vérifié côté backend).
+  async resolveMissed(
+    id: string,
+    decision: "refund" | "keep_payment" | "reschedule_credit"
+  ): Promise<Appointment> {
+    const res = await api.patch<ApiResponse<Appointment>>(
+      `/appointments/${id}/resolve-missed`, { decision }
+    );
+    return res.data;
+  },
+
   async join(id: string, role: "patient" | "doctor"): Promise<{ message: string }> {
     const res = await api.post<ApiResponse<{ message: string }>>(
       `/appointments/${id}/join`, { role }

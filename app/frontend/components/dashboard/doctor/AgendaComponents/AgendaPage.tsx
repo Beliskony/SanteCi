@@ -34,6 +34,7 @@ const STATUS_OPTIONS = [
   { value: "completed", label: "Terminé" },
   { value: "cancelled", label: "Annulé" },
   { value: "no_show", label: "Absent" },
+  { value: "missed_review", label: "À examiner" }, // ← ajouté
 ];
 
 // ── Page principale ───────────────────────────────────────────────────────────
@@ -46,6 +47,7 @@ export default function AgendaPage() {
   const [isStarting,   setIsStarting]   = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isResolving,  setIsResolving]  = useState(false); // ← ajouté
   const [statusFilter, setStatusFilter] = useState<string>("all"); //  Filtre de statut
 
   // Sélecteurs atomiques
@@ -56,6 +58,7 @@ export default function AgendaPage() {
   const fetchAgenda  = useAppointmentStore((s) => s.fetchAgenda);
   const startAppointment  = useAppointmentStore((s) => s.start);
   const cancelAppointment = useAppointmentStore((s) => s.cancel);
+  const resolveMissed     = useAppointmentStore((s) => s.resolveMissed); // ← ajouté
 
   const doctorId = useMemo(() => {
     if (!user || !isDoctor(user)) return null;
@@ -163,6 +166,22 @@ export default function AgendaPage() {
       alert(err instanceof Error ? err.message : "Impossible d'annuler le rendez-vous.");
     } finally {
       setIsCancelling(false);
+    }
+  };
+
+  // ── Résoudre un RDV payé et manqué ──────────────────────────────────────
+  const handleResolveMissed = async (
+    decision: "refund" | "keep_payment" | "reschedule_credit"
+  ) => {
+    if (!activeAppt) return;
+    setIsResolving(true);
+    try {
+      await resolveMissed(activeAppt._id, decision);
+      setActiveAppt(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Impossible de résoudre ce rendez-vous.");
+    } finally {
+      setIsResolving(false);
     }
   };
 
@@ -336,22 +355,52 @@ export default function AgendaPage() {
               <InfoRow label="Statut" value={activeAppt.status.current} />
             </div>
 
-            <div className="flex flex-col gap-2 mt-auto">
-              <button
-                onClick={handleStartConsultation}
-                disabled={isStarting || isCancelling}
-                className="w-full py-2.5 bg-[#1e3a8a] text-white text-xs font-bold rounded-xl hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isStarting ? "Démarrage..." : "Démarrer la consultation"}
-              </button>
-              <button
-                onClick={handleCancelAppointment}
-                disabled={isStarting || isCancelling}
-                className="w-full py-2.5 border border-red-100 text-red-500 text-xs font-semibold rounded-xl hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isCancelling ? "Annulation..." : "Annuler le RDV"}
-              </button>
-            </div>
+            {/* ── RDV payé et manqué : décision de résolution ── */}
+            {activeAppt.status.current === "missed_review" ? (
+              <div className="flex flex-col gap-2 mt-auto">
+                <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2.5">
+                  Ce rendez-vous payé n'a pas eu lieu. Choisissez comment le résoudre.
+                </p>
+                <button
+                  onClick={() => handleResolveMissed("refund")}
+                  disabled={isResolving}
+                  className="w-full py-2.5 bg-red-500 text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isResolving ? "..." : "Rembourser le patient"}
+                </button>
+                <button
+                  onClick={() => handleResolveMissed("reschedule_credit")}
+                  disabled={isResolving}
+                  className="w-full py-2.5 bg-[#1e3a8a] text-white text-xs font-bold rounded-xl hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isResolving ? "..." : "Offrir un crédit de reprogrammation"}
+                </button>
+                <button
+                  onClick={() => handleResolveMissed("keep_payment")}
+                  disabled={isResolving}
+                  className="w-full py-2.5 border border-slate-200 text-slate-600 text-xs font-semibold rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isResolving ? "..." : "Conserver le paiement"}
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2 mt-auto">
+                <button
+                  onClick={handleStartConsultation}
+                  disabled={isStarting || isCancelling}
+                  className="w-full py-2.5 bg-[#1e3a8a] text-white text-xs font-bold rounded-xl hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isStarting ? "Démarrage..." : "Démarrer la consultation"}
+                </button>
+                <button
+                  onClick={handleCancelAppointment}
+                  disabled={isStarting || isCancelling}
+                  className="w-full py-2.5 border border-red-100 text-red-500 text-xs font-semibold rounded-xl hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isCancelling ? "Annulation..." : "Annuler le RDV"}
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}
